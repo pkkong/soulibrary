@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>크롤러 관리자 대시보드</title>
+    <style>
+        body { font-family: 'Apple SD Gothic Neo', sans-serif; padding: 30px; background: #f4f6f8; }
+        .dashboard { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        /* 헤더 영역 스타일 */
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        h1 { margin: 0; color: #333; }
+        
+        /* 테이블 스타일 */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #555; }
+        
+        /* 버튼 스타일 */
+        button { padding: 8px 15px; cursor: pointer; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 14px; transition: 0.2s; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* 상태 텍스트 스타일 */
+        .status-running { color: orange; font-weight: bold; }
+        .status-idle { color: green; }
+        .status-error { color: red; }
+        .status-msg { color: #666; font-size: 0.9em; font-weight: bold; }
+
+        /* --- [신규] 토글 스위치 CSS --- */
+        .switch-container { display: flex; align-items: center; gap: 10px; background: #eee; padding: 8px 16px; border-radius: 30px; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2ecc71; }
+        input:checked + .slider:before { transform: translateX(26px); }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🛠️ 크롤러 통합 관리 (총 16개)</h1>
+            
+            <div class="switch-container">
+                <span style="font-weight: bold; color:#555;">🤖 자동 갱신</span>
+                <label class="switch">
+                    <input type="checkbox" id="autoToggle" onclick="toggleAuto()">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+
+        <p>각 도서관의 데이터 수집 상태를 확인하고 실행할 수 있습니다. (자동 갱신을 켜면 개수가 다를 때만 수집합니다)</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>도서관 이름</th>
+                    <th style="width: 120px;">상태</th>
+                    <th>메시지 (Update Info)</th> <th>마지막 실행</th>
+                    <th>작업</th>
+                </tr>
+            </thead>
+            <tbody id="status-table">
+                {% for code, info in status.items() %}
+                <tr>
+                    <td><strong>{{ info.name }}</strong></td>
+                    <td class="status-idle">{{ info.status }}</td>
+                    <td class="status-msg">{{ info.msg or '-' }}</td> <td>{{ info.last_run }}</td>
+                    <td>
+                        <button onclick="runCrawler('{{ code }}', '{{ info.name }}')">
+                            지금 수집 시작
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 20px; text-align: right;">
+            <a href="/">🏠 검색 페이지로 돌아가기</a>
+        </div>
+    </div>
+
+    <script>
+        // 1. 자동 갱신 스위치 토글 함수
+        function toggleAuto() {
+            const isChecked = document.getElementById('autoToggle').checked;
+            
+            fetch('/admin/auto-crawl', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: isChecked })
+            })
+            .then(res => res.json())
+            .then(data => {
+                // 서버 응답 메시지를 알림으로 띄움 (선택사항)
+                // alert(data.msg); 
+                console.log(data.msg);
+            })
+            .catch(err => {
+                alert("오류 발생: " + err);
+                // 에러 나면 스위치 원복
+                document.getElementById('autoToggle').checked = !isChecked;
+            });
+        }
+
+        // 2. 상태 업데이트 함수 (주기적으로 호출됨)
+        function updateStatus() {
+            fetch('/admin/status')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('status-table');
+                    tbody.innerHTML = '';
+                    
+                    for (const [code, info] of Object.entries(data)) {
+                        const isRunning = info.status.includes("실행");
+                        const statusClass = isRunning ? "status-running" : (info.status.includes("오류") ? "status-error" : "status-idle");
+                        
+                        // 👈 [수정] 테이블 행 생성 시 메시지(info.msg) 컬럼 추가
+                        const row = `
+                            <tr>
+                                <td><strong>${info.name || code}</strong></td>
+                                <td class="${statusClass}">${info.status}</td>
+                                <td class="status-msg" style="${info.msg && info.msg.includes('감지') ? 'color:#e74c3c' : ''}">${info.msg || '-'}</td>
+                                <td>${info.last_run}</td>
+                                <td>
+                                    <button onclick="runCrawler('${code}', '${info.name}')" ${isRunning ? 'disabled' : ''}>
+                                        ${isRunning ? '수집 중...' : '지금 수집 시작'}
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    }
+                });
+        }
+
+        // 3. 수집 시작 버튼 함수
+        function runCrawler(libCode, libName) {
+            if(!confirm(libName + " 수집을 시작할까요?")) return;
+            
+            fetch(`/admin/run/${libCode}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.msg);
+                    updateStatus(); 
+                });
+        }
+
+        // 3초마다 상태 자동 갱신
+        setInterval(updateStatus, 3000);
+    </script>
+</body>
+</html>

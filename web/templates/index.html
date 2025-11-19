@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>서울시 전자책 통합검색</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* ... (기존 CSS 그대로 유지) ... */
+        :root {
+            --primary: #3498db;
+            --primary-dark: #2980b9;
+            --bg-color: #f8f9fa;
+            --text-main: #2c3e50;
+            --text-sub: #7f8c8d;
+            --card-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            --card-hover: 0 10px 15px rgba(0,0,0,0.1);
+        }
+
+        body { font-family: 'Noto Sans KR', sans-serif; margin: 0; background-color: var(--bg-color); color: var(--text-main); }
+        .hero { background: linear-gradient(135deg, #3498db, #8e44ad); padding: 60px 20px; text-align: center; color: white; margin-bottom: 40px; }
+        .hero h1 { margin: 0 0 10px 0; font-weight: 700; font-size: 2.2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .hero p { margin: 0 0 30px 0; opacity: 0.9; font-weight: 300; }
+        .search-container { max-width: 600px; margin: 0 auto; position: relative; display: flex; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border-radius: 50px; overflow: hidden; background: white; }
+        input { flex: 1; padding: 18px 25px; font-size: 16px; border: none; outline: none; }
+        button { padding: 0 30px; background: var(--primary); color: white; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: var(--primary-dark); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px 60px 20px; }
+        #status { text-align: center; margin-bottom: 20px; color: var(--text-sub); font-weight: 500; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
+        .book-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: var(--card-shadow); transition: transform 0.3s ease, box-shadow 0.3s ease; border: 1px solid #eee; display: flex; flex-direction: column; }
+        .book-card:hover { transform: translateY(-7px); box-shadow: var(--card-hover); }
+        .book-img-wrapper { width: 100%; height: 220px; background: #f1f2f6; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .book-img-wrapper img { height: 100%; width: auto; object-fit: contain; transition: transform 0.3s; }
+        .book-card:hover .book-img-wrapper img { transform: scale(1.05); }
+        .no-img { color: #bdc3c7; font-size: 14px; text-align: center; }
+        .book-info { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+        .book-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; line-height: 1.4; color: var(--text-main); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .book-meta { font-size: 13px; color: var(--text-sub); margin-bottom: 15px; }
+        .badge-container { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+        
+        /* 뱃지 스타일 수정 (링크용) */
+        .lib-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: #e3f2fd;
+            color: #1976d2;
+            text-decoration: none; /* 밑줄 제거 */
+            transition: background 0.2s;
+        }
+        .lib-badge:hover { background-color: #bbdefb; } /* 호버 효과 */
+        
+        .lib-badge.seoul { background-color: #fff3e0; color: #f57c00; }
+        .lib-badge.seoul:hover { background-color: #ffe0b2; }
+
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>📚 서울시 전자책 통합검색</h1>
+        <p>16개 도서관의 38만권 장서를 한 번에 찾아보세요</p>
+        <div class="search-container">
+            <input type="text" id="query" placeholder="책 제목, 저자, 출판사 검색..." onkeypress="if(event.key==='Enter') search()">
+            <button onclick="search()">검색</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="status"></div>
+        <div class="loader" id="loading-spinner"></div>
+        <div id="results" class="book-grid"></div>
+    </div>
+
+    <script>
+        function search() {
+            const query = document.getElementById('query').value.trim();
+            if (!query) return alert("검색어를 입력해주세요.");
+
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            const loader = document.getElementById('loading-spinner');
+            
+            statusDiv.innerText = "";
+            resultsDiv.innerHTML = "";
+            loader.style.display = "block"; 
+
+            fetch(`/search?query=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    loader.style.display = "none"; 
+
+                    if (data.error) return statusDiv.innerText = "⚠️ 오류: " + data.error;
+                    if (data.length === 0) return statusDiv.innerHTML = `<div style="padding:40px;">🤔 <strong>'${query}'</strong>에 대한 검색 결과가 없습니다.</div>`;
+
+                    statusDiv.innerText = `총 ${data.length}권의 책을 찾았습니다.`;
+
+                    data.forEach(book => {
+                        const imgHtml = book.image_url 
+                            ? `<img src="${book.image_url}" onerror="this.parentElement.innerHTML='<div class=\'no-img\'>이미지<br>준비중</div>'">` 
+                            : `<div class="no-img">도서 표지<br>준비중</div>`;
+
+                        // 🚨 [수정] 도서관 뱃지 렌더링 로직 (링크 <a> 태그 사용)
+                        // 이제 book.library는 [{name:'...', url:'...'}, ...] 형태의 배열입니다.
+                        let badgeHtml = "";
+                        if (Array.isArray(book.library)) {
+                            badgeHtml = book.library.map(lib => {
+                                const libClass = lib.name.includes("서울") ? "lib-badge seoul" : "lib-badge";
+                                // URL이 '#'이면 링크 기능 끄기 (선택)
+                                const href = lib.url !== '#' ? `href="${lib.url}" target="_blank"` : '';
+                                return `<a ${href} class="${libClass}">${lib.name}</a>`;
+                            }).join("");
+                        }
+
+                        const html = `
+                            <div class="book-card">
+                                <div class="book-img-wrapper">${imgHtml}</div>
+                                <div class="book-info">
+                                    <div class="book-title" title="${book.title}">${book.title}</div>
+                                    <div class="book-meta">
+                                        ${book.author} <br> 
+                                        <span style="font-size:0.9em; color:#999;">${book.publisher}</span>
+                                    </div>
+                                    <div class="badge-container">${badgeHtml}</div>
+                                </div>
+                            </div>
+                        `;
+                        resultsDiv.innerHTML += html;
+                    });
+                })
+                .catch(err => {
+                    loader.style.display = "none";
+                    statusDiv.innerText = "서버 통신 오류가 발생했습니다.";
+                    console.error(err);
+                });
+        }
+    </script>
+</body>
+</html>

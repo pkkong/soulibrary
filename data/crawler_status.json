@@ -1,0 +1,82 @@
+{
+  "yongsan": {
+    "name": "용산구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "seoul": {
+    "name": "서울도서관 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "sen_owned": {
+    "name": "서울시교육청 (소장/YES24)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "sen_subs": {
+    "name": "서울시교육청 (구독)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "seongbuk": {
+    "name": "성북구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "gangnam": {
+    "name": "강남구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "yeongdeungpo": {
+    "name": "영등포구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "dongdaemun": {
+    "name": "동대문구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "dongjak": {
+    "name": "동작구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "gangseo": {
+    "name": "강서구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "seocho": {
+    "name": "서초구 (YES24)",
+    "status": "완료 (대기)",
+    "last_run": "2025-11-18 17:02:56"
+  },
+  "eunpyeong": {
+    "name": "은평구 (교보)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "jongno": {
+    "name": "종로구 (API)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "songpa": {
+    "name": "송파구 (API)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "geumcheon": {
+    "name": "금천구 (API)",
+    "status": "대기",
+    "last_run": "-"
+  },
+  "yangcheon": {
+    "name": "양천구 (API)",
+    "status": "대기",
+    "last_run": "-"
+  }
+}
