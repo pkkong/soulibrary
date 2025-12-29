@@ -1,65 +1,73 @@
 import scrapy
+import re
 from urllib.parse import urlencode
 
 class YongsanKyoboSpider(scrapy.Spider):
-    """
-    [DB 구축용] 용산구(교보). 1000개씩 전체 긁기 + 이미지 URL 추가.
-    """
     name = "yongsan_kyobo"
-    base_url = "https://ebook.yslibrary.or.kr"
-    common_headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': base_url 
-    }
-
+    allowed_domains = ["ebook.yslibrary.or.kr"]
+    
+    # 용산구 전자도서관 (교보 신버전)
+    base_url = "https://ebook.yslibrary.or.kr/elibrary-front/content/contentList.ink"
+    
     def start_requests(self):
-        content_path = "/elibrary-front/content/contentList.ink"
-        params = {
-            'contentAll': 'Y',
-            'cttsDvsnCode': '001',
-            'orderByKey': 'publDate',
-            'selViewCnt': '1000',    # 1000개씩
-            'pageIndex': '1'
-        }
-        start_url = f"{self.base_url}{content_path}?{urlencode(params)}"
-        print(f"--- [용산] 1000개씩 DB 구축 시작 (이미지 포함) ---")
-        yield scrapy.Request(url=start_url, headers=self.common_headers, callback=self.parse_search_results, meta={'pageIndex': 1})
+        # 🚀 [속도 최적화] 1~500페이지 (약 2~3만 권 예상)
+        max_page = 500
+        
+        for page in range(1, max_page + 1):
+            params = {
+                'brcd': '',
+                'sntnAuthCode': '',
+                'contentAll': 'Y',      # 전체 보기
+                'cttsDvsnCode': '001',  # 전자책
+                'ctgrId': '',
+                'orderByKey': 'publDate', # 최신순
+                'selViewCnt': '80',       # 80개씩 (효율적)
+                'pageIndex': str(page),
+                'recordCount': '20'
+            }
+            url = f"{self.base_url}?{urlencode(params)}"
+            yield scrapy.Request(url, callback=self.parse, meta={'page': page})
 
-    def parse_search_results(self, response):
-        pageIndex = response.meta['pageIndex']
-        books = response.css("#container > div > ul > li")
+    def parse(self, response):
+        page = response.meta['page']
+        
+        # 🎯 교보문고 신버전 공통 XPath
+        books = response.xpath('//li[.//li[@class="tit"]]')
         
         if not books:
-            print(f"--- [용산] Page {pageIndex}: 끝 (더 이상 데이터 없음) ---")
             return
 
-        print(f"--- [용산] Page {pageIndex}: {len(books)}권 수집 중... ---")
+        if page % 10 == 0:
+            print(f"--- [용산구] Page {page}: {len(books)}권 수집 중 ---")
 
         for book in books:
+            # 1. 제목
             title = book.css("li.tit a::text").get()
-            if not title: continue
-
-            # [이미지 URL 추출]
-            # 보통 <div class="thumb"> <img src="..."> </div> 구조입니다.
-            image_url = book.css("div.thumb img::attr(src)").get()
             
-            writer_li = book.css("li.writer")
-            all_info = writer_li.css("::text").getall()
-            info_list = [t.strip() for t in all_info if t.strip() and t.strip() != '|']
-            
-            author = info_list[0] if len(info_list) > 0 else "저자 미상"
-            publisher = info_list[1] if len(info_list) > 1 else "출판사 미상"
+            # 2. 저자 / 출판사 파싱
+            writer_texts = book.css("li.writer::text").getall()
+            author = writer_texts[0].strip() if writer_texts else ""
+            publisher = book.css("li.writer span::text").get() or ""
 
-            yield {
-                'title': title.strip(),
-                'author': author,
-                'publisher': publisher,
-                'image_url': image_url, # 이미지 컬럼 추가!
-                'library': "용산구 전자도서관 (교보)"
-            }
-        
-        # 다음 페이지 요청
-        next_idx = pageIndex + 1
-        params = {'contentAll': 'Y', 'cttsDvsnCode': '001', 'orderByKey': 'publDate', 'selViewCnt': '1000', 'pageIndex': next_idx}
-        next_url = f"{self.base_url}/elibrary-front/content/contentList.ink?{urlencode(params)}"
-        yield scrapy.Request(url=next_url, headers=self.common_headers, callback=self.parse_search_results, meta={'pageIndex': next_idx})
+            # 3. 이미지 URL
+            image_url = book.css("div.img a img::attr(src)").get()
+            if image_url and image_url.startswith("//"):
+                image_url = "https:" + image_url
+            
+            # 4. ISBN 추출
+            isbn = ""
+            if image_url:
+                match = re.search(r'/(\d+)/L\1', image_url)
+                if match:
+                    isbn = match.group(1)
+            
+            if title:
+                yield {
+                    'title': title.strip(),
+                    'author': author,
+                    'publisher': publisher,
+                    'library': "용산구 전자도서관",
+                    'platform': "교보문고(신버전)",
+                    'image_url': image_url,
+                    'isbn': isbn
+                }
