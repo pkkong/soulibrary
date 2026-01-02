@@ -1,197 +1,416 @@
-# web/app.py (도서관 링크 기능 추가된 Full Version)
+# web/app.py (SQLite 기반 경량 검색)
 
 import os
-import pandas as pd
 import json
+import re
+import sqlite3
 import threading
-import re 
+import subprocess
+import datetime
+from pathlib import Path
 from flask import Flask, render_template, request, jsonify
-from config import LIBRARIES, STATUS_FILE 
+from config import LIBRARIES, STATUS_FILE, PLATFORM_LABELS, LIBRARY_SHORT
 
 try:
-    from crawler_manager import CRAWLER_STATUS, start_crawling
+    from crawler_manager import CRAWLER_STATUS, start_crawling, check_library_update
 except ImportError:
     CRAWLER_STATUS = {}
+
     def start_crawling(code, cb=None): return False
+    def check_library_update(code): return (0, -1)
 
 app = Flask(__name__)
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(ROOT_DIR, "data", "library.db")
 db_lock = threading.Lock()
+DATA_DIR = Path(ROOT_DIR) / "data"
+BUILD_SCRIPT = Path(ROOT_DIR) / "scripts" / "build_sqlite.py"
 
-DB_FILES = {lib: det["db_file"] for lib, det in LIBRARIES.items()}
 
-# ----------------------------------------------------------------
-# 🚨 [신규] 도서관 이름 -> URL 매핑 딕셔너리 생성 (초고속 조회용)
-# ----------------------------------------------------------------
+def _latest_data_mtime():
+    latest = 0
+    for p in DATA_DIR.glob("*"):
+        if p.suffix.lower() in {".csv", ".json"} and p.is_file():
+            latest = max(latest, p.stat().st_mtime)
+    return latest
+
+
+def ensure_db_fresh():
+    """Rebuild SQLite if missing or older than source data files."""
+    data_mtime = _latest_data_mtime()
+    need_build = not os.path.exists(DB_PATH) or (data_mtime and os.path.getmtime(DB_PATH) < data_mtime)
+    if need_build and BUILD_SCRIPT.exists():
+        try:
+            subprocess.run(["python", str(BUILD_SCRIPT)], cwd=ROOT_DIR, check=True)
+        except Exception as e:
+            print(f"[경고] SQLite 빌드 실패: {e}")
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+    try:
+        conn.execute("PRAGMA busy_timeout = 30000")
+    except Exception:
+        pass
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def load_counts():
+    counts = {}
+    if not os.path.exists(DB_PATH):
+        return counts
+    conn = get_db()
+    try:
+        cur = conn.execute("SELECT library_code, COUNT(*) FROM books GROUP BY library_code;")
+        for code, cnt in cur.fetchall():
+            counts[code] = cnt
+    finally:
+        conn.close()
+    return counts
+
+
+LIB_COUNTS = load_counts()
+# 원격 총권수 체크 결과 유지용
+REMOTE_COUNTS_CACHE = {}
+# Persist remote count checks to disk so admin page can show last results after reloads.
+REMOTE_COUNTS_FILE = os.path.join(DATA_DIR, "remote_counts.json")
+
+
+def load_remote_counts():
+    if os.path.exists(REMOTE_COUNTS_FILE):
+        try:
+            with open(REMOTE_COUNTS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_remote_counts(cache):
+    try:
+        with open(REMOTE_COUNTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+REMOTE_COUNTS_CACHE = load_remote_counts()
+
+# SQLite 신선도 확인 후 준비
+ensure_db_fresh()
+
+LIB_NAME_TO_CODE = {info["library_name"]: code for code, info in LIBRARIES.items()}
+
+# 도서관 이름/단축명/코드 -> URL 매핑
 LIB_URL_MAP = {}
-for lib_code, info in LIBRARIES.items():
-    # DB에 저장된 library_name을 키로, homepage_url을 값으로 매핑
-    LIB_URL_MAP[info['library_name']] = info.get('homepage_url', '#')
+for code, info in LIBRARIES.items():
+    lib_name = info["library_name"]
+    short = LIBRARY_SHORT.get(code, lib_name)
+    url = info.get("homepage_url", "#")
+    for key in {lib_name, short, code}:
+        LIB_URL_MAP[key] = url
 
-# ----------------------------------------------------------------
+LIB_META_BY_NAME = {}
+for code, info in LIBRARIES.items():
+    lib_name = info["library_name"]
+    platform_code = info.get("platform", "Unknown")
+    LIB_META_BY_NAME[lib_name] = {
+        "code": code,
+        "name": lib_name,
+        "short": LIBRARY_SHORT.get(code, lib_name),
+        "homepage_url": info.get("homepage_url", "#"),
+        "platform_code": platform_code,
+        "platform_label": PLATFORM_LABELS.get(platform_code, "기타"),
+    }
 
-def first_valid_image(series):
-    for img in series:
-        if img and pd.notna(img): return img
-    return "" 
+PROVIDER_MAP = {
+    "교보문고": "교보",
+    "교보": "교보",
+    "kyobo": "교보",
+    "교보도서관": "교보",
+    "yes24": "YES24",
+    "YES24": "YES24",
+    "예스24": "YES24",
+    "예스이십사": "YES24",
+    "예스": "YES24",
+    "aladin": "알라딘",
+    "알라딘": "알라딘",
+}
+
+LIB_NAME_LOOKUP = {}
+for code, info in LIBRARIES.items():
+    lib_name = info["library_name"]
+    short = LIBRARY_SHORT.get(code, lib_name)
+    platform_code = info.get("platform", "Unknown")
+    platform_label = PLATFORM_LABELS.get(platform_code, "기타")
+    LIB_NAME_LOOKUP[lib_name] = {"short": short, "platform_label": platform_label}
+
+PLATFORM_PRIORITY = {
+    "Kyobo_New": 0,
+    "Kyobo": 1,
+    "YES24": 2,
+    "FxLibrary": 3,
+    "Mixed": 4,
+    "Aladin": 5,
+    "Unknown": 9,
+}
+TYPE_PRIORITY = {
+    "scrapy": 0,
+    "custom": 1,
+    "odcloud": 2,
+}
+
+
+def group_platforms(libs):
+    buckets = {}
+    for lib_name in libs:
+        meta = LIB_NAME_LOOKUP.get(lib_name, {})
+        label = meta.get("platform_label", "기타")
+        short = meta.get("short", lib_name)
+        buckets.setdefault(label, []).append(short)
+    return buckets
+
 
 def normalize_title(text):
-    if not text or pd.isna(text): return ""
+    if not text:
+        return ""
     text = str(text).lower()
-    text = re.sub(r'\[.*?\]|\(.*?\)', '', text) 
-    text = re.sub(r'(\d)\s*(권|부|편|화)', r'\1', text)
-    text = re.sub(r'[^\w\s]', '', text).strip()
-    text = re.sub(r'\s+', '', text)
+    text = re.sub(r"\[.*?\]|\(.*?\)", "", text)
+    text = re.sub(r"(\d)\s*(권|부|호|화)", r"\1", text)
+    text = re.sub(r"[^\w\s]", "", text).strip()
+    text = re.sub(r"\s+", "", text)
     return text
+
 
 def normalize_author(text):
-    if not text or pd.isna(text): return ""
+    if not text:
+        return ""
     text = str(text)
-    text = re.sub(r'[<>()\[\]]', ' ', text)
-    split_chars = r'[,/|]'
+    text = re.sub(r"[<>\(\)\[\]]", " ", text)
+    split_chars = r"[,/|]"
     if re.search(split_chars, text):
         text = re.split(split_chars, text, 1)[0]
-    roles = r'(원작|지음|지은이|저|엮음|그림|글|옮김|역|저자)'
-    text = re.sub(roles, '', text)
-    text = re.sub(r'[^\w\s]', '', text).lower().strip()
-    text = re.sub(r'\s+', '', text)
+    roles = r"(지음|글|저|지음/그림|그림|옮김|엮음|역)"
+    text = re.sub(roles, "", text)
+    text = re.sub(r"[^\w\s]", "", text).lower().strip()
+    text = re.sub(r"\s+", "", text)
     return text
 
-# 🚨 [신규] 도서관 목록을 [{name: '...', url: '...'}, ...] 형태로 변환하는 함수
-def build_library_objects(series):
-    unique_libs = series.unique()
-    result = []
-    for lib_name in unique_libs:
-        result.append({
-            'name': lib_name,
-            'url': LIB_URL_MAP.get(lib_name, '#') # 매핑된 URL이 없으면 #
-        })
-    return result
 
+def normalize_provider(raw_value):
+    if raw_value:
+        key = str(raw_value).strip()
+        norm = PROVIDER_MAP.get(key) or PROVIDER_MAP.get(key.lower())
+        return norm or key
+    return ""
 
-def load_database():
-    all_data = []
-    print("--- [시스템] 통합 DB 로딩 중... ---")
-    STANDARD_COLUMNS = ['title', 'author', 'publisher', 'library', 'image_url', 'isbn']
-    
-    for lib_code, db_file in DB_FILES.items(): 
-        if not os.path.exists(db_file): continue
-        try:
-            print(f"📄 읽는 중: {os.path.basename(db_file)}")
-            if db_file.endswith(".csv"):
-                df = pd.read_csv(db_file, dtype=str).fillna("")
-            elif db_file.endswith(".json"):
-                df = pd.read_json(db_file, dtype=str).fillna("")
-            
-            lib_config = LIBRARIES[lib_code]
-            prefix = lib_config.get("url_prefix")
-
-            if 'image_url' in df.columns:
-                if prefix: 
-                    df['image_url'] = df['image_url'].apply(lambda x: f"{prefix}{x}" if str(x).startswith('/') else x)
-                elif "sen_" in lib_code: 
-                    df['image_url'] = df['image_url'].apply(lambda x: x.replace("http://", "https://") if str(x).startswith('http://') else x)
-            
-            for col in STANDARD_COLUMNS:
-                if col not in df.columns: df[col] = "" 
-            
-            df = df[STANDARD_COLUMNS]
-            all_data.append(df)
-        except Exception as e:
-            print(f"[오류] 로딩 실패 ({db_file}): {e}")
-
-    if not all_data: return pd.DataFrame()
-
-    master_db = pd.concat(all_data, ignore_index=True)
-    master_db['isbn'] = master_db['isbn'].fillna("").astype(str)
-    print(f"--- [완료] 총 {len(master_db)}권 통합 DB 준비됨. ---")
-    return master_db
 
 def reload_database_safely(lib_code=None, success=True):
-    if not success: return
-    global library_db
-    print(f"--- [{lib_code}] DB 리로드 시작 ---")
-    new_db = load_database()
-    with db_lock: library_db = new_db
-    print(f"--- DB 리로드 완료 ---")
+    # 크롤 종료 후 count만 갱신 (SQLite 재구축은 별도 스크립트)
+    global LIB_COUNTS
+    LIB_COUNTS = load_counts()
 
-library_db = load_database()
+
+def get_counts():
+    lib_total = len(LIBRARIES)
+    book_total = None
+    if os.path.exists(DB_PATH):
+        conn = get_db()
+        try:
+            cur = conn.execute("SELECT COUNT(*) FROM books;")
+            book_total = cur.fetchone()[0]
+        finally:
+            conn.close()
+    return lib_total, book_total
+
+
+def build_admin_rows():
+    # 매 요청마다 최신 로컬 카운트 로드 (서버 시작 시 0으로 고정되는 문제 방지)
+    local_counts = load_counts()
+    rows = []
+    for code, info in LIBRARIES.items():
+        status = CRAWLER_STATUS.get(code, {"status": "-", "msg": "", "last_run": "-"})
+        local_count = local_counts.get(code, 0)
+        remote_meta = REMOTE_COUNTS_CACHE.get(code, {})
+        rows.append({
+            "code": code,
+            "name": info.get("library_name", info.get("name", code)),
+            "short": LIBRARY_SHORT.get(code, ""),
+            "platform_label": PLATFORM_LABELS.get(info.get("platform", "Unknown"), "기타"),
+            "service_type": info.get("service_type", ""),
+            "crawl_type": info.get("type", ""),
+            "count": local_count,
+            "remote_count": remote_meta.get("remote_count"),
+            "remote_checked_at": remote_meta.get("checked_at"),
+            "recommend_update": remote_meta.get("recommend_update", False),
+            "status": status.get("status", "-"),
+            "msg": status.get("msg", ""),
+            "last_run": status.get("last_run", "-"),
+            "homepage": info.get("homepage_url", "#")
+        })
+    def sort_key(r):
+        cfg = LIBRARIES[r["code"]]
+        type_key = cfg.get("type", "zzz")
+        platform_code = cfg.get("platform", "Unknown")
+        return (
+            TYPE_PRIORITY.get(type_key, 9),
+            PLATFORM_PRIORITY.get(platform_code, 99) if type_key == "scrapy" else 99,
+            r["name"],
+        )
+    return sorted(rows, key=sort_key)
 
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    lib_total, book_total = get_counts()
+    return render_template('index.html', library_count=lib_total, book_count=book_total, lib_url_map=LIB_URL_MAP)
+
 
 @app.route('/search')
 def search():
     query = request.args.get('query', '').strip()
-    if not query: return jsonify([])
+    if not query:
+        return jsonify([])
 
-    RAW_LIMIT = 1500  
-    FINAL_LIMIT = 300 
+    FINAL_LIMIT = 300
+    match_query = f'{query}*'
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            """
+            SELECT b.title, b.author, b.publisher, b.library, b.image_url, b.isbn, b.provider, b.platform
+            FROM books_fts f
+            JOIN books b ON b.id = f.rowid
+            WHERE books_fts MATCH ?
+            LIMIT ?
+            """,
+            (match_query, FINAL_LIMIT * 3),
+        )
+        rows = cur.fetchall()
+    except Exception as e:
+        print(f"[오류] 검색 실패: {e}")
+        return jsonify({"error": "검색 중 오류 발생"})
+    finally:
+        conn.close()
 
-    with db_lock:
-        if library_db.empty: return jsonify([])
-        try:
-            raw_results = library_db[
-                library_db['title'].str.contains(query, case=False) | 
-                library_db['author'].str.contains(query, case=False)
-            ].head(RAW_LIMIT).copy()
-            
-            if raw_results.empty: return jsonify([])
+    # 그룹핑: 동일 제목/저자 합치기
+    grouped = {}
+    for row in rows:
+        title = row["title"] or ""
+        author = row["author"] or ""
+        norm_key = (normalize_title(title), normalize_author(author))
+        item = grouped.setdefault(norm_key, {
+            "title": title,
+            "author": author,
+            "publisher": row["publisher"] or "",
+            "provider": normalize_provider(row["provider"] or ""),
+            "image_url": row["image_url"] or "",
+            "libraries": [],
+            "platforms": set(),
+        })
+        lib_name = row["library"] or ""
+        if lib_name:
+            item["libraries"].append(lib_name)
+        plat = row["platform"] or ""
+        if plat:
+            item["platforms"].add(plat)
+        if not item["image_url"] and row["image_url"]:
+            item["image_url"] = row["image_url"]
+    results = []
+    for item in grouped.values():
+        lib_details = []
+        platforms = set()
+        for lib_name in item["libraries"]:
+            meta = LIB_META_BY_NAME.get(lib_name)
+            if meta:
+                lib_details.append(meta)
+                platforms.add(meta["platform_code"])
+            else:
+                lib_details.append({
+                    "code": None,
+                    "name": lib_name,
+                    "short": lib_name,
+                    "homepage_url": "#",
+                    "platform_code": "Unknown",
+                    "platform_label": "기타",
+                })
+        if not platforms:
+            for meta in lib_details:
+                platforms.add(meta.get("platform_code", "Unknown"))
+        results.append({
+            "title": item["title"],
+            "author": item["author"],
+            "publisher": item["publisher"],
+            "provider": item["provider"],
+            "image_url": item["image_url"],
+            "libraries": lib_details,
+            "platforms": list(platforms or item["platforms"]),
+        })
+    return jsonify(results[:FINAL_LIMIT])
 
-            # 정규화
-            raw_results['norm_title'] = raw_results['title'].apply(normalize_title)
-            raw_results['norm_author'] = raw_results['author'].apply(normalize_author)
-            
-            # 통합 그룹핑
-            grouped_results = raw_results.groupby(
-                ['norm_title', 'norm_author']
-            ).agg(
-                title=('title', 'first'), 
-                author=('author', 'first'),
-                publisher=('publisher', 'first'),
-                image_url=('image_url', first_valid_image),
-                
-                # 🚨 [수정] 도서관 목록을 URL 포함 객체 리스트로 변환
-                library=('library', build_library_objects) 
-                
-            ).reset_index()
-
-            final_results = grouped_results.drop(
-                columns=['norm_title', 'norm_author']
-            ).head(FINAL_LIMIT)
-            
-            return jsonify(final_results.to_dict('records')) 
-        
-        except Exception as e:
-            print(f"[오류] 검색 중: {e}")
-            return jsonify({"error": "검색 중 오류 발생"})
 
 @app.route('/admin')
 def admin_page():
-    return render_template('admin.html', status=CRAWLER_STATUS)
+    lib_total, book_total = get_counts()
+    rows = build_admin_rows()
+    return render_template('admin.html', status=CRAWLER_STATUS, library_count=lib_total, book_count=book_total, rows=rows)
+
 
 @app.route('/admin/run/<lib_code>', methods=['POST'])
 def run_crawler(lib_code):
     if start_crawling(lib_code, on_complete_callback=reload_database_safely):
-        return jsonify({"success": True, "msg":f"{LIBRARIES[lib_code]['name']} 시작"})
+        return jsonify({"success": True, "msg": f"{LIBRARIES[lib_code]['name']} 수행"})
     else:
-        return jsonify({"success": False, "msg": "이미 실행 중"})
+        return jsonify({"success": False, "msg": "이미 실행 중이거나 실패"})
+
 
 @app.route('/admin/status')
 def get_status():
     return jsonify(CRAWLER_STATUS)
 
-# (자동갱신용 라우트, import 필요하면 추가하세요)
-from crawler_manager import set_auto_crawl 
+
+from crawler_manager import set_auto_crawl
+
 @app.route('/admin/auto-crawl', methods=['POST'])
 def toggle_auto_crawl():
     data = request.get_json()
     is_active = data.get('active', False)
     current_state = set_auto_crawl(is_active)
-    msg = "✅ 자동 갱신 ON" if current_state else "🛑 자동 갱신 OFF"
+    msg = "자동 갱신 ON" if current_state else "자동 갱신 OFF"
     return jsonify({"success": True, "active": current_state, "msg": msg})
 
+
+@app.route('/admin/check-totals', methods=['POST'])
+def check_totals():
+    global LIB_COUNTS, REMOTE_COUNTS_CACHE
+    # 최신 로컬 카운트 로드
+    LIB_COUNTS = load_counts()
+    results = {}
+    checked_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for code, info in LIBRARIES.items():
+        try:
+            local_from_file, remote_from_site = check_library_update(code)
+            local_count = LIB_COUNTS.get(code, local_from_file if local_from_file >= 0 else 0)
+            remote_val = remote_from_site if remote_from_site >= 0 else None
+            rec_needed = remote_val is not None and remote_val != local_count
+            REMOTE_COUNTS_CACHE[code] = {
+                "remote_count": remote_val,
+                "recommend_update": rec_needed,
+                "checked_at": checked_at,
+            }
+            results[code] = {
+                "remote_count": remote_val,
+                "recommend_update": rec_needed,
+                "local_count": local_count,
+                "checked_at": checked_at,
+            }
+        except Exception as e:
+            results[code] = {"remote_count": None, "recommend_update": False, "error": str(e), "checked_at": checked_at}
+    save_remote_counts(REMOTE_COUNTS_CACHE)
+    return jsonify({"success": True, "data": results})
+
+
 if __name__ == '__main__':
-    # host='0.0.0.0'은 "누구나 접속 들어오세요"라는 뜻입니다.
     app.run(host='0.0.0.0', port=5000)

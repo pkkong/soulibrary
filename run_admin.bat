@@ -1,14 +1,15 @@
 @echo off
-echo [도서관 크롤러] 관리자 대시보드를 시작합니다...
+chcp 65001 >nul
+echo [Admin] Starting library crawler dashboard...
 
-:: 1. 브라우저를 먼저 엽니다 (서버가 켜지는 동안 잠시 기다릴 수 있음)
-start http://127.0.0.1:5000/admin
+:: 1) Open admin page in browser
+start "" http://127.0.0.1:5000/admin
 
-:: 2. 웹 서버 폴더로 이동합니다
-cd web
+:: 2) Move to web directory (handles spaces/Korean paths)
+cd /d "%~dp0web"
 
-:: 3. 서버를 실행합니다 (이 창을 끄면 서버도 꺼집니다)
+:: 3) Run server (keep this window open)
 python app.py
 
-:: 서버가 에러로 꺼지면 화면이 바로 사라지지 않게 멈춤
+:: Keep window open
 pause

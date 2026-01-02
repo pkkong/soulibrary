@@ -1,143 +1,344 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>서울시 전자책 통합검색</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>서울시 전자도서 통합검색</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
     <style>
-        /* ... (기존 CSS 그대로 유지) ... */
         :root {
-            --primary: #3498db;
-            --primary-dark: #2980b9;
-            --bg-color: #f8f9fa;
-            --text-main: #2c3e50;
-            --text-sub: #7f8c8d;
-            --card-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            --card-hover: 0 10px 15px rgba(0,0,0,0.1);
+            --bg: #f6f7f9;
+            --panel: #ffffff;
+            --border: #e5e7eb;
+            --text-main: #111;
+            --text-sub: #6b7280;
+            --accent: #111827;
+            --chip: #f3f4f6;
+            --shadow: 0 8px 24px rgba(0,0,0,0.06);
+            --kyobo: #0cbc80;
+            --yes24: #0a8cf0;
+        }
+        * { box-sizing: border-box; }
+        body { margin:0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text-main); }
+        .hero { padding: 32px 16px 12px; text-align: center; }
+        .hero h1 { margin: 0 0 8px; font-weight: 800; font-size: 1.9rem; }
+        .hero p { margin: 0 0 16px; color: var(--text-sub); font-size: 14px; }
+        .search-bar { width: 100%; max-width: 720px; margin: 0 auto; display: flex; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); }
+        .search-bar input { flex:1; padding: 16px; font-size: 15px; border: none; outline: none; background: transparent; }
+        .search-bar button { padding: 0 18px; background: var(--accent); color: #fff; border: none; font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity .2s, transform .1s; }
+        .search-bar button:hover { opacity: 0.92; }
+        .search-bar button:active { transform: translateY(1px); }
+
+        .layout { display: grid; grid-template-columns: 1fr; gap: 16px; max-width: 1280px; margin: 0 auto; padding: 0 16px 40px; }
+        @media (min-width: 1040px) { .layout { grid-template-columns: 280px 1fr; align-items: start; } }
+
+        .filters { background: var(--panel); border:1px solid var(--border); border-radius: 14px; padding: 14px 14px 12px; box-shadow: var(--shadow); position: sticky; top: 16px; display: none; }
+        .filters.active { display: block; }
+        .filters.hidden { display: none !important; }
+        .filter-title { font-weight: 800; font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+        .filter-section { margin-bottom: 16px; }
+        .filter-section h4 { margin: 0 0 8px; font-size: 13px; color: var(--text-sub); }
+        .checkbox-list { display: flex; flex-wrap: wrap; gap: 8px; max-height: none; }
+        .checkbox-list label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-main); cursor: pointer; padding: 6px 10px; border:1px solid var(--border); border-radius: 10px; background: var(--chip); }
+        .checkbox-list input { accent-color: var(--accent); margin: 0; }
+
+        .filter-toggle { display: none; align-items: center; gap: 6px; padding: 10px 12px; border-radius: 10px; border:1px solid var(--border); background: var(--panel); cursor: pointer; font-weight:700; }
+
+        @media (max-width: 1039px) {
+            .layout { grid-template-columns: 1fr; }
+            .filters { position: fixed; left: 0; right: 0; bottom: 0; top: auto; max-height: 70vh; overflow: auto; z-index: 10; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 32px rgba(0,0,0,0.15); display: none; }
+            .filters.drawer-open { display: block; }
+            .filter-toggle { display: inline-flex; }
         }
 
-        body { font-family: 'Noto Sans KR', sans-serif; margin: 0; background-color: var(--bg-color); color: var(--text-main); }
-        .hero { background: linear-gradient(135deg, #3498db, #8e44ad); padding: 60px 20px; text-align: center; color: white; margin-bottom: 40px; }
-        .hero h1 { margin: 0 0 10px 0; font-weight: 700; font-size: 2.2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .hero p { margin: 0 0 30px 0; opacity: 0.9; font-weight: 300; }
-        .search-container { max-width: 600px; margin: 0 auto; position: relative; display: flex; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border-radius: 50px; overflow: hidden; background: white; }
-        input { flex: 1; padding: 18px 25px; font-size: 16px; border: none; outline: none; }
-        button { padding: 0 30px; background: var(--primary); color: white; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: var(--primary-dark); }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px 60px 20px; }
-        #status { text-align: center; margin-bottom: 20px; color: var(--text-sub); font-weight: 500; }
-        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
-        .book-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: var(--card-shadow); transition: transform 0.3s ease, box-shadow 0.3s ease; border: 1px solid #eee; display: flex; flex-direction: column; }
-        .book-card:hover { transform: translateY(-7px); box-shadow: var(--card-hover); }
-        .book-img-wrapper { width: 100%; height: 220px; background: #f1f2f6; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-        .book-img-wrapper img { height: 100%; width: auto; object-fit: contain; transition: transform 0.3s; }
-        .book-card:hover .book-img-wrapper img { transform: scale(1.05); }
-        .no-img { color: #bdc3c7; font-size: 14px; text-align: center; }
-        .book-info { padding: 20px; flex: 1; display: flex; flex-direction: column; }
-        .book-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; line-height: 1.4; color: var(--text-main); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .book-meta { font-size: 13px; color: var(--text-sub); margin-bottom: 15px; }
-        .badge-container { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; }
-        
-        /* 뱃지 스타일 수정 (링크용) */
-        .lib-badge {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            background-color: #e3f2fd;
-            color: #1976d2;
-            text-decoration: none; /* 밑줄 제거 */
-            transition: background 0.2s;
-        }
-        .lib-badge:hover { background-color: #bbdefb; } /* 호버 효과 */
-        
-        .lib-badge.seoul { background-color: #fff3e0; color: #f57c00; }
-        .lib-badge.seoul:hover { background-color: #ffe0b2; }
+        .content { min-height: 400px; }
+        #status { margin: 8px 0 12px; color: var(--text-sub); font-size: 14px; }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+        @media (min-width: 700px) { .grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); } }
+        .card { background: var(--panel); border:1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; display: flex; gap: 12px; align-items: stretch; }
+        .thumb { width: 96px; min-width: 96px; height: 136px; border:1px solid var(--border); border-radius: 10px; background:#f3f4f6; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        .thumb img { width:100%; height:100%; object-fit: cover; }
+        .no-img { font-size: 12px; color:#9ca3af; text-align:center; padding:6px; line-height:1.4; }
+        .info { display:flex; flex-direction:column; gap:8px; flex:1; min-width:0; }
+        .title { margin:0; font-size:16px; font-weight:800; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .meta { font-size:13px; color: var(--text-sub); line-height:1.5; }
+        .badges { display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; }
+        .badge { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:12px; background: var(--chip); border:1px solid var(--border); font-size:12px; color:var(--text-main); text-decoration:none; }
+        .plat { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:12px; border:1px solid var(--border); background:#eef2ff; font-weight:700; }
+        .plat img { width:18px; height:18px; object-fit:contain; }
+        .plat.kyobo { border-color: #c8f3df; color:#0b8e65; background:#e8fbf2; }
+        .plat.yes24 { border-color: #cce5ff; color:#0a6bcc; background:#eaf4ff; }
+        .plat.other { border-color: #e5e7eb; color:#4b5563; background:#f3f4f6; }
 
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loader { border:3px solid #e0e0e0; border-top:3px solid #9ca3af; border-radius:50%; width:28px; height:28px; animation: spin 1s linear infinite; margin: 20px auto; display:none; }
+        @keyframes spin { 0% {transform:rotate(0deg);} 100% {transform:rotate(360deg);} }
+
+        #load-more { margin: 18px auto 0; display:none; padding: 12px 18px; border-radius: 12px; background:#111; color:#fff; border:none; font-weight:700; cursor:pointer; width: min(500px, 100%); }
     </style>
 </head>
 <body>
     <div class="hero">
-        <h1>📚 서울시 전자책 통합검색</h1>
-        <p>16개 도서관의 38만권 장서를 한 번에 찾아보세요</p>
-        <div class="search-container">
-            <input type="text" id="query" placeholder="책 제목, 저자, 출판사 검색..." onkeypress="if(event.key==='Enter') search()">
+        <h1>서울시 전자도서 통합검색</h1>
+        {% if library_count and book_count %}
+        <p>{{ library_count }}개 도서관에서 {{ "{:,}".format(book_count) }}권을 한 번에 검색하세요.</p>
+        {% elif library_count %}
+        <p>{{ library_count }}개 도서관을 한 번에 검색합니다.</p>
+        {% else %}
+        <p>여러 도서관 전자책을 한 번에 검색해보세요.</p>
+        {% endif %}
+        <div class="search-bar">
+            <input type="text" id="query" placeholder="책 제목, 저자, 출판사 검색..." />
             <button onclick="search()">검색</button>
         </div>
     </div>
 
-    <div class="container">
-        <div id="status"></div>
-        <div class="loader" id="loading-spinner"></div>
-        <div id="results" class="book-grid"></div>
+    <div class="layout">
+        <aside class="filters">
+            <div class="filter-title">필터</div>
+            <div class="filter-section">
+                <h4>플랫폼</h4>
+                <div class="checkbox-list" id="platform-filters"></div>
+            </div>
+            <div class="filter-section">
+                <h4>도서관</h4>
+                <div class="checkbox-list" id="library-filters"></div>
+            </div>
+        </aside>
+
+        <main class="content">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div id="status"></div>
+                <button class="filter-toggle" id="filter-toggle" onclick="toggleFilters()">필터</button>
+            </div>
+            <div class="loader" id="loading-spinner"></div>
+            <div id="results" class="grid"></div>
+            <button id="load-more" onclick="renderMore()">더 보기</button>
+        </main>
     </div>
 
     <script>
+        const LIB_URLS = {{ lib_url_map|tojson|safe }};
+        const PAGE_SIZE = 30;
+        const PLATFORM_LABELS = {
+            "Kyobo_New": "교보",
+            "Kyobo": "교보",
+            "YES24": "YES24",
+            "FxLibrary": "기타",
+            "Mixed": "기타",
+            "Aladin": "기타",
+            "Unknown": "기타"
+        };
+        const PLATFORM_LOGOS = {
+            "Kyobo_New": "https://play-lh.googleusercontent.com/VC6zqxCZc_k2j9PL84RRqYqDQXQcRpzSXnCPINQLfJphhaIzNMirfLybPZMz0_08O1c=w480-h960-rw",
+            "Kyobo": "https://play-lh.googleusercontent.com/VC6zqxCZc_k2j9PL84RRqYqDQXQcRpzSXnCPINQLfJphhaIzNMirfLybPZMz0_08O1c=w480-h960-rw",
+            "YES24": "https://play-lh.googleusercontent.com/Zo6Hqz-sc_Z_UcBb52363NIOcSmTm97lkfUB_GoNGmplcL3PIWVxCjESEFoXhXfuXw=w480-h960-rw"
+        };
+
+        let currentResults = [];
+        let filteredResults = [];
+        let renderIndex = 0;
+        let selectedPlatforms = new Set();
+        let selectedLibraries = new Set();
+        let filtersOpen = false;
+        let hasResults = false;
+
+        function platformLabel(code) {
+            if (!code) return "기타";
+            if (code.startsWith("Kyobo")) return "교보";
+            return PLATFORM_LABELS[code] || code || "기타";
+        }
+
+        function extractLibraries(book) {
+            if (Array.isArray(book.libraries)) return book.libraries;
+            const libField = book.library;
+            if (!libField) return [];
+            if (typeof libField === "object") {
+                const arr = [];
+                Object.values(libField).forEach(v => {
+                    if (Array.isArray(v)) {
+                        v.forEach(name => arr.push({ short: name, name, homepage_url: LIB_URLS[name] || "#" }));
+                    }
+                });
+                return arr;
+            }
+            return [{ short: String(libField), name: String(libField), homepage_url: LIB_URLS[libField] || "#" }];
+        }
+
+        function buildFilters(results) {
+            const platSet = new Set();
+            const libSet = new Set();
+            results.forEach(r => {
+                (r.platforms || []).forEach(p => platSet.add(platformLabel(p)));
+                extractLibraries(r).forEach(l => libSet.add(l.short || l.name));
+            });
+            renderFilterList("platform-filters", [...platSet].sort(), togglePlatform);
+            renderFilterList("library-filters", [...libSet].sort(), toggleLibrary);
+            hasResults = true;
+            syncFilterVisibility();
+        }
+
+        function renderFilterList(containerId, items, handler) {
+            const box = document.getElementById(containerId);
+            box.innerHTML = items.map(val => `
+                <label>
+                    <input type="checkbox" value="${val}" onchange="${handler.name}(this)" />
+                    <span>${val}</span>
+                </label>
+            `).join("");
+        }
+
+        function togglePlatform(input) {
+            if (input.checked) selectedPlatforms.add(input.value);
+            else selectedPlatforms.delete(input.value);
+            applyFilters();
+        }
+
+        function toggleLibrary(input) {
+            if (input.checked) selectedLibraries.add(input.value);
+            else selectedLibraries.delete(input.value);
+            applyFilters();
+        }
+
+        function applyFilters() {
+            filteredResults = currentResults.filter(r => {
+                const plats = (r.platforms || []).map(platformLabel);
+                const libs = extractLibraries(r).map(l => l.short || l.name);
+                const platOk = selectedPlatforms.size === 0 || plats.some(p => selectedPlatforms.has(p));
+                const libOk = selectedLibraries.size === 0 || libs.some(l => selectedLibraries.has(l));
+                return platOk && libOk;
+            });
+            renderIndex = 0;
+            document.getElementById('results').innerHTML = "";
+            renderMore();
+            document.getElementById('status').innerText = `${filteredResults.length}권이 필터링되었습니다.`;
+        }
+
         function search() {
             const query = document.getElementById('query').value.trim();
-            if (!query) return alert("검색어를 입력해주세요.");
-
+            if (!query) return alert("검색어를 입력해 주세요.");
             const statusDiv = document.getElementById('status');
             const resultsDiv = document.getElementById('results');
             const loader = document.getElementById('loading-spinner');
-            
+            const loadMoreBtn = document.getElementById('load-more');
             statusDiv.innerText = "";
             resultsDiv.innerHTML = "";
-            loader.style.display = "block"; 
-
+            loader.style.display = "block";
+            loadMoreBtn.style.display = "none";
+            renderIndex = 0;
+            currentResults = [];
+            filteredResults = [];
+            hasResults = false;
+            syncFilterVisibility();
             fetch(`/search?query=${encodeURIComponent(query)}`)
                 .then(res => res.json())
                 .then(data => {
-                    loader.style.display = "none"; 
-
-                    if (data.error) return statusDiv.innerText = "⚠️ 오류: " + data.error;
-                    if (data.length === 0) return statusDiv.innerHTML = `<div style="padding:40px;">🤔 <strong>'${query}'</strong>에 대한 검색 결과가 없습니다.</div>`;
-
-                    statusDiv.innerText = `총 ${data.length}권의 책을 찾았습니다.`;
-
-                    data.forEach(book => {
-                        const imgHtml = book.image_url 
-                            ? `<img src="${book.image_url}" onerror="this.parentElement.innerHTML='<div class=\'no-img\'>이미지<br>준비중</div>'">` 
-                            : `<div class="no-img">도서 표지<br>준비중</div>`;
-
-                        // 🚨 [수정] 도서관 뱃지 렌더링 로직 (링크 <a> 태그 사용)
-                        // 이제 book.library는 [{name:'...', url:'...'}, ...] 형태의 배열입니다.
-                        let badgeHtml = "";
-                        if (Array.isArray(book.library)) {
-                            badgeHtml = book.library.map(lib => {
-                                const libClass = lib.name.includes("서울") ? "lib-badge seoul" : "lib-badge";
-                                // URL이 '#'이면 링크 기능 끄기 (선택)
-                                const href = lib.url !== '#' ? `href="${lib.url}" target="_blank"` : '';
-                                return `<a ${href} class="${libClass}">${lib.name}</a>`;
-                            }).join("");
-                        }
-
-                        const html = `
-                            <div class="book-card">
-                                <div class="book-img-wrapper">${imgHtml}</div>
-                                <div class="book-info">
-                                    <div class="book-title" title="${book.title}">${book.title}</div>
-                                    <div class="book-meta">
-                                        ${book.author} <br> 
-                                        <span style="font-size:0.9em; color:#999;">${book.publisher}</span>
-                                    </div>
-                                    <div class="badge-container">${badgeHtml}</div>
-                                </div>
-                            </div>
-                        `;
-                        resultsDiv.innerHTML += html;
-                    });
+                    loader.style.display = "none";
+                    if (data.error) { statusDiv.innerText = "오류: " + data.error; return; }
+                    if (data.length === 0) { statusDiv.innerHTML = `<div style="padding:20px;">'${query}' 결과가 없습니다.</div>`; return; }
+                    currentResults = data;
+                    buildFilters(data);
+                    applyFilters();
                 })
                 .catch(err => {
                     loader.style.display = "none";
-                    statusDiv.innerText = "서버 통신 오류가 발생했습니다.";
+                    statusDiv.innerText = "검색 중 오류가 발생했습니다.";
                     console.error(err);
                 });
         }
+
+        function platformBadge(platforms) {
+            const code = (platforms || [])[0] || "Unknown";
+            const label = platformLabel(code);
+            const cls = code.startsWith("Kyobo") ? "plat kyobo" : code === "YES24" ? "plat yes24" : "plat other";
+            const logo = PLATFORM_LOGOS[code];
+            const logoImg = logo ? `<img src="${logo}" alt="${label} 로고">` : "";
+            return `<span class="${cls}">${logoImg}${label}</span>`;
+        }
+
+        function uniqueLibraries(book) {
+            const seen = new Set();
+            const libs = [];
+            extractLibraries(book).forEach(l => {
+                const key = l.code || l.short || l.name;
+                if (seen.has(key)) return;
+                seen.add(key);
+                libs.push(l);
+            });
+            return libs;
+        }
+
+        function renderMore() {
+            const resultsDiv = document.getElementById('results');
+            const loadMoreBtn = document.getElementById('load-more');
+            const slice = filteredResults.slice(renderIndex, renderIndex + PAGE_SIZE);
+            if (slice.length === 0) { loadMoreBtn.style.display = "none"; return; }
+
+            slice.forEach(book => {
+                const imgHtml = book.image_url
+                    ? `<img src="${book.image_url}" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'no-img\\'>이미지 없음</div>'">`
+                    : `<div class="no-img">이미지 없음</div>`;
+
+                const libs = uniqueLibraries(book);
+                const libBadges = libs.map(lib => {
+                    const name = lib.short || lib.name;
+                    const url = lib.homepage_url || LIB_URLS[name] || "#";
+                    return `<a class="badge" href="${url}" target="_blank" rel="noopener noreferrer">${name}</a>`;
+                }).join("");
+
+                const platBadge = platformBadge(book.platforms);
+
+                const html = `
+                    <div class="card">
+                        <div class="thumb">${imgHtml}</div>
+                        <div class="info">
+                            <h3 class="title" title="${book.title}">${book.title}</h3>
+                            <div class="meta">${book.author || ""}<br><span style="font-size:12px;color:#9ca3af;">${book.publisher || ""}</span></div>
+                            <div class="badges">${platBadge}${libBadges}</div>
+                        </div>
+                    </div>
+                `;
+                resultsDiv.insertAdjacentHTML('beforeend', html);
+            });
+            renderIndex += slice.length;
+            loadMoreBtn.style.display = renderIndex < filteredResults.length ? "block" : "none";
+        }
+
+        function toggleFilters() {
+            const isDesktop = window.matchMedia("(min-width: 1040px)").matches;
+            if (isDesktop) return;
+            filtersOpen = !filtersOpen;
+            syncFilterVisibility();
+        }
+
+        function syncFilterVisibility() {
+            const filters = document.querySelector('.filters');
+            const isDesktop = window.matchMedia("(min-width: 1040px)").matches;
+            if (!hasResults) {
+                filters.classList.remove('active', 'drawer-open');
+                filters.classList.add('hidden');
+                return;
+            }
+            filters.classList.add('active');
+            filters.classList.remove('hidden');
+            if (isDesktop) {
+                filters.classList.remove('drawer-open');
+            } else {
+                if (filtersOpen) filters.classList.add('drawer-open');
+                else filters.classList.remove('drawer-open');
+            }
+        }
+
+        function handleScroll() {
+            const loadMoreBtn = document.getElementById('load-more');
+            if (loadMoreBtn.style.display !== "none") {
+                const scrollPos = window.innerHeight + window.scrollY;
+                const threshold = document.body.offsetHeight - 300;
+                if (scrollPos >= threshold) renderMore();
+            }
+        }
+        window.addEventListener('scroll', handleScroll);
+        window.addEventListener('resize', syncFilterVisibility);
+        document.getElementById('query').addEventListener('keypress', (e) => { if (e.key === 'Enter') search(); });
     </script>
 </body>
 </html>
