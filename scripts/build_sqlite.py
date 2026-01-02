@@ -10,12 +10,15 @@ CSV/JSON -> SQLite(FTS5) 변환 스크립트
 
 import csv
 import json
+import os
 import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
-DB_PATH = DATA / "library.db"
+DEFAULT_DB_PATH = ROOT / "data" / "library.db"
+# Allow overriding DB path for read-only filesystems (e.g., Cloudtype root)
+DB_PATH = Path(os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB_PATH))
+DATA = DB_PATH.parent
 
 # 표준 컬럼
 COLUMNS = ["title", "author", "publisher", "library", "image_url", "isbn", "provider", "platform", "library_code"]

@@ -22,7 +22,7 @@ except ImportError:
 app = Flask(__name__)
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(ROOT_DIR, "data", "library.db")
+DB_PATH = os.environ.get("LIBRARY_DB_PATH", os.path.join(ROOT_DIR, "data", "library.db"))
 db_lock = threading.Lock()
 DATA_DIR = Path(ROOT_DIR) / "data"
 BUILD_SCRIPT = Path(ROOT_DIR) / "scripts" / "build_sqlite.py"
