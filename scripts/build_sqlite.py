@@ -15,10 +15,11 @@ import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DB_PATH = ROOT / "data" / "library.db"
-# Allow overriding DB path for read-only filesystems (e.g., Cloudtype root)
+SOURCE_DATA = ROOT / "data"  # 원본 CSV/JSON 위치는 고정
+DEFAULT_DB_PATH = SOURCE_DATA / "library.db"
+# DB 저장 경로는 환경변수로 오버라이드 가능 (읽기 전용 파일시스템 대비)
 DB_PATH = Path(os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB_PATH))
-DATA = DB_PATH.parent
+DATA = SOURCE_DATA  # backward compatibility alias
 
 # 표준 컬럼
 COLUMNS = ["title", "author", "publisher", "library", "image_url", "isbn", "provider", "platform", "library_code"]
@@ -52,7 +53,7 @@ def init_db(conn: sqlite3.Connection):
 
 
 def iter_rows():
-    for path in DATA.iterdir():
+    for path in SOURCE_DATA.iterdir():
         if path.name.endswith("_db.csv"):
             lib_code = path.stem.replace("_db", "")
             if path.stat().st_size == 0:
