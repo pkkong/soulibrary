@@ -99,10 +99,6 @@ def save_to_csv(books):
     except:
         df['library'] = '서울시교육청 (소장형)'
     
-    # 중복 제거 (제목+저자)
-    df = df.drop_duplicates(subset=['title', 'author'])
-    print(f"-> 중복 제거 후 최종 {len(df)}권")
-
     final_df = df[['title', 'author', 'publisher', 'library', 'image_url']]
     
     final_df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')

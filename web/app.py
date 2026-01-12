@@ -22,7 +22,10 @@ except ImportError:
 app = Flask(__name__)
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.environ.get("LIBRARY_DB_PATH", os.path.join(ROOT_DIR, "data", "library.db"))
+DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
+LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
+DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
+IS_SPLIT_DB = True  # 기본은 split DB 사용
 db_lock = threading.Lock()
 DATA_DIR = Path(ROOT_DIR) / "data"
 BUILD_SCRIPT = Path(ROOT_DIR) / "scripts" / "build_sqlite.py"
@@ -63,7 +66,7 @@ def load_counts():
         return counts
     conn = get_db()
     try:
-        cur = conn.execute("SELECT library_code, COUNT(*) FROM books GROUP BY library_code;")
+        cur = conn.execute("SELECT library_code, COUNT(*) FROM holdings GROUP BY library_code;")
         for code, cnt in cur.fetchall():
             counts[code] = cnt
     finally:
@@ -117,6 +120,19 @@ for code, info in LIBRARIES.items():
     lib_name = info["library_name"]
     platform_code = info.get("platform", "Unknown")
     LIB_META_BY_NAME[lib_name] = {
+        "code": code,
+        "name": lib_name,
+        "short": LIBRARY_SHORT.get(code, lib_name),
+        "homepage_url": info.get("homepage_url", "#"),
+        "platform_code": platform_code,
+        "platform_label": PLATFORM_LABELS.get(platform_code, "기타"),
+    }
+
+LIB_META_BY_CODE = {}
+for code, info in LIBRARIES.items():
+    lib_name = info["library_name"]
+    platform_code = info.get("platform", "Unknown")
+    LIB_META_BY_CODE[code] = {
         "code": code,
         "name": lib_name,
         "short": LIBRARY_SHORT.get(code, lib_name),
@@ -199,12 +215,35 @@ def normalize_author(text):
     return text
 
 
+def normalize_search_text(text: str) -> str:
+    """Normalize query for prefix search on precomputed columns."""
+    if not text:
+        return ""
+    text = str(text).lower().strip()
+    text = re.sub(r"[\u200b\ufeff]", "", text)
+    text = re.sub(r"[\\s\\[\\]\\(\\){}<>.,/|\\\\\\-_:;\"'`~!?]", "", text)
+    return text
+
+
 def normalize_provider(raw_value):
     if raw_value:
         key = str(raw_value).strip()
         norm = PROVIDER_MAP.get(key) or PROVIDER_MAP.get(key.lower())
         return norm or key
     return ""
+
+
+def provider_from_platforms(platforms):
+    for code in platforms:
+        if code in {"Kyobo", "Kyobo_New"}:
+            return "교보"
+        if code == "YES24":
+            return "YES24"
+        if code == "Aladin":
+            return "알라딘"
+        if code == "Bookcube":
+            return "북큐브"
+    return "기타"
 
 
 def reload_database_safely(lib_code=None, success=True):
@@ -274,81 +313,114 @@ def search():
     if not query:
         return jsonify([])
 
-    FINAL_LIMIT = 300
-    match_query = f'{query}*'
+    field = request.args.get('field', 'title_author')
+    norm_query = normalize_search_text(query)
+    if not norm_query:
+        return jsonify([])
+
+    FINAL_LIMIT = 1200
+    pattern = f"%{norm_query}%"
     conn = get_db()
     try:
-        cur = conn.execute(
-            """
-            SELECT b.title, b.author, b.publisher, b.library, b.image_url, b.isbn, b.provider, b.platform
-            FROM books_fts f
-            JOIN books b ON b.id = f.rowid
-            WHERE books_fts MATCH ?
-            LIMIT ?
-            """,
-            (match_query, FINAL_LIMIT * 3),
-        )
+        select_base = "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE "
+        clauses = []
+        params = []
+        if field in ("title", "title_author"):
+            clauses.append(select_base + "title_norm LIKE ?")
+            params.append(pattern)
+        if field in ("author", "title_author"):
+            clauses.append(select_base + "author_norm LIKE ?")
+            params.append(pattern)
+        if field == "publisher":
+            clauses.append(select_base + "publisher_norm LIKE ?")
+            params.append(pattern)
+        if not clauses:
+            clauses.append(select_base + "title_norm LIKE ?")
+            params.append(pattern)
+        sql = " UNION ALL ".join(clauses) + " LIMIT ?"
+        params.append(FINAL_LIMIT * 3)
+        cur = conn.execute(sql, params)
         rows = cur.fetchall()
+
+        book_ids = [r["id"] for r in rows]
+        holdings_map = {}
+        if book_ids:
+            placeholders = ",".join("?" for _ in book_ids)
+            hcur = conn.execute(
+                f"SELECT book_id, library_code, library, provider, platform, image_url, isbn FROM holdings WHERE book_id IN ({placeholders})",
+                book_ids,
+            )
+            for h in hcur.fetchall():
+                holdings_map.setdefault(h["book_id"], []).append(h)
+
+        grouped = {}
+        for row in rows:
+            title = row["title"] or ""
+            author = row["author"] or ""
+            norm_key = (normalize_title(title), normalize_author(author), normalize_title(row["publisher"] or ""))
+            item = grouped.setdefault(norm_key, {
+                "title": title,
+                "author": author,
+                "publisher": row["publisher"] or "",
+                "provider": "",
+                "image_url": row["image_url"] or "",
+                "libraries": [],
+                "platforms": set(),
+            })
+            for h in holdings_map.get(row["id"], []):
+                prov = normalize_provider(h["provider"] or "")
+                if prov and not item["provider"]:
+                    item["provider"] = prov
+                lib_code = h["library_code"] or ""
+                lib_name = h["library"] or ""
+                item["libraries"].append({"name": lib_name, "code": lib_code})
+                plat = h["platform"] or ""
+                if plat:
+                    item["platforms"].add(plat)
+                if not item["image_url"] and h["image_url"]:
+                    item["image_url"] = h["image_url"]
+        results = []
+        for item in grouped.values():
+            lib_details = []
+            platforms = set()
+            for lib in item["libraries"]:
+                lib_code = lib.get("code") or ""
+                lib_name = lib.get("name") or ""
+                meta = LIB_META_BY_CODE.get(lib_code) if lib_code else None
+                if not meta:
+                    meta = LIB_META_BY_NAME.get(lib_name)
+                if meta:
+                    lib_details.append(meta)
+                    platforms.add(meta["platform_code"])
+                else:
+                    short = LIBRARY_SHORT.get(lib_code, lib_name)
+                    lib_details.append({
+                        "code": lib_code or None,
+                        "name": lib_name or lib_code,
+                        "short": short or lib_name or lib_code,
+                        "homepage_url": "#",
+                        "platform_code": "Unknown",
+                        "platform_label": "기타",
+                    })
+            if not platforms:
+                for meta in lib_details:
+                    platforms.add(meta.get("platform_code", "Unknown"))
+            provider = item["provider"] or provider_from_platforms(platforms or item["platforms"])
+            results.append({
+                "title": item["title"],
+                "author": item["author"],
+                "publisher": item["publisher"],
+                "provider": provider,
+                "image_url": item["image_url"],
+                "libraries": lib_details,
+                "platforms": list(platforms or item["platforms"]),
+            })
+        return jsonify(results[:FINAL_LIMIT])
     except Exception as e:
         print(f"[오류] 검색 실패: {e}")
         return jsonify({"error": "검색 중 오류 발생"})
     finally:
         conn.close()
-
-    # 그룹핑: 동일 제목/저자 합치기
-    grouped = {}
-    for row in rows:
-        title = row["title"] or ""
-        author = row["author"] or ""
-        norm_key = (normalize_title(title), normalize_author(author))
-        item = grouped.setdefault(norm_key, {
-            "title": title,
-            "author": author,
-            "publisher": row["publisher"] or "",
-            "provider": normalize_provider(row["provider"] or ""),
-            "image_url": row["image_url"] or "",
-            "libraries": [],
-            "platforms": set(),
-        })
-        lib_name = row["library"] or ""
-        if lib_name:
-            item["libraries"].append(lib_name)
-        plat = row["platform"] or ""
-        if plat:
-            item["platforms"].add(plat)
-        if not item["image_url"] and row["image_url"]:
-            item["image_url"] = row["image_url"]
-    results = []
-    for item in grouped.values():
-        lib_details = []
-        platforms = set()
-        for lib_name in item["libraries"]:
-            meta = LIB_META_BY_NAME.get(lib_name)
-            if meta:
-                lib_details.append(meta)
-                platforms.add(meta["platform_code"])
-            else:
-                lib_details.append({
-                    "code": None,
-                    "name": lib_name,
-                    "short": lib_name,
-                    "homepage_url": "#",
-                    "platform_code": "Unknown",
-                    "platform_label": "기타",
-                })
-        if not platforms:
-            for meta in lib_details:
-                platforms.add(meta.get("platform_code", "Unknown"))
-        results.append({
-            "title": item["title"],
-            "author": item["author"],
-            "publisher": item["publisher"],
-            "provider": item["provider"],
-            "image_url": item["image_url"],
-            "libraries": lib_details,
-            "platforms": list(platforms or item["platforms"]),
-        })
-    return jsonify(results[:FINAL_LIMIT])
 
 
 @app.route('/admin')

@@ -1,81 +1,81 @@
 {
   "yongsan": {
     "name": "용산구 (교보)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:46:11",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "seoul": {
     "name": "서울도서관",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 11:08:54",
-    "msg": "업데이트 완료"
+    "status": "done",
+    "last_run": "2026-01-06 14:32:28",
+    "msg": "정상 완료"
   },
   "sen_owned": {
-    "name": "서울시교육청 (소장)",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 11:09:47",
-    "msg": "업데이트 완료"
+    "name": "서울교육청 (소장)",
+    "status": "running",
+    "last_run": "2026-01-07 10:12:39",
+    "msg": "실행 중"
   },
   "sen_subs": {
-    "name": "서울시교육청 (구독)",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 11:17:10",
-    "msg": "업데이트 완료"
+    "name": "서울교육청 (구독)",
+    "status": "done",
+    "last_run": "2026-01-06 16:43:28",
+    "msg": "정상 완료"
   },
   "seongbuk": {
     "name": "성북구 (교보 신버전)",
-    "status": "오류 발생",
+    "status": "failed",
     "last_run": "2025-12-31 16:02:52",
     "msg": "database is locked"
   },
   "gangnam": {
     "name": "강남구 전자도서관",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 13:31:44",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "yeongdeungpo": {
     "name": "영등포구 (YES24)",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 11:09:29",
-    "msg": "업데이트 완료"
+    "status": "done",
+    "last_run": "2026-01-06 11:39:18",
+    "msg": "정상 완료"
   },
   "dongdaemun": {
     "name": "동대문구 (교보 신버전)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 16:04:29",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "dongjak": {
     "name": "동작구 (교보 신버전)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 16:03:53",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "gangseo": {
     "name": "강서구 (YES24)",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 10:47:58",
-    "msg": "업데이트 완료"
+    "status": "done",
+    "last_run": "2026-01-06 11:48:11",
+    "msg": "정상 완료"
   },
   "seocho": {
     "name": "서초구 (교보 신버전)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 16:50:25",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "eunpyeong": {
     "name": "은평구 (기타)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-30 10:44:51",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "jongno": {
     "name": "종로구 (YES24)",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 11:08:51",
-    "msg": "업데이트 완료"
+    "status": "done",
+    "last_run": "2026-01-06 13:39:45",
+    "msg": "정상 완료"
   },
   "songpa": {
     "name": "송파구 (교보)",
@@ -84,10 +84,10 @@
     "msg": "업데이트 완료"
   },
   "geumcheon": {
-    "name": "금천구 (북큐브)",
-    "status": "완료 (대기)",
+    "name": "금천구(북큐브)",
+    "status": "done",
     "last_run": "2025-12-30 10:47:41",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "yangcheon": {
     "name": "양천구 (YES24)",
@@ -97,116 +97,116 @@
   },
   "mapo": {
     "name": "마포구 (교보)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:40:55",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "gangbuk": {
     "name": "강북구 (교보)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:31:45",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "gwangjin": {
     "name": "광진구 (소장)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 13:34:57",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "gwangjin_subs": {
     "name": "광진구 (구독)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 13:12:04",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "seongdong": {
     "name": "성동구 (Fx)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-30 11:58:38",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "gangdong_owned": {
     "name": "강동구 (YES24)",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 10:48:19",
-    "msg": "업데이트 완료"
+    "status": "done",
+    "last_run": "2026-01-06 09:50:42",
+    "msg": "정상 완료"
   },
   "gangdong_subs": {
     "name": "강동구 (구독)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 13:08:16",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "dobong": {
     "name": "도봉구 (교보)",
-    "status": "대기 (중단됨)",
+    "status": "failed",
     "last_run": "2025-12-30 16:09:50",
     "msg": "데이터 수집 중..."
   },
   "seodaemun_subs": {
     "name": "서대문구 (구독)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 13:14:24",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "seodaemun_owned": {
     "name": "서대문구 (소장)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:42:11",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "junggu": {
     "name": "중구 (교보)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:42:18",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "jungnang": {
     "name": "중랑구 (교보)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:56:12",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "gwanak": {
     "name": "관악구 (YES24)",
-    "status": "완료 (대기)",
-    "last_run": "2025-12-30 11:00:34",
-    "msg": "업데이트 완료"
+    "status": "done",
+    "last_run": "2026-01-06 11:28:55",
+    "msg": "정상 완료"
   },
   "nowon": {
     "name": "노원구 (교보)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:21:42",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "guro": {
     "name": "구로구 (교보)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 11:50:08",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "songpa_subs": {
     "name": "송파구 (구독)",
-    "status": "오류 발생",
+    "status": "failed",
     "last_run": "2025-12-31 16:14:02",
     "msg": "database is locked"
   },
   "songpa_owned": {
     "name": "송파구 (소장)",
-    "status": "대기",
-    "last_run": "-",
-    "msg": ""
+    "status": "done",
+    "last_run": "2026-01-06 12:41:04",
+    "msg": "정상 완료"
   },
   "yangcheon_subs": {
     "name": "양천구 (구독)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 16:14:43",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   },
   "yangcheon_owned": {
     "name": "양천구 (소장)",
-    "status": "완료 (대기)",
+    "status": "done",
     "last_run": "2025-12-31 16:03:06",
-    "msg": "업데이트 완료"
+    "msg": "정상 완료"
   }
 }

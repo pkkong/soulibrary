@@ -10,6 +10,8 @@ class DobongKyoboSpider(scrapy.Spider):
 
     # 도봉구 전자도서관 (교보 구버전 T3)
     base_url = "https://elib.dobong.kr/Kyobo_T3/Content/ebook/ebook_Main.asp"
+    library_name = "도봉구립도서관"
+    page_size = 80  # listnum
 
     def start_requests(self):
         params = {
@@ -22,27 +24,19 @@ class DobongKyoboSpider(scrapy.Spider):
             "search_product_cd": "",
             "list_type": "",
             "now_page": "1",
-            "listnum": "80",
+            "listnum": str(self.page_size),
         }
         url = f"{self.base_url}?{urlencode(params)}"
         yield scrapy.Request(
             url,
             callback=self.parse,
-            meta={"page": 1, "total_pages": None},
+            meta={"page": 1},
             headers={"User-Agent": "Mozilla/5.0 (compatible; DobongCrawler/1.0)"},
             dont_filter=True,
         )
 
     def parse(self, response):
         page = response.meta.get("page", 1)
-        total_pages = response.meta.get("total_pages")
-
-        if total_pages is None:
-            total_text = response.css("#totalPage::text").get()
-            try:
-                total_pages = int(total_text.replace(",", "").strip())
-            except Exception:
-                total_pages = 500
 
         books = response.css("ul.books_wrap > li[id^='content_'], ul.list_type01 > li[id^='content_'], ul#content_list > li[id^='content_']")
         if not books:
@@ -55,6 +49,7 @@ class DobongKyoboSpider(scrapy.Spider):
         for book in books:
             title = book.css("dt a::text").get()
             em_text = book.css("dd em::text").get() or ""
+            em_text = " ".join(em_text.split())
 
             # "김미희 / [ 다그림책(키다리) / 2025-07-21 ]" 형태에서 저자/출판사 추출
             author = ""
@@ -84,7 +79,7 @@ class DobongKyoboSpider(scrapy.Spider):
                     "title": title.strip(),
                     "author": author,
                     "publisher": publisher,
-                    "library": "도봉구 전자도서관",
+                    "library": self.library_name,
                     "platform": "Kyobo",
                     "provider": "교보문고",
                     "image_url": image_url,
@@ -92,24 +87,23 @@ class DobongKyoboSpider(scrapy.Spider):
                 }
 
         next_page = page + 1
-        if next_page <= total_pages:
-            params = {
-                "product_cd": "001",
-                "category_id": "",
-                "content_all": "Y",
-                "order_key": "STOCK_YMD",
-                "search_keyword": "",
-                "search_type": "",
-                "search_product_cd": "",
-                "list_type": "",
-                "now_page": str(next_page),
-                "listnum": "80",
-            }
-            url = f"{self.base_url}?{urlencode(params)}"
-            yield scrapy.Request(
-                url,
-                callback=self.parse,
-                meta={"page": next_page, "total_pages": total_pages},
-                headers={"User-Agent": "Mozilla/5.0 (compatible; DobongCrawler/1.0)"},
-                dont_filter=True,
-            )
+        params = {
+            "product_cd": "001",
+            "category_id": "",
+            "content_all": "Y",
+            "order_key": "STOCK_YMD",
+            "search_keyword": "",
+            "search_type": "",
+            "search_product_cd": "",
+            "list_type": "",
+            "now_page": str(next_page),
+            "listnum": str(self.page_size),
+        }
+        url = f"{self.base_url}?{urlencode(params)}"
+        yield scrapy.Request(
+            url,
+            callback=self.parse,
+            meta={"page": next_page},
+            headers={"User-Agent": "Mozilla/5.0 (compatible; DobongCrawler/1.0)"},
+            dont_filter=True,
+        )

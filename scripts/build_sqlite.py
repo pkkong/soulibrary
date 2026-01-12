@@ -1,28 +1,60 @@
 """
-CSV/JSON -> SQLite(FTS5) 변환 스크립트
+Convert source CSV/JSON files into a unified SQLite DB with FTS5.
 
-실행:
+Run:
     python scripts/build_sqlite.py
 
-결과:
-    data/library.db 에 books(베이스 테이블) + books_fts(FTS5) 생성
+Output:
+    data/library.db with books, books_fts (FTS), and libraries metadata.
 """
 
 import csv
 import json
 import os
 import sqlite3
+import sys
+import re
+import time
 from pathlib import Path
 
+# Paths
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_DATA = ROOT / "data"  # 원본 CSV/JSON 위치는 고정
+SOURCE_DATA = ROOT / "data"
 DEFAULT_DB_PATH = SOURCE_DATA / "library.db"
-# DB 저장 경로는 환경변수로 오버라이드 가능 (읽기 전용 파일시스템 대비)
 DB_PATH = Path(os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB_PATH))
+TMP_DB_SUFFIX = ".building"
 DATA = SOURCE_DATA  # backward compatibility alias
 
-# 표준 컬럼
-COLUMNS = ["title", "author", "publisher", "library", "image_url", "isbn", "provider", "platform", "library_code"]
+# Import library metadata from web.config
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+from web.config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
+
+# Book columns
+COLUMNS = [
+    "title",
+    "author",
+    "publisher",
+    "library",
+    "image_url",
+    "isbn",
+    "provider",
+    "platform",
+    "library_code",
+    "title_norm",
+    "author_norm",
+    "publisher_norm",
+]
+
+
+def normalize_text(value: str) -> str:
+    """Lowercase and strip spaces/punctuation for prefix search."""
+    if not value:
+        return ""
+    text = str(value).lower()
+    text = re.sub(r"[\u200b\ufeff]", "", text)  # zero-width chars
+    text = re.sub(r"[\\s\\[\\]\\(\\){}<>.,/|\\\\\\-_:;\"'`~!?]", "", text)
+    return text
 
 
 def init_db(conn: sqlite3.Connection):
@@ -31,6 +63,7 @@ def init_db(conn: sqlite3.Connection):
         """
         DROP TABLE IF EXISTS books;
         DROP TABLE IF EXISTS books_fts;
+        DROP TABLE IF EXISTS libraries;
         CREATE TABLE books (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT,
@@ -41,11 +74,31 @@ def init_db(conn: sqlite3.Connection):
             isbn TEXT,
             provider TEXT,
             platform TEXT,
-            library_code TEXT
+            library_code TEXT,
+            title_norm TEXT,
+            author_norm TEXT,
+            publisher_norm TEXT
         );
         CREATE VIRTUAL TABLE books_fts USING fts5(
             title, author, publisher, library, provider, platform, isbn, library_code,
-            content='books', content_rowid='id'
+            content='books', content_rowid='id', tokenize='unicode61'
+        );
+        CREATE INDEX idx_books_title_norm ON books(title_norm);
+        CREATE INDEX idx_books_author_norm ON books(author_norm);
+        CREATE INDEX idx_books_publisher_norm ON books(publisher_norm);
+        CREATE TABLE libraries (
+            code TEXT PRIMARY KEY,
+            name TEXT,
+            library_name TEXT,
+            short_name TEXT,
+            platform TEXT,
+            platform_label TEXT,
+            service_type TEXT,
+            homepage_url TEXT,
+            type TEXT,
+            db_file TEXT,
+            total_count_url TEXT,
+            url_prefix TEXT
         );
         """
     )
@@ -53,43 +106,34 @@ def init_db(conn: sqlite3.Connection):
 
 
 def iter_rows():
+    """Yield normalized rows from all source files."""
     for path in SOURCE_DATA.iterdir():
         if path.name.endswith("_db.csv"):
             lib_code = path.stem.replace("_db", "")
+            if lib_code in {"songpa", "yangcheon"}:
+                continue
             if path.stat().st_size == 0:
                 continue
             with path.open("r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
+                    title = row.get("title", "")
+                    author = row.get("author", "")
+                    publisher = row.get("publisher", "")
                     yield {
-                        "title": row.get("title", ""),
-                        "author": row.get("author", ""),
-                        "publisher": row.get("publisher", ""),
+                        "title": title,
+                        "author": author,
+                        "publisher": publisher,
                         "library": row.get("library", ""),
                         "image_url": row.get("image_url", ""),
                         "isbn": row.get("isbn", ""),
                         "provider": row.get("provider", ""),
                         "platform": row.get("platform", ""),
                         "library_code": lib_code,
+                        "title_norm": normalize_text(title),
+                        "author_norm": normalize_text(author),
+                        "publisher_norm": normalize_text(publisher),
                     }
-        elif path.name == "seoul_ebook_db.json":
-            with path.open("r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                except Exception:
-                    continue
-            for row in data:
-                yield {
-                    "title": row.get("title", ""),
-                    "author": row.get("author", ""),
-                    "publisher": row.get("publisher", ""),
-                    "library": row.get("library", ""),
-                    "image_url": row.get("image_url", ""),
-                    "isbn": row.get("isbn", ""),
-                    "provider": row.get("provider", ""),
-                    "platform": row.get("platform", ""),
-                    "library_code": "seoul",
-                }
 
 
 def bulk_insert(conn: sqlite3.Connection):
@@ -99,31 +143,97 @@ def bulk_insert(conn: sqlite3.Connection):
         buf.append([row.get(col, "") for col in COLUMNS])
         if len(buf) >= 5000:
             cur.executemany(
-                "INSERT INTO books (title, author, publisher, library, image_url, isbn, provider, platform, library_code) VALUES (?,?,?,?,?,?,?,?,?)",
+                """
+                INSERT INTO books (
+                    title, author, publisher, library, image_url, isbn, provider, platform, library_code,
+                    title_norm, author_norm, publisher_norm
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
                 buf,
             )
             buf.clear()
     if buf:
         cur.executemany(
-            "INSERT INTO books (title, author, publisher, library, image_url, isbn, provider, platform, library_code) VALUES (?,?,?,?,?,?,?,?,?)",
+            """
+            INSERT INTO books (
+                title, author, publisher, library, image_url, isbn, provider, platform, library_code,
+                title_norm, author_norm, publisher_norm
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
             buf,
         )
     conn.commit()
-    cur.execute("INSERT INTO books_fts (rowid, title, author, publisher, library, provider, platform, isbn, library_code) SELECT id, title, author, publisher, library, provider, platform, isbn, library_code FROM books;")
+    cur.execute(
+        "INSERT INTO books_fts (rowid, title, author, publisher, library, provider, platform, isbn, library_code) "
+        "SELECT id, title, author, publisher, library, provider, platform, isbn, library_code FROM books;"
+    )
     conn.commit()
+
+
+def insert_libraries(conn: sqlite3.Connection):
+    cur = conn.cursor()
+    rows = []
+    for code, cfg in LIBRARIES.items():
+        platform = cfg.get("platform", "Unknown")
+        platform_label = PLATFORM_LABELS.get(platform, "기타")
+        rows.append(
+            (
+                code,
+                cfg.get("name", cfg.get("library_name", code)),
+                cfg.get("library_name", cfg.get("name", code)),
+                LIBRARY_SHORT.get(code, cfg.get("library_name", code)),
+                platform,
+                platform_label,
+                cfg.get("service_type", ""),
+                cfg.get("homepage_url", ""),
+                cfg.get("type", ""),
+                cfg.get("db_file", ""),
+                cfg.get("total_count_url", ""),
+                cfg.get("url_prefix", ""),
+            )
+        )
+    cur.executemany(
+        """
+        INSERT INTO libraries (
+            code, name, library_name, short_name, platform, platform_label, service_type, homepage_url, type, db_file, total_count_url, url_prefix
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        rows,
+    )
+    conn.commit()
+
+
+def _atomic_replace(src: Path, dest: Path, retries: int = 10, delay: float = 0.5):
+    for attempt in range(retries):
+        try:
+            os.replace(src, dest)
+            return
+        except PermissionError:
+            if attempt == retries - 1:
+                raise
+            time.sleep(delay)
 
 
 def main():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    tmp_db = DB_PATH.with_suffix(DB_PATH.suffix + TMP_DB_SUFFIX)
+    if tmp_db.exists():
+        try:
+            tmp_db.unlink()
+        except Exception:
+            pass
+    conn = sqlite3.connect(tmp_db)
     try:
         init_db(conn)
         bulk_insert(conn)
+        insert_libraries(conn)
         cur = conn.execute("SELECT COUNT(*) FROM books;")
         total = cur.fetchone()[0]
-        print(f"[완료] 총 {total}권 SQLite에 적재됨 -> {DB_PATH}")
     finally:
         conn.close()
+
+    _atomic_replace(tmp_db, DB_PATH)
+    print(f"[완료] 총 {total}권 SQLite로 재생성 -> {DB_PATH}")
 
 
 if __name__ == "__main__":

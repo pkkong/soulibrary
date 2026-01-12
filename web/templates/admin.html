@@ -1,212 +1,177 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <title>크롤러 대시보드 v2 (로컬)</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
-    <title>크롤러 관리자 대시보드</title>
-    <style>
-        body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; padding: 30px; background: #f4f6f8; }
-        .dashboard { max-width: 1100px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
-        h1 { margin: 0; color: #333; font-size: 22px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
-        th { background: #f8f9fa; color: #555; }
-        button { padding: 8px 12px; cursor: pointer; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 13px; transition: 0.2s; }
-        button:hover { background: #2980b9; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .status-running { color: orange; font-weight: bold; }
-        .status-idle { color: green; }
-        .status-error { color: red; }
-        .status-msg { color: #666; font-size: 0.9em; font-weight: bold; }
-        .switch-container { display: flex; align-items: center; gap: 10px; background: #eee; padding: 8px 16px; border-radius: 30px; }
-        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #2ecc71; }
-        input:checked + .slider:before { transform: translateX(26px); }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
 </head>
 <body>
-    <div class="dashboard">
-        <div class="header">
-            <h1>크롤러 통합 관리{% if library_count %} (총 {{ library_count }}개, {{ "{:,}".format(book_count or 0) }}권){% endif %}</h1>
-            <div class="switch-container">
-                <span style="font-weight: bold; color:#555;">자동 갱신</span>
-                <label class="switch">
-                    <input type="checkbox" id="autoToggle" onclick="toggleAuto()">
-                    <span class="slider round"></span>
-                </label>
+    <div class="container">
+        <h1>크롤러 대시보드 v2 (로컬)</h1>
+        <div class="muted">로컬에서 바로 상태를 확인하고 실행할 수 있는 새 버전입니다. 기존 /admin은 이 화면으로 대체됩니다.</div>
+
+        <div class="toolbar">
+            <button class="btn-primary" id="btnCheckTotals">원격 권수 새로고침</button>
+            <button class="btn-secondary" id="btnRefresh">상태 새로고침</button>
+            <div class="muted" id="lastCheckInfo"></div>
+        </div>
+
+        <div class="grid" id="summaryGrid">
+            <div class="card">
+                <div class="card-title">도서관 수</div>
+                <div class="card-value" id="summaryLibs">{{ library_count }}</div>
+                <div class="small">전체 등록된 대상</div>
+            </div>
+            <div class="card">
+                <div class="card-title">총 도서 권수</div>
+                <div class="card-value" id="summaryBooks">{{ "{:,}".format(book_count or 0) }}</div>
+                <div class="small">SQLite 기준 로컬 합계</div>
+            </div>
+            <div class="card">
+                <div class="card-title">진행 중</div>
+                <div class="card-value" id="summaryRunning">0</div>
+                <div class="small">현재 실행 중인 작업</div>
+            </div>
+            <div class="card">
+                <div class="card-title">실패 / 경고</div>
+                <div class="card-value" id="summaryFailed">0</div>
+                <div class="small">최근 상태가 실패 또는 차이 존재</div>
             </div>
         </div>
 
-        <p>도서관별 플랫폼/방식/장서수를 확인하고 즉시 실행할 수 있습니다.</p>
-        <div style="margin: 10px 0; display:flex; gap:10px; align-items:center;">
-            <button id="checkTotalsBtn" onclick="checkTotals()">총 장서수 체크</button>
-            <span id="checkTotalsStatus" style="color:#555; font-size:13px;"></span>
-            <span id="checkTotalsTime" style="color:#888; font-size:12px;"></span>
+        <div class="sticky-actions">
+            <strong>도서관별 상태</strong>
         </div>
-        
+
         <table>
             <thead>
                 <tr>
-                    <th>도서관명</th>
+                    <th>도서관</th>
                     <th>플랫폼</th>
                     <th>방식</th>
-                    <th>유형</th>
-                    <th>수집 장서수</th>
-                    <th>원격(표기) 장서수</th>
+                    <th class="nowrap">로컬 권수</th>
+                    <th class="nowrap">원격 권수</th>
                     <th>차이</th>
-                    <th style="width: 110px;">상태</th>
+                    <th>상태</th>
                     <th>메시지</th>
-                    <th>마지막 실행</th>
-                    <th>실행</th>
+                    <th class="nowrap">최근 실행</th>
+                    <th class="nowrap">원격 확인</th>
+                    <th>액션</th>
                 </tr>
             </thead>
-            <tbody id="status-table">
-                {% for row in rows %}
-                {% set info = status.get(row.code, {}) %}
-                {% set isRunning = info.status and ('실행' in info.status) %}
-                {% set isError = info.status and ('오류' in info.status) %}
-                <tr>
-                    <td><a class="lib-link" href="{{ row.homepage or '#' }}" target="_blank" rel="noopener noreferrer"><strong>{{ row.name }}</strong></a> {% if row.short %}<span style="color:#777;">({{ row.short }})</span>{% endif %}</td>
-                    <td>{{ row.platform_label }}</td>
-                    <td>{{ "scrapy" if row.crawl_type == "scrapy" else "API" }}</td>
-                    <td>{{ row.service_type }}</td>
-                    <td>{{ "{:,}".format(row.count) if row.count else 0 }}</td>
-                    <td>{{ "{:,}".format(row.remote_count) if row.remote_count is not none else "-" }}</td>
-                    <td>
-                        {% if row.remote_count is not none %}
-                            {% set diff = row.remote_count - row.count %}
-                            {% if diff == 0 %}<span style="color:green;">동일</span>
-                            {% else %}<span style="color:{{ 'red' if diff>0 else '#555' }};">{{ diff|int }}</span>
-                            {% endif %}
-                        {% else %}-{% endif %}
-                        {% if row.recommend_update %}<div style="color:red; font-weight:bold;">업데이트 권장</div>{% endif %}
-                    </td>
-                    <td class="{{ 'status-running' if isRunning else ('status-error' if isError else 'status-idle') }}">{{ info.status or '-' }}</td>
-                    <td class="status-msg">{{ info.msg or '-' }}</td>
-                    <td>{{ info.last_run or '-' }}</td>
-                    <td>
-                        <button onclick="runCrawler('{{ row.code }}', '{{ row.name }}')" {% if isRunning %}disabled{% endif %}>
-                            {% if isRunning %}실행 중...{% else %}지금 실행{% endif %}
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
+            <tbody id="rowsBody"></tbody>
         </table>
-        
-        <div style="margin-top: 20px; text-align: right;">
-            <a href="/">? 검색페이지로 돌아가기</a>
-        </div>
     </div>
 
     <script>
         const rowsData = {{ rows|tojson|safe }};
 
-        function toggleAuto() {
-            const isChecked = document.getElementById('autoToggle').checked;
-            fetch('/admin/auto-crawl', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ active: isChecked })
-            })
-            .then(res => res.json())
-            .then(data => {
-                console.log(data.msg);
-            })
-            .catch(err => {
-                alert("오류 발생: " + err);
-                document.getElementById('autoToggle').checked = !isChecked;
-            });
+        function statusClass(statusText) {
+            if (!statusText) return "status-idle";
+            const s = statusText.toLowerCase();
+            if (s.includes("run")) return "status-running";
+            if (s.includes("fail") || s.includes("오류")) return "status-failed";
+            if (s.includes("idle") || s.includes("대기")) return "status-idle";
+            if (s.includes("완료") || s.includes("done")) return "status-done";
+            return "status-idle";
         }
 
-        function formatRelative(timeText) {
-            if (!timeText || timeText === "-") return "-";
-            const parsed = new Date(timeText.replace(" ", "T"));
-            if (isNaN(parsed.getTime())) return timeText;
-            const diffMs = Date.now() - parsed.getTime();
-            const hourMs = 60 * 60 * 1000;
-            const dayMs = 24 * hourMs;
-            if (diffMs < hourMs) return "최근(1시간 미만)";
-            if (diffMs < 6 * hourMs) return "1~6시간 전";
-            if (diffMs < 12 * hourMs) return "6~12시간 전";
-            if (diffMs < dayMs) return "12~24시간 전";
-            if (diffMs < 7 * dayMs) return "1~7일 전";
-            return timeText;
+        function formatNumber(n) {
+            if (n === null || n === undefined) return "-";
+            return Number(n).toLocaleString();
         }
 
-        function updateStatus() {
-            fetch('/admin/status')
+        function formatTime(text) {
+            if (!text || text === "-") return "-";
+            return text;
+        }
+
+        function renderTable(statusMap) {
+            const tbody = document.getElementById("rowsBody");
+            tbody.innerHTML = "";
+            let running = 0;
+            let failed = 0;
+            let diffWarn = 0;
+
+            for (const row of rowsData) {
+                const info = statusMap[row.code] || {};
+                const statusText = info.status || "-";
+                const cls = statusClass(statusText);
+                if (cls === "status-running") running++;
+                if (cls === "status-failed") failed++;
+
+                const local = row.count || 0;
+                const remote = (row.remote_count === null || row.remote_count === undefined) ? null : row.remote_count;
+                let diffHtml = '<span class="diff-neutral">-</span>';
+                if (remote !== null) {
+                    const diff = remote - local;
+                    const diffClass = diff === 0 ? "diff-good" : (diff > 0 ? "diff-bad" : "diff-neutral");
+                    if (diff !== 0) diffWarn++;
+                    diffHtml = `<span class="${diffClass}">${diff.toLocaleString()}</span>`;
+                }
+
+                const btnDisabled = cls === "status-running" ? "disabled" : "";
+                const btnLabel = cls === "status-running" ? "실행 중" : "지금 실행";
+
+                const homepage = row.homepage || "#";
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>
+                        <div><a href="${homepage}" target="_blank" rel="noopener noreferrer"><strong>${row.name}</strong></a></div>
+                        ${row.short ? `<div class="small">${row.short}</div>` : ""}
+                    </td>
+                    <td>${row.platform_label}</td>
+                    <td>${row.crawl_type === "scrapy" ? "scrapy" : "API"}</td>
+                    <td>${formatNumber(local)}</td>
+                    <td>${remote === null ? "-" : formatNumber(remote)}</td>
+                    <td>${diffHtml}</td>
+                    <td><span class="status-chip ${cls}">${statusText}</span></td>
+                    <td class="msg">${info.msg || "-"}</td>
+                    <td class="nowrap">${formatTime(info.last_run || "-")}</td>
+                    <td class="nowrap">${row.remote_checked_at ? formatTime(row.remote_checked_at) : "-"}</td>
+                    <td>
+                        <button class="btn-primary" ${btnDisabled} onclick="runCrawler('${row.code}', '${row.name}')">${btnLabel}</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            document.getElementById("summaryRunning").textContent = running;
+            document.getElementById("summaryFailed").textContent = failed + diffWarn;
+        }
+
+        function refreshStatus() {
+            fetch("/admin/status")
                 .then(res => res.json())
                 .then(data => {
-                    const tbody = document.getElementById('status-table');
-                    tbody.innerHTML = '';
-                    for (const row of rowsData) {
-                        const info = data[row.code] || {};
-                        const isRunning = info.status && info.status.includes('실행');
-                        const isError = info.status && info.status.includes('오류');
-                        const statusClass = isRunning ? "status-running" : (isError ? "status-error" : "status-idle");
-                        const msg = info.msg || '-';
-                        const lastRunText = info.last_run || '-';
-                        const lastRun = formatRelative(lastRunText);
-                        const count = row.count ? row.count.toLocaleString() : '0';
-                        const remote = (row.remote_count !== null && row.remote_count !== undefined) ? row.remote_count.toLocaleString() : '-';
-                        const diffVal = (row.remote_count !== null && row.remote_count !== undefined) ? (row.remote_count - row.count) : null;
-                        let diffHtml = '-';
-                        if (diffVal !== null) {
-                            if (diffVal === 0) diffHtml = '<span style="color:green;">동일</span>';
-                            else diffHtml = `<span style="color:${diffVal>0 ? 'red' : '#555'};">${diffVal}</span>`;
-                            if (row.recommend_update) diffHtml += '<div style="color:red; font-weight:bold;">업데이트 권장</div>';
-                        }
-                        const btnLabel = isRunning ? '실행 중...' : '지금 실행';
-                        const disabled = isRunning ? 'disabled' : '';
-                        const short = row.short ? ` <span style="color:#777;">(${row.short})</span>` : '';
-                        const homepage = row.homepage || '#';
-                        const crawlType = row.crawl_type === 'scrapy' ? 'scrapy' : 'API';
-                        const tr = `
-                            <tr>
-                                <td><a href="${homepage}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit;"><strong>${row.name}</strong></a>${short}</td>
-                                <td>${row.platform_label}</td>
-                                <td>${crawlType}</td>
-                                <td>${row.service_type}</td>
-                                <td>${count}</td>
-                                <td>${remote}</td>
-                                <td>${diffHtml}</td>
-                                <td class="${statusClass}">${info.status || '-'}</td>
-                                <td class="status-msg">${msg}</td>
-                                <td title="${lastRunText}">${lastRun}</td>
-                                <td><button onclick="runCrawler('${row.code}', '${row.name}')" ${disabled}>${btnLabel}</button></td>
-                            </tr>
-                        `;
-                        tbody.insertAdjacentHTML('beforeend', tr);
-                    }
-                });
+                    renderTable(data);
+                })
+                .catch(() => {});
         }
 
-        function runCrawler(libCode, libName) {
-            if(!confirm(libName + " 수집을 시작할까요?")) return;
-            fetch(`/admin/run/${libCode}`, { method: 'POST' })
+        function runCrawler(code, name) {
+            if (!confirm(`${name} 크롤을 실행할까요?`)) return;
+            fetch(`/admin/run/${code}`, { method: "POST" })
                 .then(res => res.json())
                 .then(data => {
-                    alert(data.msg);
-                    updateStatus(); 
-                });
+                    alert(data.msg || "요청됨");
+                    refreshStatus();
+                })
+                .catch(err => alert("실행 오류: " + err));
         }
 
         function checkTotals() {
-            const btn = document.getElementById('checkTotalsBtn');
-            const statusSpan = document.getElementById('checkTotalsStatus');
-            const timeSpan = document.getElementById('checkTotalsTime');
+            const btn = document.getElementById("btnCheckTotals");
             btn.disabled = true;
-            statusSpan.textContent = "총 장서수 확인 중...";
-            timeSpan.textContent = "";
-            fetch('/admin/check-totals', { method: 'POST' })
+            btn.textContent = "원격 확인 중...";
+            fetch("/admin/check-totals", { method: "POST" })
                 .then(res => res.json())
                 .then(payload => {
                     const data = payload.data || {};
+                    const nowText = (Object.values(data)[0] || {}).checked_at || "";
+                    document.getElementById("lastCheckInfo").textContent = nowText ? `원격 확인: ${nowText}` : "";
                     for (const row of rowsData) {
                         const item = data[row.code];
                         if (item) {
@@ -215,31 +180,22 @@
                             row.remote_checked_at = item.checked_at;
                         }
                     }
-                    updateStatus();
-                    statusSpan.textContent = "[완료]";
-                    const any = Object.values(data).find(v => v && v.checked_at);
-                    if (any && any.checked_at) {
-                        timeSpan.textContent = `최근: ${formatRelative(any.checked_at)}`;
-                    }
+                    refreshStatus();
                 })
-                .catch(err => {
-                    statusSpan.textContent = "오류 발생";
-                    console.error(err);
-                })
-                .finally(() => { btn.disabled = false; });
+                .catch(err => alert("원격 권수 확인 실패: " + err))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = "원격 권수 새로고침";
+                });
         }
 
-        // 페이지 최초 로드 시 기존 체크 시각 표시
-        (function initCheckTotalsTime() {
-            const timeSpan = document.getElementById('checkTotalsTime');
-            const any = rowsData.find(r => r.remote_checked_at);
-            if (any && any.remote_checked_at) {
-                timeSpan.textContent = `최근: ${formatRelative(any.remote_checked_at)}`;
-            }
-        })();
+        document.getElementById("btnRefresh").addEventListener("click", refreshStatus);
+        document.getElementById("btnCheckTotals").addEventListener("click", checkTotals);
 
-        updateStatus();
-        setInterval(updateStatus, 3000);
+        // 초기 렌더
+        renderTable({});
+        refreshStatus();
+        setInterval(refreshStatus, 4000);
     </script>
 </body>
 </html>

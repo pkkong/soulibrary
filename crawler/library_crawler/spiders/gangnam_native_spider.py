@@ -9,9 +9,10 @@ class GangnamNativeSpider(scrapy.Spider):
     allowed_domains = ["ebook.gangnam.go.kr"]
     base_url = "https://ebook.gangnam.go.kr/elibbook/book_category.asp"
     library_name = "강남구 전자도서관"
-    platform = "Unknown"
-    page_size = 20
+    platform = "Unknown"  # 자체 플랫폼
+    page_size = 20  # 기본 20권
     total_pages = None
+    max_pages_fallback = 1500
 
     def start_requests(self):
         yield self._make_request(1)
@@ -29,7 +30,8 @@ class GangnamNativeSpider(scrapy.Spider):
         return scrapy.Request(url, callback=self.parse, meta={"page": page}, dont_filter=True)
 
     def _extract_total_pages(self, response):
-        text = response.css("div.list_header strong::text").get()
+        # 상단에 <strong>24,734</strong>건 형태
+        text = response.css("strong::text").get()
         if not text:
             return None
         try:
@@ -46,6 +48,9 @@ class GangnamNativeSpider(scrapy.Spider):
             if detected:
                 self.total_pages = detected
                 self.logger.info("Total pages detected: %s", self.total_pages)
+            else:
+                self.total_pages = self.max_pages_fallback
+                self.logger.info("Total pages not detected, using fallback: %s", self.total_pages)
 
         books = response.css("div.book")
         if not books:
@@ -57,9 +62,14 @@ class GangnamNativeSpider(scrapy.Spider):
             author = (book.css("div.writer::text").get() or "").strip()
 
             publish_text = book.css("div.publish_date::text").get() or ""
-            publisher = publish_text.split("·")[0].strip() if "·" in publish_text else publish_text.strip()
+            if "·" in publish_text:
+                publisher = publish_text.split("·")[0].strip()
+            elif "ㆍ" in publish_text:
+                publisher = publish_text.split("ㆍ")[0].strip()
+            else:
+                publisher = publish_text.strip()
 
-            provider = (book.css("div.book_info div.current strong::text").get() or "").strip() or "강남전자도서관"
+            provider = (book.css("div.book_info div.current strong::text").get() or "").strip() or "기타"
 
             image_url = book.css("div.book_frame img::attr(src)").get()
             if image_url:
@@ -67,8 +77,10 @@ class GangnamNativeSpider(scrapy.Spider):
                     image_url = "https:" + image_url
                 elif image_url.startswith("/"):
                     image_url = "https://ebook.gangnam.go.kr" + image_url
+            else:
+                image_url = ""
 
-            isbn = ""  # 목록에서는 제공되지 않음
+            isbn = ""  # 목록에서는 제공되지 않음, 빈칸 유지
 
             if title:
                 yield {
