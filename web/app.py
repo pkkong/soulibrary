@@ -29,6 +29,7 @@ IS_SPLIT_DB = True  # 기본은 split DB 사용
 db_lock = threading.Lock()
 DATA_DIR = Path(ROOT_DIR) / "data"
 BUILD_SCRIPT = Path(ROOT_DIR) / "scripts" / "build_sqlite.py"
+AUTO_BUILD = os.environ.get("LIBRARY_AUTO_BUILD", "").lower() in {"1", "true", "yes"}
 
 
 def _latest_data_mtime():
@@ -102,7 +103,8 @@ def save_remote_counts(cache):
 REMOTE_COUNTS_CACHE = load_remote_counts()
 
 # SQLite 신선도 확인 후 준비
-ensure_db_fresh()
+if AUTO_BUILD:
+    ensure_db_fresh()
 
 LIB_NAME_TO_CODE = {info["library_name"]: code for code, info in LIBRARIES.items()}
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -9,24 +9,28 @@
 <body>
     <div class="container">
         <h1>크롤러 대시보드 v2 (로컬)</h1>
-        <div class="muted">로컬에서 바로 상태를 확인하고 실행할 수 있는 새 버전입니다. 기존 /admin은 이 화면으로 대체됩니다.</div>
+        <div class="muted">로컬에서 수집 상태를 확인하고 실행하는 관리자 화면입니다. 기존 /admin 화면을 대체합니다.</div>
 
         <div class="toolbar">
             <button class="btn-primary" id="btnCheckTotals">원격 권수 새로고침</button>
             <button class="btn-secondary" id="btnRefresh">상태 새로고침</button>
             <div class="muted" id="lastCheckInfo"></div>
         </div>
+        <div class="notice">
+            <strong>안내</strong> 이 화면은 크롤/체커 전용입니다. 크롤 결과는 CSV까지 생성되며 DB 빌드는 수동 실행하세요.<br>
+            split DB: <code>python scripts/build_library_split.py</code> / 통합 DB(필요 시): <code>python scripts/build_sqlite.py</code>
+        </div>
 
         <div class="grid" id="summaryGrid">
             <div class="card">
                 <div class="card-title">도서관 수</div>
                 <div class="card-value" id="summaryLibs">{{ library_count }}</div>
-                <div class="small">전체 등록된 대상</div>
+                <div class="small">등록된 전체 라이브러리</div>
             </div>
             <div class="card">
                 <div class="card-title">총 도서 권수</div>
                 <div class="card-value" id="summaryBooks">{{ "{:,}".format(book_count or 0) }}</div>
-                <div class="small">SQLite 기준 로컬 합계</div>
+                <div class="small">SQLite 기반 로컬 합계</div>
             </div>
             <div class="card">
                 <div class="card-title">진행 중</div>
@@ -36,7 +40,7 @@
             <div class="card">
                 <div class="card-title">실패 / 경고</div>
                 <div class="card-value" id="summaryFailed">0</div>
-                <div class="small">최근 상태가 실패 또는 차이 존재</div>
+                <div class="small">최근 실패 상태</div>
             </div>
         </div>
 
@@ -70,8 +74,8 @@
         function statusClass(statusText) {
             if (!statusText) return "status-idle";
             const s = statusText.toLowerCase();
-            if (s.includes("run")) return "status-running";
-            if (s.includes("fail") || s.includes("오류")) return "status-failed";
+            if (s.includes("run") || s.includes("실행")) return "status-running";
+            if (s.includes("fail") || s.includes("오류") || s.includes("중단")) return "status-failed";
             if (s.includes("idle") || s.includes("대기")) return "status-idle";
             if (s.includes("완료") || s.includes("done")) return "status-done";
             return "status-idle";
@@ -92,7 +96,6 @@
             tbody.innerHTML = "";
             let running = 0;
             let failed = 0;
-            let diffWarn = 0;
 
             for (const row of rowsData) {
                 const info = statusMap[row.code] || {};
@@ -107,7 +110,6 @@
                 if (remote !== null) {
                     const diff = remote - local;
                     const diffClass = diff === 0 ? "diff-good" : (diff > 0 ? "diff-bad" : "diff-neutral");
-                    if (diff !== 0) diffWarn++;
                     diffHtml = `<span class="${diffClass}">${diff.toLocaleString()}</span>`;
                 }
 
@@ -119,83 +121,84 @@
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td>
-                        <div><a href="${homepage}" target="_blank" rel="noopener noreferrer"><strong>${row.name}</strong></a></div>
-                        ${row.short ? `<div class="small">${row.short}</div>` : ""}
+                        <a class="strong lib-link" href="${homepage}" target="_blank" rel="noopener noreferrer">${row.name}</a>
+                        <div class="muted small">${row.short || ""}</div>
                     </td>
-                    <td>${row.platform_label}</td>
-                    <td>${row.crawl_type === "scrapy" ? "scrapy" : "API"}</td>
+                    <td>${row.platform_label || "-"}</td>
+                    <td>${row.service_type || "-"}</td>
                     <td>${formatNumber(local)}</td>
-                    <td>${remote === null ? "-" : formatNumber(remote)}</td>
+                    <td>${formatNumber(remote)}</td>
                     <td>${diffHtml}</td>
-                    <td><span class="status-chip ${cls}">${statusText}</span></td>
-                    <td class="msg">${info.msg || "-"}</td>
-                    <td class="nowrap">${formatTime(info.last_run || "-")}</td>
-                    <td class="nowrap">${row.remote_checked_at ? formatTime(row.remote_checked_at) : "-"}</td>
-                    <td>
-                        <button class="btn-primary" ${btnDisabled} onclick="runCrawler('${row.code}', '${row.name}')">${btnLabel}</button>
+                    <td><span class="status ${cls}">${statusText}</span></td>
+                    <td class="small">${info.msg || "-"}</td>
+                    <td class="small">${formatTime(info.last_run || "-")}</td>
+                    <td class="small">${row.remote_checked_at || "-"}</td>
+                    <td class="nowrap">
+                        <button class="btn-mini" data-code="${row.code}" ${btnDisabled}>${btnLabel}</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             }
 
             document.getElementById("summaryRunning").textContent = running;
-            document.getElementById("summaryFailed").textContent = failed + diffWarn;
+            document.getElementById("summaryFailed").textContent = failed;
         }
 
-        function refreshStatus() {
-            fetch("/admin/status")
-                .then(res => res.json())
-                .then(data => {
-                    renderTable(data);
-                })
-                .catch(() => {});
+        async function refreshStatus() {
+            try {
+                const res = await fetch("/admin/status");
+                const statusMap = await res.json();
+                renderTable(statusMap);
+            } catch (err) {
+                console.error(err);
+            }
         }
 
-        function runCrawler(code, name) {
-            if (!confirm(`${name} 크롤을 실행할까요?`)) return;
-            fetch(`/admin/run/${code}`, { method: "POST" })
-                .then(res => res.json())
-                .then(data => {
-                    alert(data.msg || "요청됨");
-                    refreshStatus();
-                })
-                .catch(err => alert("실행 오류: " + err));
-        }
-
-        function checkTotals() {
-            const btn = document.getElementById("btnCheckTotals");
-            btn.disabled = true;
-            btn.textContent = "원격 확인 중...";
-            fetch("/admin/check-totals", { method: "POST" })
-                .then(res => res.json())
-                .then(payload => {
-                    const data = payload.data || {};
-                    const nowText = (Object.values(data)[0] || {}).checked_at || "";
-                    document.getElementById("lastCheckInfo").textContent = nowText ? `원격 확인: ${nowText}` : "";
-                    for (const row of rowsData) {
-                        const item = data[row.code];
-                        if (item) {
-                            row.remote_count = item.remote_count;
-                            row.recommend_update = item.recommend_update;
-                            row.remote_checked_at = item.checked_at;
+        async function refreshTotals() {
+            document.getElementById("lastCheckInfo").textContent = "원격 권수 확인 중...";
+            try {
+                const res = await fetch("/admin/check-totals", { method: "POST" });
+                const data = await res.json();
+                if (data && data.success) {
+                    const now = new Date();
+                    document.getElementById("lastCheckInfo").textContent = `마지막 확인: ${now.toLocaleString()}`;
+                    rowsData.forEach(row => {
+                        const r = data.data[row.code];
+                        if (r) {
+                            row.remote_count = r.remote_count;
+                            row.remote_checked_at = r.checked_at;
                         }
-                    }
-                    refreshStatus();
-                })
-                .catch(err => alert("원격 권수 확인 실패: " + err))
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.textContent = "원격 권수 새로고침";
-                });
+                    });
+                    await refreshStatus();
+                } else {
+                    document.getElementById("lastCheckInfo").textContent = "원격 권수 확인 실패";
+                }
+            } catch (err) {
+                document.getElementById("lastCheckInfo").textContent = "원격 권수 확인 실패";
+            }
         }
 
+        document.getElementById("btnCheckTotals").addEventListener("click", refreshTotals);
         document.getElementById("btnRefresh").addEventListener("click", refreshStatus);
-        document.getElementById("btnCheckTotals").addEventListener("click", checkTotals);
 
-        // 초기 렌더
-        renderTable({});
+        document.getElementById("rowsBody").addEventListener("click", async (event) => {
+            const btn = event.target.closest("button[data-code]");
+            if (!btn) return;
+            const code = btn.getAttribute("data-code");
+            btn.disabled = true;
+            btn.textContent = "실행 중";
+            try {
+                await fetch(`/admin/run/${code}`, { method: "POST" });
+                await refreshStatus();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "지금 실행";
+            }
+        });
+
         refreshStatus();
-        setInterval(refreshStatus, 4000);
     </script>
 </body>
 </html>

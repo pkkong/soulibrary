@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
 </head>
 <body>
-    <div class="hero">
+    <div class="hero container-compact">
         <h1><a class="brand-link" href="/">서울시 전자도서 통합검색</a></h1>
         {% if library_count and book_count %}
         <p>{{ library_count }}개 도서관에서 {{ "{:,}".format(book_count) }}권을 한 번에 검색하세요.</p>
@@ -17,21 +17,23 @@
         {% else %}
         <p>여러 도서관 전자책을 한 번에 검색해보세요.</p>
         {% endif %}
-        <div class="summary-row">
-            <div id="status"></div>
-            <div class="filter-summary" id="filter-summary" onclick="openFilterSheet()">
-                <span class="filter-desc" id="filter-summary-text">설정 없음</span>
+    </div>
+    <div class="sticky-search">
+        <div class="container-compact">
+            <div class="search-bar">
+                <input type="text" id="query" placeholder="책 제목, 저자, 출판사 검색..." />
+                <button onclick="search()">검색</button>
             </div>
         </div>
     </div>
-    <div class="sticky-search">
-        <div class="search-bar">
-            <input type="text" id="query" placeholder="책 제목, 저자, 출판사 검색..." />
-            <button onclick="search()">검색</button>
+    <div class="summary-row container-compact">
+        <div id="status"></div>
+        <div class="filter-summary" id="filter-summary" onclick="openFilterSheet()">
+            <span class="filter-desc" id="filter-summary-text">설정 없음</span>
         </div>
     </div>
 
-    <div class="layout">
+    <div class="layout container-compact">
         <main class="content">
             <div class="loader" id="loading-spinner"></div>
             <div id="results" class="grid"></div>

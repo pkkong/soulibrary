@@ -17,6 +17,7 @@ const PROVIDER_LOGOS = {};
 let currentResults = [];
 let filteredResults = [];
 let renderIndex = 0;
+let currentQueryText = "";
 let selectedProviders = new Set();
 let selectedLibraries = new Set();
 let selectedField = "title_author"; // 기본: 제목+저자
@@ -28,6 +29,20 @@ if (filterBar) filterBar.style.display = "none"; // 초기에는 숨김
 const filterSummary = document.getElementById("filter-summary");
 const filterSummaryText = document.getElementById("filter-summary-text");
 if (filterSummary) filterSummary.style.display = "none";
+
+function _isValidSearchField(value) {
+    return value === "title_author" || value === "title" || value === "author" || value === "publisher";
+}
+
+function showResultsMessage(text, kind = "empty") {
+    const resultsDiv = document.getElementById('results');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = "";
+    const el = document.createElement("div");
+    el.className = `card result-message ${kind}`;
+    el.innerText = text || "";
+    resultsDiv.appendChild(el);
+}
 
 function providerLabel(raw) {
     if (!raw) return "기타";
@@ -99,16 +114,34 @@ function applyFilters() {
         const libOk = selectedLibraries.size === 0 || libs.some(l => selectedLibraries.has(l));
         return provOk && libOk;
     });
+    filteredResults.sort((a, b) => {
+        const diff = getLibraryCount(b) - getLibraryCount(a);
+        if (diff !== 0) return diff;
+        const at = (a.title || "").toString();
+        const bt = (b.title || "").toString();
+        return at.localeCompare(bt, "ko");
+    });
     renderIndex = 0;
     document.getElementById('results').innerHTML = "";
-    renderMore();
-    document.getElementById('status').innerText = `검색 결과 ${filteredResults.length}권`;
+    const countText = filteredResults.length.toLocaleString();
+    const prefix = currentQueryText ? `${currentQueryText} ` : "";
+    document.getElementById('status').innerText = `${prefix}검색 결과 ${countText}권`;
     updateFilterSummary();
+
+    const loadMoreBtn = document.getElementById('load-more');
+    if (filteredResults.length === 0) {
+        if (loadMoreBtn) loadMoreBtn.style.display = "none";
+        if (currentResults.length > 0) showResultsMessage("필터 결과가 없습니다.", "empty");
+        return;
+    }
+
+    renderMore();
 }
 
 function search() {
     const query = document.getElementById('query').value.trim();
     if (!query) return alert("검색어를 입력해 주세요.");
+    currentQueryText = query;
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
     const loader = document.getElementById('loading-spinner');
@@ -127,8 +160,14 @@ function search() {
         .then(res => res.json())
         .then(data => {
             loader.style.display = "none";
-            if (data.error) { statusDiv.innerText = "오류: " + data.error; return; }
-            if (data.length === 0) { statusDiv.innerHTML = `<div style="padding:20px;">'${query}' 결과가 없습니다.</div>`; return; }
+            if (data.error) {
+                showResultsMessage("오류: " + data.error, "error");
+                return;
+            }
+            if (data.length === 0) {
+                statusDiv.innerText = `${query} 검색 결과 0권`;
+                return;
+            }
             currentResults = data;
             buildFilters(data);
             applyFilters();
@@ -136,7 +175,7 @@ function search() {
         })
         .catch(err => {
             loader.style.display = "none";
-            statusDiv.innerText = "검색 중 오류가 발생했습니다.";
+            showResultsMessage("검색 중 오류가 발생했습니다.", "error");
             console.error(err);
         });
 }
@@ -154,6 +193,16 @@ function uniqueLibraries(book) {
 }
 
 const SPECIAL_LIBRARY_CODES = new Set(["seoul", "sen_owned", "sen_subs"]);
+const LIB_COUNT_CACHE = new WeakMap();
+
+function getLibraryCount(book) {
+    if (!book || typeof book !== "object") return 0;
+    const cached = LIB_COUNT_CACHE.get(book);
+    if (cached !== undefined) return cached;
+    const count = uniqueLibraries(book).length;
+    LIB_COUNT_CACHE.set(book, count);
+    return count;
+}
 
 function groupLibraries(libs) {
     const groups = { kyobo: [], yes24: [], other: [], special: [] };
@@ -186,36 +235,48 @@ function renderMore() {
     if (slice.length === 0) { loadMoreBtn.style.display = "none"; return; }
 
     slice.forEach(book => {
+        const bookId = book.book_id || "";
         const imgHtml = book.image_url
             ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'no-img\\'>이미지 없음</div>'">`
             : `<div class="no-img">이미지 없음</div>`;
 
     const libs = uniqueLibraries(book);
     const groups = groupLibraries(libs);
-    const groupLines = [];
-    const providerLbl = providerLabel(book.provider);
-    const onlyKyobo = groups.kyobo.length && !groups.yes24.length && !groups.other.length;
-    const onlyYes = groups.yes24.length && !groups.kyobo.length && !groups.other.length;
-    if (groups.kyobo.length) {
-        groupLines.push(`<div class="lib-group"><span class="badge-label kyobo">교보</span>${renderLibraryBadges(groups.kyobo)}</div>`);
-    }
-    if (groups.yes24.length) {
-        groupLines.push(`<div class="lib-group"><span class="badge-label yes24">YES24</span>${renderLibraryBadges(groups.yes24)}</div>`);
-    }
-    if (groups.other.length) {
-        groupLines.push(`<div class="lib-group"><span class="badge-label other">기타</span>${renderLibraryBadges(groups.other)}</div>`);
-    }
-    if (groups.special.length) {
-        groupLines.push(`<div class="lib-group"><span class="badge-label special">서울도서관·교육청</span>${renderLibraryBadges(groups.special)}</div>`);
-    }
-    const libBadges = groupLines.join("");
+    const kyoboCount = groups.kyobo.length;
+    const yes24Count = groups.yes24.length;
+    const otherCount = groups.other.length + groups.special.length;
+    const totalLibs = kyoboCount + yes24Count + otherCount;
+    const kyoboOn = kyoboCount > 0;
+    const yes24On = yes24Count > 0;
+    const otherOn = otherCount > 0;
+    const libBadges = `
+        <div class="supply-summary">
+            <div class="prov-grid">
+                <div class="prov-item ${kyoboOn ? "" : "is-off"}">
+                    <div class="prov-chip kyobo"><img src="/static/img/kyobo.webp" alt="교보" loading="lazy"></div>
+                    <div class="prov-count">${kyoboCount || "-"}</div>
+                </div>
+                <div class="prov-item ${yes24On ? "" : "is-off"}">
+                    <div class="prov-chip yes24"><img src="/static/img/yes24.webp" alt="YES24" loading="lazy"></div>
+                    <div class="prov-count">${yes24Count || "-"}</div>
+                </div>
+                <div class="prov-item ${otherOn ? "" : "is-off"}">
+                    <div class="prov-chip other">기타</div>
+                    <div class="prov-count">${otherCount || "-"}</div>
+                </div>
+            </div>
+        </div>
+    `;
 
     const html = `
-        <div class="card">
+        <div class="card js-book-card" ${bookId ? `data-book-id="${bookId}"` : ""}>
             <div class="thumb">${imgHtml}</div>
             <div class="info">
                 <h3 class="title" title="${book.title}">${book.title}</h3>
-                <div class="meta">${book.author || ""}${book.publisher ? ` | ${book.publisher}` : ""}</div>
+                <div class="meta">
+                    <div class="meta-author">${book.author || ""}</div>
+                    ${book.publisher ? `<div class="meta-publisher">${book.publisher}</div>` : ""}
+                </div>
                 <div class="badges">${libBadges}</div>
             </div>
         </div>
@@ -225,6 +286,27 @@ function renderMore() {
     renderIndex += slice.length;
     loadMoreBtn.style.display = renderIndex < filteredResults.length ? "block" : "none";
 }
+
+document.addEventListener("click", (event) => {
+    const card = event.target.closest(".js-book-card");
+    if (!card) return;
+    const id = card.getAttribute("data-book-id");
+    if (!id) return;
+    window.location.href = `/book/${id}`;
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(window.location.search);
+    const q = (params.get("q") || "").trim();
+    if (!q) return;
+
+    const field = (params.get("field") || "").trim();
+    if (_isValidSearchField(field)) selectedField = field;
+
+    const input = document.getElementById("query");
+    if (input) input.value = q;
+    search();
+});
 
 function toggleFilters() {
 }

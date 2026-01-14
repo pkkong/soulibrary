@@ -13,9 +13,9 @@
   },
   "sen_owned": {
     "name": "서울교육청 (소장)",
-    "status": "running",
-    "last_run": "2026-01-07 10:12:39",
-    "msg": "실행 중"
+    "status": "done",
+    "last_run": "2026-01-13 16:05:33",
+    "msg": "정상 완료"
   },
   "sen_subs": {
     "name": "서울교육청 (구독)",
@@ -25,9 +25,9 @@
   },
   "seongbuk": {
     "name": "성북구 (교보 신버전)",
-    "status": "failed",
-    "last_run": "2025-12-31 16:02:52",
-    "msg": "database is locked"
+    "status": "done",
+    "last_run": "2026-01-13 16:08:12",
+    "msg": "정상 완료"
   },
   "gangnam": {
     "name": "강남구 전자도서관",
@@ -120,7 +120,7 @@
     "msg": "정상 완료"
   },
   "seongdong": {
-    "name": "성동구 (Fx)",
+    "name": "성동구 (북큐브)",
     "status": "done",
     "last_run": "2025-12-30 11:58:38",
     "msg": "정상 완료"
@@ -139,9 +139,9 @@
   },
   "dobong": {
     "name": "도봉구 (교보)",
-    "status": "failed",
-    "last_run": "2025-12-30 16:09:50",
-    "msg": "데이터 수집 중..."
+    "status": "done",
+    "last_run": "2026-01-13 19:08:08",
+    "msg": "정상 완료"
   },
   "seodaemun_subs": {
     "name": "서대문구 (구독)",
@@ -187,9 +187,9 @@
   },
   "songpa_subs": {
     "name": "송파구 (구독)",
-    "status": "failed",
-    "last_run": "2025-12-31 16:14:02",
-    "msg": "database is locked"
+    "status": "done",
+    "last_run": "2026-01-13 17:50:03",
+    "msg": "정상 완료"
   },
   "songpa_owned": {
     "name": "송파구 (소장)",

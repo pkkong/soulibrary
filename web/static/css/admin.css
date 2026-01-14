@@ -43,3 +43,7 @@ tr:last-child td { border-bottom: none; }
 .sticky-actions { position: sticky; top: 0; background: #f8fafc; padding: 10px 0; z-index: 2; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+.lib-link { color: inherit; font-weight: 800; text-decoration: none; }
+.lib-link:hover { text-decoration: underline; }
+.notice { margin: 0 0 16px; padding: 12px 14px; background: #eef6ff; border: 1px solid #dbeafe; border-radius: 10px; color: #0f172a; font-size: 13px; }
+.notice code { background: #e5e7eb; padding: 2px 6px; border-radius: 6px; font-family: "SFMono-Regular","Consolas","Liberation Mono","Menlo",monospace; font-size: 12px; }
