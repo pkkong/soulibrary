@@ -1,126 +1,124 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if book %}{{ book.title }}{% else %}도서 상세{% endif %} - 서울시 전자도서 통합검색</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
-</head>
-<body>
-    {% if error %}
-        <div class="container-compact" style="padding-top: 18px;">
-            <a href="/" class="btn-link">← 검색으로</a>
-            <div class="card result-message error" style="margin-top: 12px;">{{ error }}</div>
-        </div>
-    {% else %}
-        <div class="detail-hero">
-            {% if book.image_url %}
-                <div class="detail-bg" style="background-image: url('{{ book.image_url }}');"></div>
-            {% else %}
-                <div class="detail-bg detail-bg-fallback"></div>
-            {% endif %}
+{% extends "base.html" %}
 
-            <div class="detail-topbar">
-                <button class="detail-icon-btn" type="button" onclick="history.length > 1 ? history.back() : (location.href='/')">✕</button>
-                <button class="detail-icon-btn" type="button" aria-label="찜" title="찜(준비 중)">♡</button>
-            </div>
+{% if book %}
+{% set page_title = book.title ~ " - 서울시 전자도서 통합검색" %}
+{% else %}
+{% set page_title = "도서 상세 - 서울시 전자도서 통합검색" %}
+{% endif %}
 
-            <div class="detail-cover-wrap">
-                <div class="detail-cover">
-                    {% if book.image_url %}
-                        <img src="{{ book.image_url }}" loading="lazy" alt="표지">
-                    {% else %}
-                        <div class="no-img">이미지 없음</div>
-                    {% endif %}
-                </div>
-            </div>
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block body_class %}page-detail{% endblock %}
+
+{% block content %}
+{% if error %}
+    <div class="container-compact" style="padding-top: 18px;">
+        <a href="/search" class="btn-link">← 검색</a>
+        <div class="card result-message error" style="margin-top: 12px;">{{ error }}</div>
+    </div>
+{% else %}
+    <div class="detail-hero">
+        {% if book.image_url %}
+            <div class="detail-bg" style="background-image: url('{{ book.image_url }}');"></div>
+        {% else %}
+            <div class="detail-bg detail-bg-fallback"></div>
+        {% endif %}
+
+        <div class="detail-topbar">
+            <button class="detail-icon-btn" type="button" onclick="history.length > 1 ? history.back() : (location.href='/search')">✕</button>
+            <button class="detail-icon-btn" type="button" aria-label="찜" title="찜(미구현)">♡</button>
         </div>
 
-        <div class="detail-sheet">
-            <section class="detail-panel detail-info">
-                <div class="detail-inner">
-                <h2 class="detail-title">{{ book.title }}</h2>
-                <div class="detail-meta">
-                    <a class="detail-meta-row detail-meta-link" href="/?q={{ book.author|urlencode }}&field=author">
-                        <span class="detail-meta-k">저자</span>
-                        <span class="detail-meta-v detail-meta-v-link">
-                            <span class="detail-meta-text">{{ book.author }}</span>
-                            <span class="detail-meta-chevron">›</span>
-                        </span>
-                    </a>
-                    {% if book.publisher %}
-                        <div class="detail-meta-row"><span class="detail-meta-k">출판</span><span class="detail-meta-v">{{ book.publisher }}</span></div>
-                    {% endif %}
-                </div>
-                {# 공급사 요약은 아래 소장 도서관 섹션 헤더로 이동 #}
-                </div>
-            </section>
+        <div class="detail-cover-wrap">
+            <div class="detail-cover">
+                {% if book.image_url %}
+                    <img src="{{ book.image_url }}" loading="lazy" alt="커버">
+                {% else %}
+                    <div class="no-img">이미지 없음</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
-            <section class="detail-panel detail-libs">
-                <div class="detail-inner">
-                <div class="detail-section-head">
-                    <div class="detail-section-title">소장 도서관</div>
-                    <div class="detail-section-actions">
-                        {# 더보기 제거 #}
+    <div class="detail-sheet">
+        <section class="detail-panel detail-info">
+            <div class="detail-inner">
+            <h2 class="detail-title">{{ book.title }}</h2>
+            <div class="detail-meta">
+                <a class="detail-meta-row detail-meta-link" href="/search?q={{ book.author|urlencode }}&field=author">
+                    <span class="detail-meta-k">저자</span>
+                    <span class="detail-meta-v detail-meta-v-link">
+                        <span class="detail-meta-text">{{ book.author }}</span>
+                        <span class="detail-meta-chevron">›</span>
+                    </span>
+                </a>
+                {% if book.publisher %}
+                    <div class="detail-meta-row"><span class="detail-meta-k">출판</span><span class="detail-meta-v">{{ book.publisher }}</span></div>
+                {% endif %}
+            </div>
+            </div>
+        </section>
+
+        <section class="detail-panel detail-libs">
+            <div class="detail-inner">
+            <div class="detail-section-head">
+                <div class="detail-section-title">소장 도서관</div>
+            </div>
+            <div class="detail-section-sub">도서관 클릭 시 해당 홈페이지로 이동합니다.</div>
+
+            {% set ns = namespace(kyobo=[], yes24=[], other=[]) %}
+            {% for lib in book.libraries %}
+                {% if lib.platform_code in ["Kyobo", "Kyobo_New"] %}
+                    {% set ns.kyobo = ns.kyobo + [lib] %}
+                {% elif lib.platform_code == "YES24" %}
+                    {% set ns.yes24 = ns.yes24 + [lib] %}
+                {% else %}
+                    {% set ns.other = ns.other + [lib] %}
+                {% endif %}
+            {% endfor %}
+
+            <div class="lib-groups">
+                {% if ns.kyobo %}
+                    <div class="lib-group-row">
+                        <div class="lib-provider">
+                            <div class="prov-chip kyobo"><img src="/static/img/kyobo.webp" alt="교보"></div>
+                        </div>
+                        <div class="lib-chips">
+                            {% for lib in ns.kyobo %}
+                                <a class="badge" href="{{ lib.homepage_url }}" target="_blank" rel="noopener noreferrer">{{ lib.short }}</a>
+                            {% endfor %}
+                        </div>
                     </div>
-                </div>
-                <div class="detail-section-sub">도서관 클릭 시 해당 홈페이지로 이동합니다.</div>
+                {% endif %}
 
-                {% set ns = namespace(kyobo=[], yes24=[], other=[]) %}
-                {% for lib in book.libraries %}
-                    {% if lib.platform_code in ["Kyobo", "Kyobo_New"] %}
-                        {% set ns.kyobo = ns.kyobo + [lib] %}
-                    {% elif lib.platform_code == "YES24" %}
-                        {% set ns.yes24 = ns.yes24 + [lib] %}
-                    {% else %}
-                        {% set ns.other = ns.other + [lib] %}
-                    {% endif %}
-                {% endfor %}
-
-                <div class="lib-groups">
-                    {% if ns.kyobo %}
-                        <div class="lib-group-row">
-                            <div class="lib-provider">
-                                <div class="prov-chip kyobo"><img src="/static/img/kyobo.webp" alt="교보"></div>
-                            </div>
-                            <div class="lib-chips">
-                                {% for lib in ns.kyobo %}
-                                    <a class="badge" href="{{ lib.homepage_url }}" target="_blank" rel="noopener noreferrer">{{ lib.short }}</a>
-                                {% endfor %}
-                            </div>
+                {% if ns.yes24 %}
+                    <div class="lib-group-row">
+                        <div class="lib-provider">
+                            <div class="prov-chip yes24"><img src="/static/img/yes24.webp" alt="YES24"></div>
                         </div>
-                    {% endif %}
-
-                    {% if ns.yes24 %}
-                        <div class="lib-group-row">
-                            <div class="lib-provider">
-                                <div class="prov-chip yes24"><img src="/static/img/yes24.webp" alt="YES24"></div>
-                            </div>
-                            <div class="lib-chips">
-                                {% for lib in ns.yes24 %}
-                                    <a class="badge" href="{{ lib.homepage_url }}" target="_blank" rel="noopener noreferrer">{{ lib.short }}</a>
-                                {% endfor %}
-                            </div>
+                        <div class="lib-chips">
+                            {% for lib in ns.yes24 %}
+                                <a class="badge" href="{{ lib.homepage_url }}" target="_blank" rel="noopener noreferrer">{{ lib.short }}</a>
+                            {% endfor %}
                         </div>
-                    {% endif %}
+                    </div>
+                {% endif %}
 
-                    {% if ns.other %}
-                        <div class="lib-group-row">
-                            <div class="lib-provider">
-                                <div class="prov-chip other" aria-label="기타" title="기타">기타</div>
-                            </div>
-                            <div class="lib-chips">
-                                {% for lib in ns.other %}
-                                    <a class="badge" href="{{ lib.homepage_url }}" target="_blank" rel="noopener noreferrer">{{ lib.short }}</a>
-                                {% endfor %}
-                            </div>
+                {% if ns.other %}
+                    <div class="lib-group-row">
+                        <div class="lib-provider">
+                            <div class="prov-chip other" aria-label="기타" title="기타">기타</div>
                         </div>
-                    {% endif %}
-                </div>
-                </div>
-            </section>
-        </div>
-    {% endif %}
-</body>
-</html>
+                        <div class="lib-chips">
+                            {% for lib in ns.other %}
+                                <a class="badge" href="{{ lib.homepage_url }}" target="_blank" rel="noopener noreferrer">{{ lib.short }}</a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            </div>
+        </section>
+    </div>
+{% endif %}
+{% endblock %}

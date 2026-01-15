@@ -1,0 +1,67 @@
+﻿{% extends "base.html" %}
+
+{% block title %}검색 - 서울시 전자도서 통합검색{% endblock %}
+
+{% block body_class %}page-search{% endblock %}
+
+{% block content %}
+<div class="container-compact">
+    <div class="search-page">
+        {# search.js expects #query; keep it but hide from UI (use global bottom-sheet input instead) #}
+        <input type="text" id="query" class="hidden-query" aria-hidden="true" tabindex="-1" />
+
+        <div class="summary-row">
+            <div id="status"></div>
+            <div class="filter-summary" id="filter-summary" onclick="openFilterSheet()">
+                <span class="filter-desc" id="filter-summary-text">필터</span>
+                </div>
+        </div>
+
+        <div class="content">
+            <div class="loader" id="loading-spinner"></div>
+            <div id="results" class="grid"></div>
+            <button id="load-more" onclick="renderMore()">더 보기</button>
+        </div>
+    </div>
+</div>
+
+<div class="filter-sheet" id="filter-sheet">
+    <div class="sheet-header">
+        <div id="sheet-title">필터</div>
+        <button class="btn-link" onclick="closeSheet()">닫기</button>
+    </div>
+    <div class="sheet-body">
+        <div class="sheet-left">
+            <button class="sheet-tab" type="button" data-type="field">검색 대상</button>
+            <button class="sheet-tab" type="button" data-type="provider">공급사</button>
+            <button class="sheet-tab" type="button" data-type="library">도서관</button>
+        </div>
+        <div class="sheet-right">
+            <div class="sheet-label" id="sheet-label"></div>
+            <div class="sheet-options" id="sheet-options"></div>
+        </div>
+    </div>
+    <div class="sheet-actions">
+        <button class="btn-secondary" onclick="closeSheet()">취소</button>
+        <button class="btn-primary" onclick="applySheet()">확인</button>
+    </div>
+</div>
+<div class="overlay" id="sheet-overlay" onclick="closeSheet()"></div>
+
+<script>
+    const LIB_URLS = {{ lib_url_map|tojson|safe }};
+</script>
+<script src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const params = new URLSearchParams(window.location.search);
+        const q = (params.get("q") || "").trim();
+        if (q) return;
+        if (typeof window.__openGlobalSearch === "function") window.__openGlobalSearch();
+    });
+</script>
+{% endblock %}
+

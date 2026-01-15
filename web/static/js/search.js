@@ -1,4 +1,4 @@
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 40;
 const PROVIDER_LABELS = {
     "교보": "교보",
     "교보문고": "교보",
@@ -17,6 +17,7 @@ const PROVIDER_LOGOS = {};
 let currentResults = [];
 let filteredResults = [];
 let renderIndex = 0;
+let totalCount = 0;
 let currentQueryText = "";
 let selectedProviders = new Set();
 let selectedLibraries = new Set();
@@ -123,7 +124,7 @@ function applyFilters() {
     });
     renderIndex = 0;
     document.getElementById('results').innerHTML = "";
-    const countText = filteredResults.length.toLocaleString();
+    const countText = totalCount ? totalCount.toLocaleString() : filteredResults.length.toLocaleString();
     const prefix = currentQueryText ? `${currentQueryText} ` : "";
     document.getElementById('status').innerText = `${prefix}검색 결과 ${countText}권`;
     updateFilterSummary();
@@ -153,10 +154,13 @@ function search() {
     renderIndex = 0;
     currentResults = [];
     filteredResults = [];
+    totalCount = 0;
     const params = new URLSearchParams();
     params.set("query", query);
     params.set("field", selectedField);
-    fetch(`/search?${params.toString()}`)
+    params.set("limit", PAGE_SIZE.toString());
+    params.set("offset", "0");
+    fetch(`/api/search?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
             loader.style.display = "none";
@@ -164,13 +168,16 @@ function search() {
                 showResultsMessage("오류: " + data.error, "error");
                 return;
             }
-            if (data.length === 0) {
+            const items = Array.isArray(data.items) ? data.items : [];
+            totalCount = Number.isFinite(data.total) ? data.total : 0;
+            if (items.length === 0) {
                 statusDiv.innerText = `${query} 검색 결과 0권`;
                 return;
             }
-            currentResults = data;
-            buildFilters(data);
+            currentResults = items;
+            buildFilters(items);
             applyFilters();
+            if (loadMoreBtn) loadMoreBtn.onclick = loadMoreFromServer;
             if (filterBar) filterBar.style.display = "flex"; // 결과가 있을 때만 노출
         })
         .catch(err => {
@@ -284,7 +291,44 @@ function renderMore() {
         resultsDiv.insertAdjacentHTML('beforeend', html);
     });
     renderIndex += slice.length;
-    loadMoreBtn.style.display = renderIndex < filteredResults.length ? "block" : "none";
+    const loaded = currentResults.length;
+    const canLoadMore = totalCount === 0 ? renderIndex < filteredResults.length : loaded < totalCount;
+    loadMoreBtn.style.display = canLoadMore ? "block" : "none";
+}
+
+function loadMoreFromServer() {
+    if (!currentQueryText) return;
+    const loader = document.getElementById('loading-spinner');
+    const params = new URLSearchParams();
+    params.set("query", currentQueryText);
+    params.set("field", selectedField);
+    params.set("limit", PAGE_SIZE.toString());
+    params.set("offset", String(currentResults.length));
+    loader.style.display = "block";
+    fetch(`/api/search?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+            loader.style.display = "none";
+            if (data.error) {
+                showResultsMessage("오류: " + data.error, "error");
+                return;
+            }
+            const items = Array.isArray(data.items) ? data.items : [];
+            if (items.length === 0) {
+                const loadMoreBtn = document.getElementById('load-more');
+                if (loadMoreBtn) loadMoreBtn.style.display = "none";
+                return;
+            }
+            totalCount = Number.isFinite(data.total) ? data.total : totalCount;
+            currentResults = currentResults.concat(items);
+            buildFilters(currentResults);
+            applyFilters();
+        })
+        .catch(err => {
+            loader.style.display = "none";
+            showResultsMessage("검색 중 오류가 발생했습니다.", "error");
+            console.error(err);
+        });
 }
 
 document.addEventListener("click", (event) => {

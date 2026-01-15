@@ -1,72 +1,41 @@
-﻿<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>서울시 전자도서 통합검색</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
-</head>
-<body>
-    <div class="hero container-compact">
-        <h1><a class="brand-link" href="/">서울시 전자도서 통합검색</a></h1>
-        {% if library_count and book_count %}
-        <p>{{ library_count }}개 도서관에서 {{ "{:,}".format(book_count) }}권을 한 번에 검색하세요.</p>
-        {% elif library_count %}
-        <p>{{ library_count }}개 도서관을 한 번에 검색합니다.</p>
-        {% else %}
-        <p>여러 도서관 전자책을 한 번에 검색해보세요.</p>
-        {% endif %}
-    </div>
-    <div class="sticky-search">
-        <div class="container-compact">
-            <div class="search-bar">
-                <input type="text" id="query" placeholder="책 제목, 저자, 출판사 검색..." />
-                <button onclick="search()">검색</button>
-            </div>
-        </div>
-    </div>
-    <div class="summary-row container-compact">
-        <div id="status"></div>
-        <div class="filter-summary" id="filter-summary" onclick="openFilterSheet()">
-            <span class="filter-desc" id="filter-summary-text">설정 없음</span>
-        </div>
-    </div>
+{% extends "base.html" %}
 
-    <div class="layout container-compact">
-        <main class="content">
-            <div class="loader" id="loading-spinner"></div>
-            <div id="results" class="grid"></div>
-            <button id="load-more" onclick="renderMore()">더 보기</button>
-        </main>
-    </div>
+{% block title %}서울시 전자도서 통합검색{% endblock %}
 
-    <div class="filter-sheet" id="filter-sheet">
-        <div class="sheet-header">
-            <div id="sheet-title">필터</div>
-            <button class="btn-link" onclick="closeSheet()">닫기</button>
-        </div>
-        <div class="sheet-body">
-            <div class="sheet-left">
-                <button class="sheet-tab" type="button" data-type="field">검색 대상</button>
-                <button class="sheet-tab" type="button" data-type="provider">공급사</button>
-                <button class="sheet-tab" type="button" data-type="library">도서관</button>
-            </div>
-            <div class="sheet-right">
-                <div class="sheet-label" id="sheet-label"></div>
-                <div class="sheet-options" id="sheet-options"></div>
-            </div>
-        </div>
-        <div class="sheet-actions">
-            <button class="btn-secondary" onclick="closeSheet()">취소</button>
-            <button class="btn-primary" onclick="applySheet()">확인</button>
-        </div>
-    </div>
-    <div class="overlay" id="sheet-overlay" onclick="closeSheet()"></div>
+{% block body_class %}page-home{% endblock %}
 
-    <script>
-        const LIB_URLS = {{ lib_url_map|tojson|safe }};
-    </script>
-    <script src="{{ url_for('static', filename='js/search.js') }}"></script>
-</body>
-</html>
+{% block content %}
+<section class="curation-section" data-curation="higashino" aria-label="커버강조형 큐레이션">
+    <div class="curation-inner">
+        <div class="curation-head">
+            <div class="curation-title">디지털 e북 카페 추천 도서</div>
+            <a class="curation-more" href="https://cafe.naver.com/ebook" target="_blank" rel="noopener noreferrer">카페로 이동 &gt;</a>
+        </div>
+        <div class="curation-track curation-track-hero" id="curation-higashino"></div>
+    </div>
+</section>
+
+<section class="curation-section" data-curation="bitcoin" aria-label="순위 강조형 큐레이션">
+    <div class="curation-inner">
+        <div class="curation-head">
+            <div class="curation-title">비트코인을 공부하기 위해 필요한 책들</div>
+            <a class="curation-more" href="https://brunch.co.kr/@30f0e6d330d44fb/6" target="_blank" rel="noopener noreferrer">관련 글 보기 &gt;</a>
+        </div>
+        <div class="curation-track curation-track-ranked" id="curation-bitcoin"></div>
+    </div>
+</section>
+
+<section class="curation-section" data-curation="chanho" aria-label="기본 큐레이션">
+    <div class="curation-inner">
+        <div class="curation-head">
+            <div class="curation-title">'찬호께이' 작가의 책</div>
+            <a class="curation-more" href="/search?q={{ '찬호께이' | urlencode }}&field=author">더보기 &gt;</a>
+        </div>
+        <div class="curation-track curation-track-basic" id="curation-chanho"></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}

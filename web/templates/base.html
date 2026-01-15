@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}서울시 전자도서 통합검색{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="{% if show_topbar %}has-topbar{% endif %} {% block body_class %}{% endblock %}">
+    {% if show_topbar %}
+    <header class="topbar" role="banner">
+        <div class="topbar-inner container-compact">
+            <div class="topbar-line">
+                <a class="topbar-title" href="/">서울시 전자도서 통합검색</a>
+                {% if topbar_desc %}
+                <span class="topbar-desc">{{ topbar_desc }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+    {% endif %}
+
+    <main class="app-main" role="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <nav class="bottom-nav" aria-label="메뉴">
+        <a class="nav-item {% if active_tab == 'home' %}is-active{% endif %}" href="/">
+            <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 11.5L12 4l9 7.5"></path>
+                    <path d="M5 10.5V20h14v-9.5"></path>
+                </svg>
+            </span>
+            <span class="nav-label">홈</span>
+        </a>
+        <a class="nav-item {% if active_tab == 'search' %}is-active{% endif %}" href="/search" id="global-search-toggle">
+            <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="M21 21l-4.3-4.3"></path>
+                </svg>
+            </span>
+            <span class="nav-label">검색</span>
+        </a>
+    </nav>
+
+    <div class="global-search-sheet" id="global-search-sheet" aria-hidden="true">
+        <div class="global-search-inner">
+            <form class="search-bar" id="global-search-form">
+                <label class="sr-only" for="global-query">검색어</label>
+                <input type="text" id="global-query" placeholder="책 제목, 저자, 출판사 검색..." autocomplete="off" />
+                <button type="submit">검색</button>
+            </form>
+        </div>
+    </div>
+    <div class="global-search-overlay" id="global-search-overlay" aria-hidden="true"></div>
+
+    <script>
+        (function () {
+            const toggle = document.getElementById("global-search-toggle");
+            const sheet = document.getElementById("global-search-sheet");
+            const overlay = document.getElementById("global-search-overlay");
+            const form = document.getElementById("global-search-form");
+            const input = document.getElementById("global-query");
+
+            if (!toggle || !sheet || !overlay || !form || !input) return;
+
+            function openSheet() {
+                sheet.classList.add("show");
+                overlay.classList.add("show");
+                sheet.setAttribute("aria-hidden", "false");
+                overlay.setAttribute("aria-hidden", "false");
+                document.body.classList.add("sheet-open");
+                setTimeout(() => input.focus(), 50);
+            }
+
+            function closeSheet() {
+                sheet.classList.remove("show");
+                overlay.classList.remove("show");
+                sheet.setAttribute("aria-hidden", "true");
+                overlay.setAttribute("aria-hidden", "true");
+                document.body.classList.remove("sheet-open");
+            }
+
+            window.__openGlobalSearch = openSheet;
+            window.__closeGlobalSearch = closeSheet;
+
+            toggle.addEventListener("click", (e) => {
+                e.preventDefault();
+                openSheet();
+            });
+
+            overlay.addEventListener("click", closeSheet);
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") closeSheet();
+            });
+
+            form.addEventListener("submit", (e) => {
+                e.preventDefault();
+                const q = (input.value || "").trim();
+                if (!q) return;
+                closeSheet();
+                location.href = `/search?q=${encodeURIComponent(q)}`;
+            });
+        })();
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
