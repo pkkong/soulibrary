@@ -3,7 +3,7 @@
 import os
 import json
 import re
-import sqlite3
+from db import get_db, using_postgres
 import threading
 import subprocess
 import datetime
@@ -51,21 +51,15 @@ def ensure_db_fresh():
             print(f"[경고] SQLite 빌드 실패: {e}")
 
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    try:
-        conn.execute("PRAGMA busy_timeout = 30000")
-    except Exception:
-        pass
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_db_conn():
+    return get_db(DB_PATH)
 
 
 def load_counts():
     counts = {}
-    if not os.path.exists(DB_PATH):
+    if not using_postgres() and not os.path.exists(DB_PATH):
         return counts
-    conn = get_db()
+    conn = get_db_conn()
     try:
         cur = conn.execute("SELECT library_code, COUNT(*) FROM holdings GROUP BY library_code;")
         for code, cnt in cur.fetchall():
@@ -257,8 +251,8 @@ def reload_database_safely(lib_code=None, success=True):
 def get_counts():
     lib_total = len(LIBRARIES)
     book_total = None
-    if os.path.exists(DB_PATH):
-        conn = get_db()
+    if using_postgres() or os.path.exists(DB_PATH):
+        conn = get_db_conn()
         try:
             cur = conn.execute("SELECT COUNT(*) FROM books;")
             book_total = cur.fetchone()[0]
@@ -322,7 +316,7 @@ def search():
 
     FINAL_LIMIT = 1200
     pattern = f"%{norm_query}%"
-    conn = get_db()
+    conn = get_db_conn()
     try:
         select_base = "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE "
         clauses = []

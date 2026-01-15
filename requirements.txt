@@ -2,3 +2,5 @@ flask
 pandas
 requests
 openpyxl
+psycopg2-binary
+psycopg2-binary

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from flask import jsonify
 
+from db import using_postgres
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DB = "/tmp/library_split.db"
 
@@ -46,14 +48,17 @@ def db_ready():
         return False
 
 
-if not db_ready():
-    threading.Thread(target=build_db, daemon=True).start()
+if not using_postgres():
+    if not db_ready():
+        threading.Thread(target=build_db, daemon=True).start()
 
 from app_search import app as flask_app
 
 
 @flask_app.before_request
 def gate_until_ready():
+    if using_postgres():
+        return None
     if db_ready():
         return None
     if getattr(gate_until_ready, "_warned", False) is False:

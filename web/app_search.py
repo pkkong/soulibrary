@@ -1,7 +1,7 @@
 import os
 import json
 import re
-import sqlite3
+from db import get_db, using_postgres
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
@@ -14,14 +14,8 @@ LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
 DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
 
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    try:
-        conn.execute("PRAGMA busy_timeout = 30000")
-    except Exception:
-        pass
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_db_conn():
+    return get_db(DB_PATH)
 
 
 def normalize_title(text):
@@ -96,18 +90,22 @@ def provider_from_platforms(platforms):
 def get_counts():
     lib_total = len(LIBRARIES)
     book_total = None
-    if os.path.exists(DB_PATH):
-        conn = get_db()
+    if using_postgres() or os.path.exists(DB_PATH):
+        conn = get_db_conn()
         try:
             cur = conn.execute("SELECT COUNT(*) FROM books;")
-            book_total = cur.fetchone()[0]
+            row = cur.fetchone()
+            if using_postgres():
+                book_total = row["count"] if row else 0
+            else:
+                book_total = row[0] if row else 0
         finally:
             conn.close()
     return lib_total, book_total
 
 
 def get_book_detail(book_id: int):
-    conn = get_db()
+    conn = get_db_conn()
     try:
         cur = conn.execute(
             "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE id=?",
@@ -272,7 +270,7 @@ def search():
     offset = max(0, offset)
 
     pattern = f"%{norm_query}%"
-    conn = get_db()
+    conn = get_db_conn()
     try:
         select_base = "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE "
         count_base = "SELECT COUNT(*) AS cnt FROM books WHERE "
@@ -303,10 +301,13 @@ def search():
 
         sql = " UNION ALL ".join(clauses)
         count_sql = " UNION ALL ".join(count_clauses)
-        count_row = conn.execute(f"SELECT SUM(cnt) AS total FROM ({count_sql})", count_params).fetchone()
+        count_row = conn.execute(
+            f"SELECT SUM(cnt) AS total FROM ({count_sql}) AS counts",
+            count_params,
+        ).fetchone()
         total = count_row["total"] if count_row and count_row["total"] else 0
 
-        paged_sql = f"SELECT * FROM ({sql}) LIMIT ? OFFSET ?"
+        paged_sql = f"SELECT * FROM ({sql}) AS unioned LIMIT ? OFFSET ?"
         paged_params = params + [limit * 3, offset]
         cur = conn.execute(paged_sql, paged_params)
         rows = cur.fetchall()
@@ -422,7 +423,7 @@ def api_books():
     if not ids:
         return jsonify([])
 
-    conn = get_db()
+    conn = get_db_conn()
     try:
         placeholders = ",".join("?" for _ in ids)
         cur = conn.execute(
