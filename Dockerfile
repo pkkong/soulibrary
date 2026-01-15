@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 5. web 폴더로 이동해서 앱을 실행한다!
 WORKDIR /app/web
-CMD ["python", "app.py"]
+CMD ["python", "app_search.py"]
