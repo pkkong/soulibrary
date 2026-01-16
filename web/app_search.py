@@ -272,43 +272,40 @@ def search():
     pattern = f"%{norm_query}%"
     conn = get_db_conn()
     try:
-        select_base = "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE "
-        count_base = "SELECT COUNT(*) AS cnt FROM books WHERE "
         clauses = []
-        count_clauses = []
         params = []
-        count_params = []
         if field in ("title", "title_author"):
-            clauses.append(select_base + "title_norm LIKE ?")
+            clauses.append("b.title_norm LIKE ?")
             params.append(pattern)
-            count_clauses.append(count_base + "title_norm LIKE ?")
-            count_params.append(pattern)
         if field in ("author", "title_author"):
-            clauses.append(select_base + "author_norm LIKE ?")
+            clauses.append("b.author_norm LIKE ?")
             params.append(pattern)
-            count_clauses.append(count_base + "author_norm LIKE ?")
-            count_params.append(pattern)
         if field == "publisher":
-            clauses.append(select_base + "publisher_norm LIKE ?")
+            clauses.append("b.publisher_norm LIKE ?")
             params.append(pattern)
-            count_clauses.append(count_base + "publisher_norm LIKE ?")
-            count_params.append(pattern)
         if not clauses:
-            clauses.append(select_base + "title_norm LIKE ?")
+            clauses.append("b.title_norm LIKE ?")
             params.append(pattern)
-            count_clauses.append(count_base + "title_norm LIKE ?")
-            count_params.append(pattern)
 
-        sql = " UNION ALL ".join(clauses)
-        count_sql = " UNION ALL ".join(count_clauses)
+        where_sql = " OR ".join(clauses)
         count_row = conn.execute(
-            f"SELECT SUM(cnt) AS total FROM ({count_sql}) AS counts",
-            count_params,
+            f"SELECT COUNT(*) AS total FROM books b WHERE {where_sql}",
+            params,
         ).fetchone()
         total = count_row["total"] if count_row and count_row["total"] else 0
 
-        paged_sql = f"SELECT * FROM ({sql}) AS unioned LIMIT ? OFFSET ?"
-        paged_params = params + [limit * 3, offset]
+        paged_sql = f"""
+            SELECT
+                b.id, b.title, b.author, b.publisher, b.image_url, b.isbn,
+                COUNT(DISTINCT h.library_code) AS lib_count
+            FROM books b
+            LEFT JOIN holdings h ON h.book_id = b.id
+            WHERE {where_sql}
+            GROUP BY b.id, b.title, b.author, b.publisher, b.image_url, b.isbn
+            ORDER BY lib_count DESC, b.title ASC
+            LIMIT ? OFFSET ?
+        """
+        paged_params = params + [limit, offset]
         cur = conn.execute(paged_sql, paged_params)
         rows = cur.fetchall()
 
@@ -323,21 +320,18 @@ def search():
             for h in hcur.fetchall():
                 holdings_map.setdefault(h["book_id"], []).append(h)
 
-        grouped = {}
+        results = []
         for row in rows:
-            title = row["title"] or ""
-            author = row["author"] or ""
-            norm_key = (normalize_title(title), normalize_author(author), normalize_title(row["publisher"] or ""))
-            item = grouped.setdefault(norm_key, {
+            item = {
                 "book_id": row["id"],
-                "title": title,
-                "author": author,
+                "title": row["title"] or "",
+                "author": row["author"] or "",
                 "publisher": row["publisher"] or "",
                 "provider": "",
                 "image_url": row["image_url"] or "",
                 "libraries": [],
                 "platforms": set(),
-            })
+            }
             for h in holdings_map.get(row["id"], []):
                 prov = normalize_provider(h["provider"] or "")
                 if prov and not item["provider"]:
@@ -350,8 +344,7 @@ def search():
                     item["platforms"].add(plat)
                 if not item["image_url"] and h["image_url"]:
                     item["image_url"] = h["image_url"]
-        results = []
-        for item in grouped.values():
+
             lib_details = []
             platforms = set()
             for lib in item["libraries"]:

@@ -19,6 +19,7 @@ let filteredResults = [];
 let renderIndex = 0;
 let totalCount = 0;
 let currentQueryText = "";
+let refineQueryText = "";
 let selectedProviders = new Set();
 let selectedLibraries = new Set();
 let selectedField = "title_author"; // 기본: 제목+저자
@@ -109,6 +110,10 @@ function resetFilters() {
 
 function applyFilters() {
     filteredResults = currentResults.filter(r => {
+        if (refineQueryText) {
+            const hay = `${r.title || ""} ${r.author || ""} ${r.publisher || ""}`.toLowerCase();
+            if (!hay.includes(refineQueryText)) return false;
+        }
         const providers = r.provider ? [providerLabel(r.provider)] : [];
         const libs = extractLibraries(r).map(l => l.short || l.name);
         const provOk = selectedProviders.size === 0 || providers.some(p => selectedProviders.has(p));
@@ -125,7 +130,7 @@ function applyFilters() {
     renderIndex = 0;
     document.getElementById('results').innerHTML = "";
     const countText = totalCount ? totalCount.toLocaleString() : filteredResults.length.toLocaleString();
-    const prefix = currentQueryText ? `${currentQueryText} ` : "";
+    const prefix = currentQueryText ? `'${currentQueryText}' ` : "";
     document.getElementById('status').innerText = `${prefix}검색 결과 ${countText}권`;
     updateFilterSummary();
 
@@ -155,6 +160,9 @@ function search() {
     currentResults = [];
     filteredResults = [];
     totalCount = 0;
+    refineQueryText = "";
+    const refineInput = document.getElementById("refine-query");
+    if (refineInput) refineInput.value = "";
     const params = new URLSearchParams();
     params.set("query", query);
     params.set("field", selectedField);
@@ -169,9 +177,10 @@ function search() {
                 return;
             }
             const items = Array.isArray(data.items) ? data.items : [];
-            totalCount = Number.isFinite(data.total) ? data.total : 0;
+            const totalValue = Number(data.total);
+            totalCount = Number.isFinite(totalValue) ? totalValue : 0;
             if (items.length === 0) {
-                statusDiv.innerText = `${query} 검색 결과 0권`;
+                statusDiv.innerText = `'${query}' 검색 결과 0권`;
                 return;
             }
             currentResults = items;
@@ -319,7 +328,10 @@ function loadMoreFromServer() {
                 if (loadMoreBtn) loadMoreBtn.style.display = "none";
                 return;
             }
-            totalCount = Number.isFinite(data.total) ? data.total : totalCount;
+            const totalValue = Number(data.total);
+            if (Number.isFinite(totalValue)) {
+                totalCount = totalValue;
+            }
             currentResults = currentResults.concat(items);
             buildFilters(currentResults);
             applyFilters();
@@ -351,6 +363,22 @@ document.addEventListener("DOMContentLoaded", () => {
     if (input) input.value = q;
     search();
 });
+
+const refineInput = document.getElementById("refine-query");
+const refineApply = document.getElementById("refine-apply");
+function applyRefineQuery() {
+    if (!refineInput) return;
+    refineQueryText = (refineInput.value || "").trim().toLowerCase();
+    applyFilters();
+}
+if (refineApply) {
+    refineApply.addEventListener("click", applyRefineQuery);
+}
+if (refineInput) {
+    refineInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") applyRefineQuery();
+    });
+}
 
 function toggleFilters() {
 }

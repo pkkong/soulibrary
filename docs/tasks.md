@@ -5,11 +5,40 @@
 - **필수: 모든 사용자 노출 문자열은 한글 + UTF-8로 유지한다.** (깨짐 발견 시 즉시 수정)
 - 추측으로 구현하지 말고, 필요한 정보는 질문 후 진행한다.
 - 변경 사항은 이 문서에 기록하고, 완료 항목은 날짜를 남긴다.
+- 채팅방이 바뀌어도 **매일 마지막 작업 이후 변경점**을 아래 "일일 업데이트" 섹션에 추가한다.
+- 일일 업데이트는 하루에 1회, 최신 날짜를 맨 위에 쌓는다.
+- 배포/운영 영향이 있는 변경은 "운영/배포"에 반드시 기록한다.
+
+## 표준 작업 흐름 (로컬 → 배포)
+### A. 코드/UI 변경
+1) 로컬에서 수정 및 테스트(로컬 PostgreSQL 사용).
+2) 변경 내용 정리 후 GitHub commit/push.
+3) Cloudtype 재배포.
+
+### B. 데이터(정규화/중복 제거 등) 변경
+1) 크롤링 → CSV 생성.
+2) CSV → 로컬 PostgreSQL 적재(데이터 갱신).
+3) 로컬에서 검색/화면 확인(문제 없으면 OK).
+4) Cloudtype PostgreSQL에 동일 데이터 적재.
+5) 서비스 정상 동작 확인(`/`, `/search`, `/book/<id>`).
+
+### C. 운영 반영 원칙
+- 코드 변경은 GitHub로, 데이터 변경은 PostgreSQL 적재로 반영한다.
+- SQLite는 중간 검증용이었으나 현재는 PostgreSQL 중심으로 운영한다.
+
+## 일일 업데이트 (템플릿)
+### YYYY-MM-DD
+- 변경 요약:
+- 기능 개선:
+- 버그 수정:
+- 운영/배포:
+- 다음 계획:
 
 ## 현재 구조 요약
 - 크롤링/정제는 로컬 전용.
 - 서버는 검색 전용 앱만 실행.
 - DB는 split 구조(books/holdings) 사용.
+- 운영은 PostgreSQL 전환 진행 중(로컬 SQLite는 이관/검증용).
 
 폴더 구조(정리 기준)
 - data/raw: 크롤러 출력 CSV/JSON
@@ -24,7 +53,7 @@
 - 로컬 실행 스크립트
   - run_search.bat → app_search.py
   - run_admin.bat → app.py
-- Dockerfile CMD: app_search.py
+- Dockerfile CMD: app_search.py (Cloudtype에서는 app_cloudtype.py로 교체됨)
 
 ## 크롤러/체커 역할
 - 크롤링이 언제 되어 있는지
@@ -72,6 +101,14 @@
 - 2026-01-14: 비트코인 섹션 타이틀/링크 추가, 찬호께이 섹션 타이틀/더보기 링크 추가.
 - 2026-01-14: 검색 API 페이징 도입(`/api/search` total+items, limit/offset) 및 검색 UI 더보기 연동.
 - 2026-01-14: 검색 화면 필터 옆 세모 중복 제거.
+- 2026-01-15: Cloudtype용 스타터 추가(app_cloudtype.py, DB 빌드 완료 전 503 처리).
+- 2026-01-15: PostgreSQL 전환 준비(`web/db.py` 추가, sqlite/postgres 자동 전환).
+- 2026-01-15: PostgreSQL 이관 스크립트 추가(`scripts/migrate_sqlite_to_postgres.py`).
+- 2026-01-15: PostgreSQL 드라이버 추가(`psycopg2-binary`).
+- 2026-01-15: PostgreSQL 데이터 이관 완료(books=577,197 / holdings=1,531,278).
+- 2026-01-16: Cloudtype soulib 환경변수에 PostgreSQL 접속 정보 설정(DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD).
+- 2026-01-16: 도메인 `soulib.kr` DNS 설정(CNAME/TXT) 및 Cloudtype 도메인 인증 완료.
+- 2026-01-16: 검색 결과 총권수 표시(total 파싱) 보정(`web/static/js/search.js`).
 
 ## 서울도서관 OpenAPI (전자책 필터)
 - 옵션 파라미터 순서: TITLE / AUTHOR / CTRLNO / ISBN / BIB_TYPE
@@ -81,10 +118,15 @@
 - 정상 확인값: list_total_count=29440, row.BIB_TYPE=ze
 
 ## Cloudtype 배포 이슈(요약)
-- 컨테이너에서 DB 생성 시 헬스체크/메모리 문제 발생
-- 512MB/1GB 환경에서 DB 빌드가 느려 포트 오픈 전 실패 가능
-- 해결 방향: DB는 로컬에서 생성 후 업로드/볼륨 마운트## 다음 할 일
-- Cloudtype에 DB 업로드/볼륨 연결 방식 확정
+- 컨테이너 파일은 영구 저장 불가(디스크 마운트 미지원).
+- 임시 DB 빌드는 재시작 시 소실 → 운영용으로 부적합.
+- 해결 방향: PostgreSQL로 전환하여 네트워크 DB 사용.
+
+## 다음 할 일
+- Cloudtype soulib 서비스에 PostgreSQL 환경변수 세팅 확인(DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD).
+- 변경 코드 commit/push 후 재배포.
+- 배포 후 `/`, `/search`, `/book/<id>` 정상 동작 확인.
+- SSL 인증서 발급 완료 확인 및 보안 경고 해소.
+- `soulib.kr` → `www.soulib.kr` 포워딩 설정 여부 확인.
 - (큰 할일) 도서 상세 페이지 구성 고도화(섹션 추가/광고 배치/추천 등)
 - (내일) 홈 화면 UI 미세 조정(모바일/PC: 큐레이션 트랙 시작/끝 여백, 스크롤 시 정렬/여백 체감)
-- (내일) beta 버전 배포하기

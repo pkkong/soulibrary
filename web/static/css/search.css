@@ -448,14 +448,55 @@ body.has-topbar .app-main {
 
 .summary-row {
     max-width: none;
-    margin: var(--space-2) auto var(--space-2);
+    margin: var(--space-2) auto 8px;
     padding: 0;
     display:flex;
     justify-content:space-between;
     align-items:center;
     gap: 10px;
 }
-#status { margin: 0; padding-left: var(--search-inner-offset); color: var(--text-main); font-size: 13px; font-weight:700; text-align:left; flex: 1; }
+#status {
+    margin: 0;
+    padding-left: var(--search-inner-offset);
+    color: var(--text-main);
+    font-size: 15px;
+    font-weight: 800;
+    text-align: left;
+    flex: 1;
+}
+.filter-summary .filter-desc {
+    font-size: 15px;
+    font-weight: 800;
+}
+.refine-row {
+    margin: 0 0 12px;
+    padding: 0 var(--search-inner-offset);
+    display: flex;
+    gap: 8px;
+}
+.refine-input {
+    flex: 1;
+    border: 1px solid #e6e8ed;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+}
+.refine-input:focus {
+    border-color: #cbd5e1;
+}
+.refine-apply {
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #ffffff;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
 
 /* 필터 바/시트 */
 .search-actions { display:flex; flex-direction:column; gap:10px; }
