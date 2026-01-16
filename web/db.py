@@ -1,5 +1,4 @@
 import os
-import sqlite3
 from urllib.parse import urlparse
 
 try:
@@ -43,28 +42,21 @@ class PgConn:
         self._conn.close()
 
 
-def get_db(sqlite_path):
-    if using_postgres():
-        if psycopg2 is None:
-            raise RuntimeError("psycopg2 is required for PostgreSQL connections.")
-        url = os.environ.get("DATABASE_URL")
-        if url:
-            cfg = _parse_database_url(url)
-        else:
-            cfg = {
-                "host": os.environ.get("DB_HOST"),
-                "port": int(os.environ.get("DB_PORT", "5432")),
-                "dbname": os.environ.get("DB_NAME", "postgres"),
-                "user": os.environ.get("DB_USER", "root"),
-                "password": os.environ.get("DB_PASSWORD", ""),
-            }
-        conn = psycopg2.connect(**cfg)
-        return PgConn(conn)
-
-    conn = sqlite3.connect(sqlite_path, timeout=30, check_same_thread=False)
-    try:
-        conn.execute("PRAGMA busy_timeout = 30000")
-    except Exception:
-        pass
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_db(_sqlite_path=None):
+    if not using_postgres():
+        raise RuntimeError("PostgreSQL env vars are required (DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD).")
+    if psycopg2 is None:
+        raise RuntimeError("psycopg2 is required for PostgreSQL connections.")
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        cfg = _parse_database_url(url)
+    else:
+        cfg = {
+            "host": os.environ.get("DB_HOST"),
+            "port": int(os.environ.get("DB_PORT", "5432")),
+            "dbname": os.environ.get("DB_NAME", "postgres"),
+            "user": os.environ.get("DB_USER", "root"),
+            "password": os.environ.get("DB_PASSWORD", ""),
+        }
+    conn = psycopg2.connect(**cfg)
+    return PgConn(conn)

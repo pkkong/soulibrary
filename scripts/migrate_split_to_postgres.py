@@ -1,4 +1,5 @@
 """
+LEGACY: SQLite → PostgreSQL 마이그레이션 (이제는 CSV → PostgreSQL 권장).
 Migrate SQLite split DB (books/holdings) to PostgreSQL.
 
 Usage:

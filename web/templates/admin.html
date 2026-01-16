@@ -17,8 +17,8 @@
             <div class="muted" id="lastCheckInfo"></div>
         </div>
         <div class="notice">
-            <strong>안내</strong> 이 화면은 크롤/체커 전용입니다. 크롤 결과는 CSV까지 생성되며 DB 빌드는 수동 실행하세요.<br>
-            split DB: <code>python scripts/build_library_split.py</code> / 통합 DB(필요 시): <code>python scripts/build_sqlite.py</code>
+            <strong>안내</strong> 이 화면은 크롤/체커 전용입니다. 크롤 결과는 CSV까지 생성되며 DB 적재는 수동 실행하세요.<br>
+            CSV → PostgreSQL: <code>python scripts/load_csv_to_postgres.py</code>
         </div>
 
         <div class="grid" id="summaryGrid">
@@ -30,7 +30,7 @@
             <div class="card">
                 <div class="card-title">총 도서 권수</div>
                 <div class="card-value" id="summaryBooks">{{ "{:,}".format(book_count or 0) }}</div>
-                <div class="small">SQLite 기반 로컬 합계</div>
+                <div class="small">PostgreSQL 기반 로컬 합계</div>
             </div>
             <div class="card">
                 <div class="card-title">진행 중</div>

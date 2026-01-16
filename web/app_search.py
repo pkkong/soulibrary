@@ -191,9 +191,7 @@ for code, info in LIBRARIES.items():
 def index():
     lib_total, book_total = get_counts()
     desc = ""
-    if lib_total and book_total:
-        desc = f"{lib_total}개 도서관 · {book_total:,}권"
-    elif lib_total:
+    if lib_total:
         desc = f"{lib_total}개 도서관"
     return render_template(
         'index.html',
@@ -210,9 +208,7 @@ def index():
 def search_page():
     lib_total, book_total = get_counts()
     desc = ""
-    if lib_total and book_total:
-        desc = f"{lib_total}개 도서관 · {book_total:,}권"
-    elif lib_total:
+    if lib_total:
         desc = f"{lib_total}개 도서관"
     return render_template(
         "search.html",
@@ -254,9 +250,11 @@ def search():
         return jsonify({"total": 0, "items": []})
 
     field = request.args.get('field', 'title_author')
+    refine = request.args.get('refine', '').strip()
     norm_query = normalize_search_text(query)
     if not norm_query:
         return jsonify({"total": 0, "items": []})
+    refine_norm = normalize_search_text(refine) if refine else ""
 
     try:
         limit = int(request.args.get('limit', '200'))
@@ -269,9 +267,8 @@ def search():
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
 
-    pattern = f"%{norm_query}%"
-    conn = get_db_conn()
-    try:
+    def build_where(norm_value):
+        pattern = f"%{norm_value}%"
         clauses = []
         params = []
         if field in ("title", "title_author"):
@@ -286,8 +283,15 @@ def search():
         if not clauses:
             clauses.append("b.title_norm LIKE ?")
             params.append(pattern)
+        return "(" + " OR ".join(clauses) + ")", params
 
-        where_sql = " OR ".join(clauses)
+    conn = get_db_conn()
+    try:
+        where_sql, params = build_where(norm_query)
+        if refine_norm:
+            refine_sql, refine_params = build_where(refine_norm)
+            where_sql = f"{where_sql} AND {refine_sql}"
+            params = params + refine_params
         count_row = conn.execute(
             f"SELECT COUNT(*) AS total FROM books b WHERE {where_sql}",
             params,
@@ -308,6 +312,39 @@ def search():
         paged_params = params + [limit, offset]
         cur = conn.execute(paged_sql, paged_params)
         rows = cur.fetchall()
+
+        filter_providers = []
+        filter_libraries = []
+        if total > 0:
+            providers = set()
+            libraries = set()
+            pcur = conn.execute(
+                f"SELECT DISTINCT h.provider FROM holdings h JOIN books b ON b.id = h.book_id WHERE {where_sql}",
+                params,
+            )
+            for r in pcur.fetchall():
+                raw = r["provider"] if using_postgres() else r[0]
+                if raw:
+                    providers.add(str(raw))
+            lcur = conn.execute(
+                f"SELECT DISTINCT h.library_code, h.library FROM holdings h JOIN books b ON b.id = h.book_id WHERE {where_sql}",
+                params,
+            )
+            for r in lcur.fetchall():
+                if using_postgres():
+                    code = r.get("library_code")
+                    name = r.get("library")
+                else:
+                    code = r[0] if len(r) > 0 else None
+                    name = r[1] if len(r) > 1 else None
+                if code:
+                    meta = LIB_META_BY_CODE.get(code)
+                    libraries.add(meta.get("short") if meta else code)
+                elif name:
+                    meta = LIB_NAME_LOOKUP.get(name)
+                    libraries.add(meta.get("short") if meta else name)
+            filter_providers = sorted(providers)
+            filter_libraries = sorted(libraries)
 
         book_ids = [r["id"] for r in rows]
         holdings_map = {}
@@ -389,7 +426,7 @@ def search():
                 "libraries": lib_details,
                 "platforms": list(platforms or item["platforms"]),
             })
-        return jsonify({"total": total, "items": results})
+        return jsonify({"total": total, "items": results, "filters": {"providers": filter_providers, "libraries": filter_libraries}})
     except Exception as e:
         print(f"[오류] 검색 실패: {e}")
         return jsonify({"error": "검색 처리 오류 발생"})

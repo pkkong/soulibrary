@@ -5,7 +5,6 @@ import json
 import re
 from db import get_db, using_postgres
 import threading
-import subprocess
 import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
@@ -28,27 +27,6 @@ DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT
 IS_SPLIT_DB = True  # 기본은 split DB 사용
 db_lock = threading.Lock()
 DATA_DIR = Path(ROOT_DIR) / "data"
-BUILD_SCRIPT = Path(ROOT_DIR) / "scripts" / "build_sqlite.py"
-AUTO_BUILD = os.environ.get("LIBRARY_AUTO_BUILD", "").lower() in {"1", "true", "yes"}
-
-
-def _latest_data_mtime():
-    latest = 0
-    for p in DATA_DIR.glob("*"):
-        if p.suffix.lower() in {".csv", ".json"} and p.is_file():
-            latest = max(latest, p.stat().st_mtime)
-    return latest
-
-
-def ensure_db_fresh():
-    """Rebuild SQLite if missing or older than source data files."""
-    data_mtime = _latest_data_mtime()
-    need_build = not os.path.exists(DB_PATH) or (data_mtime and os.path.getmtime(DB_PATH) < data_mtime)
-    if need_build and BUILD_SCRIPT.exists():
-        try:
-            subprocess.run(["python", str(BUILD_SCRIPT)], cwd=ROOT_DIR, check=True)
-        except Exception as e:
-            print(f"[경고] SQLite 빌드 실패: {e}")
 
 
 def get_db_conn():
@@ -97,8 +75,6 @@ def save_remote_counts(cache):
 REMOTE_COUNTS_CACHE = load_remote_counts()
 
 # SQLite 신선도 확인 후 준비
-if AUTO_BUILD:
-    ensure_db_fresh()
 
 LIB_NAME_TO_CODE = {info["library_name"]: code for code, info in LIBRARIES.items()}
 

@@ -1,4 +1,5 @@
 """
+LEGACY: SQLite 전용 빌드 스크립트입니다. 현재는 `scripts/load_csv_to_postgres.py` 사용.
 Build split SQLite DB with books (deduped) and holdings (per library).
 
 Run:

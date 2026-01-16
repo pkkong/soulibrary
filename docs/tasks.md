@@ -1,5 +1,14 @@
 ﻿# 작업 메모 (공용)
 
+## 인수인계 요약
+- PostgreSQL 전환 완료(로컬/서버 모두 사용).
+- 로컬 Docker PostgreSQL: `soulib-postgres` (port 5432, user root, db postgres, pw localpass).
+- Cloudtype 환경변수: DB_HOST=postgresql / DB_PORT=5432 / DB_NAME=postgres / DB_USER=root / DB_PASSWORD=시크릿.
+- 검색 로직: 서버에서 도서관 수 기준 정렬 + 페이지네이션.
+- 최근 UI 변경: 검색결과 문구 따옴표/크기 조정, 결과 내 재검색(Enter/적용), 필터 텍스트 크기 맞춤.
+- run_search.bat에 로컬 PostgreSQL 기본 환경변수 설정.
+- 남은 작업: commit/push → Cloudtype 재배포, SSL 인증서 발급 확인, `soulib.kr` 루트 → `www` 포워딩 확인.
+
 ## 사용 가이드 (Codex)
 - 작업 시작 전 이 문서를 읽고 현재 상태/규칙을 확인한다.
 - **필수: 모든 사용자 노출 문자열은 한글 + UTF-8로 유지한다.** (깨짐 발견 시 즉시 수정)
@@ -22,9 +31,56 @@
 4) Cloudtype PostgreSQL에 동일 데이터 적재.
 5) 서비스 정상 동작 확인(`/`, `/search`, `/book/<id>`).
 
+#### Cloudtype 적재 절차(요약)
+1) 로컬에서 CSV → PostgreSQL 적재 완료 후 검증.
+2) Cloudtype PostgreSQL 접속 정보 확인(DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD).
+3) 동일 CSV를 Cloudtype PostgreSQL로 적재.
+4) 배포 재시작/재배포 후 `/api/search` 및 화면 정상 동작 확인.
+
 ### C. 운영 반영 원칙
 - 코드 변경은 GitHub로, 데이터 변경은 PostgreSQL 적재로 반영한다.
 - SQLite는 중간 검증용이었으나 현재는 PostgreSQL 중심으로 운영한다.
+
+## DB 작업 모음
+- 서울도서관/서울시교육청 크롤러 데이터 정리(풀네임 표기 이상 원인 추적 및 수정)
+- 증분 적재 방식 설계/도입(풀 적재 대체)
+- 표준화(정규화) 규칙 정비 및 문서화
+- 중복 제거 기준 조정 및 영향(BOOK_ID 변동) 정리
+- CSV → PostgreSQL 적재 성능 개선(배치/인덱스/병렬화)
+
+## PostgreSQL 적재 설계 (CSV → DB)
+### 배경
+- SQLite 기반 빌드는 기존 중간 단계였지만, 운영/테스트를 PostgreSQL 중심으로 전환한다.
+- books/holdings 분리와 중복 제거 로직은 그대로 유지하되 DB가 PostgreSQL로 바뀐다.
+
+### 중복 제거 기준
+- `title_norm + author_norm + publisher_norm` 조합으로 중복 판단.
+- books는 1회만 저장, holdings는 도서관별 소장 데이터로 계속 저장.
+
+### 정규화 기준
+- `normalize_text()`로 공백/특수문자 정리 + 소문자화.
+- CSV의 title/author/publisher에서 `_norm` 값을 생성해 사용.
+
+### 적재 흐름(핵심)
+1) 크롤링 → CSV 생성
+2) title/author/publisher 정규화(`_norm` 생성)
+3) books upsert
+   - `books` UNIQUE(title_norm, author_norm, publisher_norm)
+   - 충돌 시 기존 id 재사용
+4) holdings insert
+   - book_id와 함께 소장 정보 저장
+5) 인덱스 생성
+   - books(title_norm/author_norm/publisher_norm)
+   - holdings(book_id)
+
+### 로컬/서버 반영 흐름
+- 로컬: CSV → 로컬 PostgreSQL 적재 → 로컬 서버로 확인
+- 서버: 같은 CSV를 Cloudtype PostgreSQL에 적재 → 서비스 재시작/확인
+
+### 스크립트/도구
+- CSV → PostgreSQL: `scripts/load_csv_to_postgres.py`
+- SQLite 레거시(보관용): `scripts/build_library_split.py`, `scripts/build_sqlite.py`,
+  `scripts/migrate_sqlite_to_postgres.py`, `scripts/migrate_split_to_postgres.py`
 
 ## 일일 업데이트 (템플릿)
 ### YYYY-MM-DD
@@ -109,6 +165,12 @@
 - 2026-01-16: Cloudtype soulib 환경변수에 PostgreSQL 접속 정보 설정(DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD).
 - 2026-01-16: 도메인 `soulib.kr` DNS 설정(CNAME/TXT) 및 Cloudtype 도메인 인증 완료.
 - 2026-01-16: 검색 결과 총권수 표시(total 파싱) 보정(`web/static/js/search.js`).
+- 2026-01-16: 로컬 PostgreSQL 기반 실행 스크립트 추가(run_search.bat에 DB 환경변수 기본값 설정).
+- 2026-01-16: 검색 결과 내 재검색 입력 추가(적용 버튼/Enter로 반영, 즉시 반영 제거).
+- 2026-01-16: 검색 결과 문구 스타일 개선(따옴표 표시, 텍스트 크기 확대, 필터 텍스트 크기 맞춤).
+- 2026-01-17: 로컬 PostgreSQL `soulib_test` 적재 완료(CSV → PostgreSQL).
+- 2026-01-17: 로컬 PostgreSQL `postgres` vs `soulib_test` counts 일치 검증(books=577,197 / holdings=1,531,278).
+- 2026-01-17: 샘플 검색(찬호께이) 결과 일치 검증(books=21).
 
 ## 서울도서관 OpenAPI (전자책 필터)
 - 옵션 파라미터 순서: TITLE / AUTHOR / CTRLNO / ISBN / BIB_TYPE

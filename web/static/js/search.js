@@ -67,13 +67,23 @@ function extractLibraries(book) {
     return [{ short: String(libField), name: String(libField), homepage_url: LIB_URLS[libField] || "#" }];
 }
 
-function buildFilters(results) {
+function buildFilters(results, filters) {
     const providerSet = new Set();
     const libSet = new Set();
-    results.forEach(r => {
-        if (r.provider) providerSet.add(providerLabel(r.provider));
-        extractLibraries(r).forEach(l => libSet.add(l.short || l.name));
-    });
+    if (filters && Array.isArray(filters.providers)) {
+        filters.providers.forEach(p => providerSet.add(providerLabel(p)));
+    } else {
+        results.forEach(r => {
+            if (r.provider) providerSet.add(providerLabel(r.provider));
+        });
+    }
+    if (filters && Array.isArray(filters.libraries)) {
+        filters.libraries.forEach(l => libSet.add(l));
+    } else {
+        results.forEach(r => {
+            extractLibraries(r).forEach(l => libSet.add(l.short || l.name));
+        });
+    }
     renderFilterList("platform-filters", [...providerSet].sort(), "provider");
     renderFilterList("library-filters", [...libSet].sort(), "library");
 }
@@ -108,30 +118,30 @@ function resetFilters() {
     applyFilters();
 }
 
-function applyFilters() {
+function applyFilters(reset = true) {
     filteredResults = currentResults.filter(r => {
-        if (refineQueryText) {
-            const hay = `${r.title || ""} ${r.author || ""} ${r.publisher || ""}`.toLowerCase();
-            if (!hay.includes(refineQueryText)) return false;
-        }
         const providers = r.provider ? [providerLabel(r.provider)] : [];
         const libs = extractLibraries(r).map(l => l.short || l.name);
         const provOk = selectedProviders.size === 0 || providers.some(p => selectedProviders.has(p));
         const libOk = selectedLibraries.size === 0 || libs.some(l => selectedLibraries.has(l));
         return provOk && libOk;
     });
-    filteredResults.sort((a, b) => {
-        const diff = getLibraryCount(b) - getLibraryCount(a);
-        if (diff !== 0) return diff;
-        const at = (a.title || "").toString();
-        const bt = (b.title || "").toString();
-        return at.localeCompare(bt, "ko");
-    });
-    renderIndex = 0;
-    document.getElementById('results').innerHTML = "";
+    if (reset) {
+        filteredResults.sort((a, b) => {
+            const diff = getLibraryCount(b) - getLibraryCount(a);
+            if (diff !== 0) return diff;
+            const at = (a.title || "").toString();
+            const bt = (b.title || "").toString();
+            return at.localeCompare(bt, "ko");
+        });
+        renderIndex = 0;
+        document.getElementById('results').innerHTML = "";
+    }
     const countText = totalCount ? totalCount.toLocaleString() : filteredResults.length.toLocaleString();
-    const prefix = currentQueryText ? `'${currentQueryText}' ` : "";
-    document.getElementById('status').innerText = `${prefix}검색 결과 ${countText}권`;
+    const prefix = currentQueryText ? `'${currentQueryText}'` : "";
+    const refineLabel = refineQueryText ? ` + '${refineQueryText}'` : "";
+    const label = prefix ? `${prefix}${refineLabel} ` : "";
+    document.getElementById('status').innerText = `${label}\uAC80\uC0C9 \uACB0\uACFC ${countText}\uAD8C`;
     updateFilterSummary();
 
     const loadMoreBtn = document.getElementById('load-more');
@@ -144,10 +154,7 @@ function applyFilters() {
     renderMore();
 }
 
-function search() {
-    const query = document.getElementById('query').value.trim();
-    if (!query) return alert("검색어를 입력해 주세요.");
-    currentQueryText = query;
+function fetchSearch(query, refine) {
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
     const loader = document.getElementById('loading-spinner');
@@ -160,40 +167,48 @@ function search() {
     currentResults = [];
     filteredResults = [];
     totalCount = 0;
-    refineQueryText = "";
-    const refineInput = document.getElementById("refine-query");
-    if (refineInput) refineInput.value = "";
     const params = new URLSearchParams();
     params.set("query", query);
     params.set("field", selectedField);
     params.set("limit", PAGE_SIZE.toString());
     params.set("offset", "0");
+    if (refine) params.set("refine", refine);
     fetch(`/api/search?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
             loader.style.display = "none";
             if (data.error) {
-                showResultsMessage("오류: " + data.error, "error");
+                showResultsMessage("??: " + data.error, "error");
                 return;
             }
             const items = Array.isArray(data.items) ? data.items : [];
             const totalValue = Number(data.total);
             totalCount = Number.isFinite(totalValue) ? totalValue : 0;
             if (items.length === 0) {
-                statusDiv.innerText = `'${query}' 검색 결과 0권`;
+                statusDiv.innerText = `'${query}' ???? 0?`;
                 return;
             }
             currentResults = items;
-            buildFilters(items);
+            buildFilters(items, data.filters || null);
             applyFilters();
             if (loadMoreBtn) loadMoreBtn.onclick = loadMoreFromServer;
-            if (filterBar) filterBar.style.display = "flex"; // 결과가 있을 때만 노출
+            if (filterBar) filterBar.style.display = "flex";
         })
         .catch(err => {
             loader.style.display = "none";
-            showResultsMessage("검색 중 오류가 발생했습니다.", "error");
+            showResultsMessage("??? ??? ??????.", "error");
             console.error(err);
         });
+}
+
+function search() {
+    const query = document.getElementById('query').value.trim();
+    if (!query) return alert("???? ??????");
+    currentQueryText = query;
+    refineQueryText = "";
+    const refineInput = document.getElementById("refine-query");
+    if (refineInput) refineInput.value = "";
+    fetchSearch(query, "");
 }
 
 function uniqueLibraries(book) {
@@ -313,6 +328,7 @@ function loadMoreFromServer() {
     params.set("field", selectedField);
     params.set("limit", PAGE_SIZE.toString());
     params.set("offset", String(currentResults.length));
+    if (refineQueryText) params.set("refine", refineQueryText);
     loader.style.display = "block";
     fetch(`/api/search?${params.toString()}`)
         .then(res => res.json())
@@ -333,8 +349,8 @@ function loadMoreFromServer() {
                 totalCount = totalValue;
             }
             currentResults = currentResults.concat(items);
-            buildFilters(currentResults);
-            applyFilters();
+            buildFilters(currentResults, data.filters || null);
+            applyFilters(false);
         })
         .catch(err => {
             loader.style.display = "none";
@@ -368,8 +384,9 @@ const refineInput = document.getElementById("refine-query");
 const refineApply = document.getElementById("refine-apply");
 function applyRefineQuery() {
     if (!refineInput) return;
-    refineQueryText = (refineInput.value || "").trim().toLowerCase();
-    applyFilters();
+    refineQueryText = (refineInput.value || "").trim();
+    if (!currentQueryText) return;
+    fetchSearch(currentQueryText, refineQueryText);
 }
 if (refineApply) {
     refineApply.addEventListener("click", applyRefineQuery);

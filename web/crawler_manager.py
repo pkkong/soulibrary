@@ -40,7 +40,6 @@ except Exception:
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 ROOT_DIR = os.path.dirname(CRAWLER_DIR)
-AUTO_REBUILD = os.environ.get("LIBRARY_AUTO_REBUILD", "").lower() in {"1", "true", "yes"}
 status_lock = threading.Lock()
 auto_crawl_active = False
 # 오래된 상태 자동 초기화 기준(초)
@@ -426,9 +425,7 @@ def run_spider_background(lib_code, on_complete_callback=None):
 
     try:
         subprocess.run(cmd, cwd=CRAWLER_DIR, check=True)
-        if AUTO_REBUILD:
             try:
-                rebuild_cmd = ["python", "scripts/build_sqlite.py"]
                 subprocess.run(rebuild_cmd, cwd=ROOT_DIR, check=True)
             except Exception as e:
                 print(f"[주의] SQLite 리빌드 오류: {e}")
