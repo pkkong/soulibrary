@@ -417,22 +417,18 @@ def run_spider_background(lib_code, on_complete_callback=None):
 
     with status_lock:
         CRAWLER_STATUS[lib_code]["status"] = "running"
-        CRAWLER_STATUS[lib_code]["msg"] = "실행 중"
+        CRAWLER_STATUS[lib_code]["msg"] = "running"
         CRAWLER_STATUS[lib_code]["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_status()
 
-    print(f"[START] {lib_config['name']} 크롤 시작")
+    print(f"[START] {lib_config['name']} crawl")
 
     try:
         subprocess.run(cmd, cwd=CRAWLER_DIR, check=True)
-            try:
-                subprocess.run(rebuild_cmd, cwd=ROOT_DIR, check=True)
-            except Exception as e:
-                print(f"[주의] SQLite 리빌드 오류: {e}")
         with status_lock:
             CRAWLER_STATUS[lib_code]["status"] = "done"
             CRAWLER_STATUS[lib_code]["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            CRAWLER_STATUS[lib_code]["msg"] = "정상 완료"
+            CRAWLER_STATUS[lib_code]["msg"] = "done"
         save_status()
         if on_complete_callback:
             on_complete_callback(lib_code, success=True)

@@ -33,17 +33,24 @@ def get_db_conn():
     return get_db(DB_PATH)
 
 
+def _count_csv_rows(path):
+    if not path or not os.path.exists(path):
+        return 0
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
+            total = sum(1 for _ in f)
+    except Exception:
+        return 0
+    if total <= 1:
+        return 0
+    return total - 1
+
+
 def load_counts():
     counts = {}
-    if not using_postgres() and not os.path.exists(DB_PATH):
-        return counts
-    conn = get_db_conn()
-    try:
-        cur = conn.execute("SELECT library_code, COUNT(*) FROM holdings GROUP BY library_code;")
-        for code, cnt in cur.fetchall():
-            counts[code] = cnt
-    finally:
-        conn.close()
+    for code, info in LIBRARIES.items():
+        csv_path = info.get("db_file")
+        counts[code] = _count_csv_rows(csv_path)
     return counts
 
 
@@ -225,15 +232,9 @@ def reload_database_safely(lib_code=None, success=True):
 
 
 def get_counts():
+    counts = load_counts()
     lib_total = len(LIBRARIES)
-    book_total = None
-    if using_postgres() or os.path.exists(DB_PATH):
-        conn = get_db_conn()
-        try:
-            cur = conn.execute("SELECT COUNT(*) FROM books;")
-            book_total = cur.fetchone()[0]
-        finally:
-            conn.close()
+    book_total = sum(counts.values()) if counts else 0
     return lib_total, book_total
 
 
@@ -277,122 +278,6 @@ def build_admin_rows():
 def index():
     lib_total, book_total = get_counts()
     return render_template('index.html', library_count=lib_total, book_count=book_total, lib_url_map=LIB_URL_MAP)
-
-
-@app.route('/search')
-def search():
-    query = request.args.get('query', '').strip()
-    if not query:
-        return jsonify([])
-
-    field = request.args.get('field', 'title_author')
-    norm_query = normalize_search_text(query)
-    if not norm_query:
-        return jsonify([])
-
-    FINAL_LIMIT = 1200
-    pattern = f"%{norm_query}%"
-    conn = get_db_conn()
-    try:
-        select_base = "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE "
-        clauses = []
-        params = []
-        if field in ("title", "title_author"):
-            clauses.append(select_base + "title_norm LIKE ?")
-            params.append(pattern)
-        if field in ("author", "title_author"):
-            clauses.append(select_base + "author_norm LIKE ?")
-            params.append(pattern)
-        if field == "publisher":
-            clauses.append(select_base + "publisher_norm LIKE ?")
-            params.append(pattern)
-        if not clauses:
-            clauses.append(select_base + "title_norm LIKE ?")
-            params.append(pattern)
-        sql = " UNION ALL ".join(clauses) + " LIMIT ?"
-        params.append(FINAL_LIMIT * 3)
-        cur = conn.execute(sql, params)
-        rows = cur.fetchall()
-
-        book_ids = [r["id"] for r in rows]
-        holdings_map = {}
-        if book_ids:
-            placeholders = ",".join("?" for _ in book_ids)
-            hcur = conn.execute(
-                f"SELECT book_id, library_code, library, provider, platform, image_url, isbn FROM holdings WHERE book_id IN ({placeholders})",
-                book_ids,
-            )
-            for h in hcur.fetchall():
-                holdings_map.setdefault(h["book_id"], []).append(h)
-
-        grouped = {}
-        for row in rows:
-            title = row["title"] or ""
-            author = row["author"] or ""
-            norm_key = (normalize_title(title), normalize_author(author), normalize_title(row["publisher"] or ""))
-            item = grouped.setdefault(norm_key, {
-                "title": title,
-                "author": author,
-                "publisher": row["publisher"] or "",
-                "provider": "",
-                "image_url": row["image_url"] or "",
-                "libraries": [],
-                "platforms": set(),
-            })
-            for h in holdings_map.get(row["id"], []):
-                prov = normalize_provider(h["provider"] or "")
-                if prov and not item["provider"]:
-                    item["provider"] = prov
-                lib_code = h["library_code"] or ""
-                lib_name = h["library"] or ""
-                item["libraries"].append({"name": lib_name, "code": lib_code})
-                plat = h["platform"] or ""
-                if plat:
-                    item["platforms"].add(plat)
-                if not item["image_url"] and h["image_url"]:
-                    item["image_url"] = h["image_url"]
-        results = []
-        for item in grouped.values():
-            lib_details = []
-            platforms = set()
-            for lib in item["libraries"]:
-                lib_code = lib.get("code") or ""
-                lib_name = lib.get("name") or ""
-                meta = LIB_META_BY_CODE.get(lib_code) if lib_code else None
-                if not meta:
-                    meta = LIB_META_BY_NAME.get(lib_name)
-                if meta:
-                    lib_details.append(meta)
-                    platforms.add(meta["platform_code"])
-                else:
-                    short = LIBRARY_SHORT.get(lib_code, lib_name)
-                    lib_details.append({
-                        "code": lib_code or None,
-                        "name": lib_name or lib_code,
-                        "short": short or lib_name or lib_code,
-                        "homepage_url": "#",
-                        "platform_code": "Unknown",
-                        "platform_label": "기타",
-                    })
-            if not platforms:
-                for meta in lib_details:
-                    platforms.add(meta.get("platform_code", "Unknown"))
-            provider = item["provider"] or provider_from_platforms(platforms or item["platforms"])
-            results.append({
-                "title": item["title"],
-                "author": item["author"],
-                "publisher": item["publisher"],
-                "provider": provider,
-                "image_url": item["image_url"],
-                "libraries": lib_details,
-                "platforms": list(platforms or item["platforms"]),
-            })
-        return jsonify(results[:FINAL_LIMIT])
-    except Exception as e:
-        print(f"[오류] 검색 실패: {e}")
-        return jsonify({"error": "검색 중 오류 발생"})
-    finally:
-        conn.close()
 
 
 @app.route('/admin')

@@ -10,9 +10,13 @@ const PROVIDER_LABELS = {
     "웅진OPMS": "웅진OPMS",
     "Y2Books": "Y2Books",
     "ECO": "ECO",
+    "기타": "기타",
 };
 
 const PROVIDER_LOGOS = {};
+const MSG_NO_RESULTS = "검색 결과가 없습니다.";
+const MSG_ERROR = "검색 중 오류가 발생했습니다.";
+const MSG_ERROR_PREFIX = "오류: ";
 
 let currentResults = [];
 let filteredResults = [];
@@ -22,12 +26,12 @@ let currentQueryText = "";
 let refineQueryText = "";
 let selectedProviders = new Set();
 let selectedLibraries = new Set();
-let selectedField = "title_author"; // 기본: 제목+저자
+let selectedField = "title_author"; // ??: ??+??
 let tempSelectedProviders = new Set();
 let tempSelectedLibraries = new Set();
 let tempSelectedField = "title_author";
 const filterBar = document.querySelector(".filter-bar");
-if (filterBar) filterBar.style.display = "none"; // 초기에는 숨김
+if (filterBar) filterBar.style.display = "none"; // ???? ??
 const filterSummary = document.getElementById("filter-summary");
 const filterSummaryText = document.getElementById("filter-summary-text");
 if (filterSummary) filterSummary.style.display = "none";
@@ -36,8 +40,8 @@ function _isValidSearchField(value) {
     return value === "title_author" || value === "title" || value === "author" || value === "publisher";
 }
 
-function showResultsMessage(text, kind = "empty") {
-    const resultsDiv = document.getElementById('results');
+function showResultsMessage(text, kind) {
+    const resultsDiv = document.getElementById("results");
     if (!resultsDiv) return;
     resultsDiv.innerHTML = "";
     const el = document.createElement("div");
@@ -147,7 +151,7 @@ function applyFilters(reset = true) {
     const loadMoreBtn = document.getElementById('load-more');
     if (filteredResults.length === 0) {
         if (loadMoreBtn) loadMoreBtn.style.display = "none";
-        if (currentResults.length > 0) showResultsMessage("필터 결과가 없습니다.", "empty");
+        showResultsMessage(MSG_NO_RESULTS, "empty");
         return;
     }
 
@@ -178,14 +182,14 @@ function fetchSearch(query, refine) {
         .then(data => {
             loader.style.display = "none";
             if (data.error) {
-                showResultsMessage("??: " + data.error, "error");
+                showResultsMessage(MSG_ERROR_PREFIX + data.error, "error");
                 return;
             }
             const items = Array.isArray(data.items) ? data.items : [];
             const totalValue = Number(data.total);
             totalCount = Number.isFinite(totalValue) ? totalValue : 0;
             if (items.length === 0) {
-                statusDiv.innerText = `'${query}' ???? 0?`;
+                statusDiv.innerText = `'${query}' \uAC80\uC0C9 \uACB0\uACFC 0\uAD8C`;
                 return;
             }
             currentResults = items;
@@ -196,7 +200,7 @@ function fetchSearch(query, refine) {
         })
         .catch(err => {
             loader.style.display = "none";
-            showResultsMessage("??? ??? ??????.", "error");
+            showResultsMessage(MSG_ERROR, "error");
             console.error(err);
         });
 }
@@ -335,7 +339,7 @@ function loadMoreFromServer() {
         .then(data => {
             loader.style.display = "none";
             if (data.error) {
-                showResultsMessage("오류: " + data.error, "error");
+                showResultsMessage(MSG_ERROR_PREFIX + data.error, "error");
                 return;
             }
             const items = Array.isArray(data.items) ? data.items : [];
@@ -354,7 +358,7 @@ function loadMoreFromServer() {
         })
         .catch(err => {
             loader.style.display = "none";
-            showResultsMessage("검색 중 오류가 발생했습니다.", "error");
+            showResultsMessage(MSG_ERROR, "error");
             console.error(err);
         });
 }

@@ -302,19 +302,27 @@ function setupInfiniteCenteredCarousel(trackEl) {
 
 async function initCurations() {
     try {
-        const chanho = await fetchTopByAuthor("찬호께이", 5);
-
-        const bitcoinIds = [239223, 300296, 235859, 29818, 310476, 185385];
+        const chanhoIds = [261, 7939, 31037, 439973, 275025];
+        const chanho = await fetchBooksByIds(chanhoIds);
+        const bitcoinIds = [29621, 293944, 231444, 234760, 303558, 182651];
         const bitcoin = await fetchBooksByIds(bitcoinIds);
 
-        const cafeIds = [50035, 3900, 1653, 1163, 2361, 63988, 275297, 243847];
+        const cafeIds = [1163, 1653, 3900, 2361, 62991, 165705, 269836, 239293];
         const cafeBooks = await fetchBooksByIds(cafeIds);
+
+        const jeongyujeongIds = [311288, 458653, 456403, 459032, 460178];
+        const jeongyujeong = await fetchBooksByIds(jeongyujeongIds);
+
+        const jeonghaeyeonIds = [1749, 2666, 2792, 4727, 9221];
+        const jeonghaeyeon = await fetchBooksByIds(jeonghaeyeonIds);
 
         renderInto("curation-higashino", cafeBooks, renderHeroCoverCard);
         const heroTrack = document.getElementById("curation-higashino");
         setupInfiniteCenteredCarousel(heroTrack);
         renderInto("curation-bitcoin", bitcoin, renderRankedCard);
         renderInto("curation-chanho", chanho, renderCoverCard);
+        renderInto("curation-jeongyujeong", jeongyujeong, renderCoverCard);
+        renderInto("curation-jeonghaeyeon", jeonghaeyeon, renderCoverCard);
 
         document.querySelectorAll(".curation-track").forEach(enableDragScroll);
     } catch (e) {
