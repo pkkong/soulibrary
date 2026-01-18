@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 import re
 from db import get_db, using_postgres
@@ -87,6 +87,22 @@ def provider_from_platforms(platforms):
     return "기타"
 
 
+
+
+
+def platform_to_provider_label(platform_code: str) -> str:
+    if not platform_code:
+        return "기타"
+    code = str(platform_code)
+    if code in {"Kyobo", "Kyobo_New"}:
+        return "교보"
+    if code == "YES24":
+        return "YES24"
+    if code == "Bookcube":
+        return "북큐브"
+    if code == "Aladin":
+        return "알라딘"
+    return "기타"
 def get_counts():
     lib_total = len(LIBRARIES)
     book_total = None
@@ -187,6 +203,25 @@ for code, info in LIBRARIES.items():
     }
 
 
+LIB_SHORT_TO_CODES = {}
+for code, info in LIBRARIES.items():
+    short = LIBRARY_SHORT.get(code, info.get("library_name") or code)
+    LIB_SHORT_TO_CODES.setdefault(short, set()).add(code)
+LIB_SHORT_TO_CODES = {k: sorted(v) for k, v in LIB_SHORT_TO_CODES.items()}
+
+PROVIDER_LABEL_TO_PLATFORMS = {}
+for code, label in PLATFORM_LABELS.items():
+    if code in {"Kyobo", "Kyobo_New"}:
+        label = "교보"
+    if code == "Bookcube":
+        label = "북큐브"
+    if code == "Aladin":
+        label = "알라딘"
+    PROVIDER_LABEL_TO_PLATFORMS.setdefault(label, set()).add(code)
+if "기타" not in PROVIDER_LABEL_TO_PLATFORMS:
+    PROVIDER_LABEL_TO_PLATFORMS["기타"] = {"FxLibrary", "Mixed", "Unknown"}
+
+
 @app.route('/')
 def index():
     lib_total, book_total = get_counts()
@@ -205,6 +240,9 @@ def index():
 
 
 @app.route('/search')
+
+
+
 def search_page():
     lib_total, book_total = get_counts()
     desc = ""
@@ -215,8 +253,8 @@ def search_page():
         library_count=lib_total,
         book_count=book_total,
         lib_url_map={},
-        show_topbar=True,
-        topbar_desc=desc,
+        show_topbar=False,
+        topbar_desc="",
         active_tab="search",
     )
 
@@ -255,6 +293,10 @@ def search():
     if not norm_query:
         return jsonify({"total": 0, "items": []})
     refine_norm = normalize_search_text(refine) if refine else ""
+    providers_raw = request.args.get('providers', '').strip()
+    libraries_raw = request.args.get('libraries', '').strip()
+    providers_selected = [p for p in providers_raw.split(",") if p]
+    libraries_selected = [l for l in libraries_raw.split(",") if l]
 
     try:
         limit = int(request.args.get('limit', '200'))
@@ -292,6 +334,42 @@ def search():
             refine_sql, refine_params = build_where(refine_norm)
             where_sql = f"{where_sql} AND {refine_sql}"
             params = params + refine_params
+        filter_clauses = []
+        filter_params = []
+        if libraries_selected:
+            lib_codes = []
+            for label in libraries_selected:
+                lib_codes.extend(LIB_SHORT_TO_CODES.get(label, []))
+            if lib_codes:
+                placeholders = ",".join("?" for _ in lib_codes)
+                filter_clauses.append(f"h2.library_code IN ({placeholders})")
+                filter_params.extend(lib_codes)
+        if providers_selected:
+            platform_codes = set()
+            include_other = False
+            for label in providers_selected:
+                if label == "기타":
+                    include_other = True
+                platform_codes.update(PROVIDER_LABEL_TO_PLATFORMS.get(label, set()))
+            provider_parts = []
+            if platform_codes:
+                placeholders = ",".join("?" for _ in sorted(platform_codes))
+                provider_parts.append(f"h2.platform IN ({placeholders})")
+                filter_params.extend(sorted(platform_codes))
+            if include_other:
+                other_platforms = sorted(PROVIDER_LABEL_TO_PLATFORMS.get("기타", set()))
+                if other_platforms:
+                    placeholders = ",".join("?" for _ in other_platforms)
+                    provider_parts.append(f"h2.platform IN ({placeholders})")
+                    filter_params.extend(other_platforms)
+                provider_parts.append("(h2.platform IS NULL OR h2.platform = '')")
+            if provider_parts:
+                filter_clauses.append("(" + " OR ".join(provider_parts) + ")")
+
+        if filter_clauses:
+            where_sql = f"{where_sql} AND EXISTS (SELECT 1 FROM holdings h2 WHERE h2.book_id = b.id AND {' AND '.join(filter_clauses)})"
+            params = params + filter_params
+
         count_row = conn.execute(
             f"SELECT COUNT(*) AS total FROM books b WHERE {where_sql}",
             params,
@@ -319,13 +397,12 @@ def search():
             providers = set()
             libraries = set()
             pcur = conn.execute(
-                f"SELECT DISTINCT h.provider FROM holdings h JOIN books b ON b.id = h.book_id WHERE {where_sql}",
+                f"SELECT DISTINCT h.platform FROM holdings h JOIN books b ON b.id = h.book_id WHERE {where_sql}",
                 params,
             )
             for r in pcur.fetchall():
-                raw = r["provider"] if using_postgres() else r[0]
-                if raw:
-                    providers.add(str(raw))
+                raw = r["platform"] if using_postgres() else r[0]
+                providers.add(platform_to_provider_label(raw))
             lcur = conn.execute(
                 f"SELECT DISTINCT h.library_code, h.library FROM holdings h JOIN books b ON b.id = h.book_id WHERE {where_sql}",
                 params,

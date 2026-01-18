@@ -1,4 +1,4 @@
-const PAGE_SIZE = 40;
+﻿const PAGE_SIZE = 40;
 const PROVIDER_LABELS = {
     "교보": "교보",
     "교보문고": "교보",
@@ -7,7 +7,7 @@ const PROVIDER_LABELS = {
     "알라딘": "알라딘",
     "알라딘커뮤니케이션": "알라딘",
     "인터파크": "인터파크",
-    "웅진OPMS": "웅진OPMS",
+    "오픈OPMS": "오픈OPMS",
     "Y2Books": "Y2Books",
     "ECO": "ECO",
     "기타": "기타",
@@ -24,17 +24,18 @@ let renderIndex = 0;
 let totalCount = 0;
 let currentQueryText = "";
 let refineQueryText = "";
+let loadMoreInFlight = false;
+let currentFilters = { providers: [], libraries: [] };
 let selectedProviders = new Set();
 let selectedLibraries = new Set();
-let selectedField = "title_author"; // ??: ??+??
+let selectedField = "title_author"; // search field: title+author
 let tempSelectedProviders = new Set();
 let tempSelectedLibraries = new Set();
 let tempSelectedField = "title_author";
 const filterBar = document.querySelector(".filter-bar");
-if (filterBar) filterBar.style.display = "none"; // ???? ??
+if (filterBar) filterBar.style.display = "none"; // legacy filter bar hidden
 const filterSummary = document.getElementById("filter-summary");
 const filterSummaryText = document.getElementById("filter-summary-text");
-if (filterSummary) filterSummary.style.display = "none";
 
 function _isValidSearchField(value) {
     return value === "title_author" || value === "title" || value === "author" || value === "publisher";
@@ -75,7 +76,7 @@ function buildFilters(results, filters) {
     const providerSet = new Set();
     const libSet = new Set();
     if (filters && Array.isArray(filters.providers)) {
-        filters.providers.forEach(p => providerSet.add(providerLabel(p)));
+        filters.providers.forEach(p => providerSet.add(p));
     } else {
         results.forEach(r => {
             if (r.provider) providerSet.add(providerLabel(r.provider));
@@ -88,8 +89,10 @@ function buildFilters(results, filters) {
             extractLibraries(r).forEach(l => libSet.add(l.short || l.name));
         });
     }
-    renderFilterList("platform-filters", [...providerSet].sort(), "provider");
-    renderFilterList("library-filters", [...libSet].sort(), "library");
+    currentFilters = {
+        providers: [...providerSet].sort(),
+        libraries: [...libSet].sort(),
+    };
 }
 
 function renderFilterList(containerId, items, type) {
@@ -123,21 +126,8 @@ function resetFilters() {
 }
 
 function applyFilters(reset = true) {
-    filteredResults = currentResults.filter(r => {
-        const providers = r.provider ? [providerLabel(r.provider)] : [];
-        const libs = extractLibraries(r).map(l => l.short || l.name);
-        const provOk = selectedProviders.size === 0 || providers.some(p => selectedProviders.has(p));
-        const libOk = selectedLibraries.size === 0 || libs.some(l => selectedLibraries.has(l));
-        return provOk && libOk;
-    });
+    filteredResults = currentResults.slice();
     if (reset) {
-        filteredResults.sort((a, b) => {
-            const diff = getLibraryCount(b) - getLibraryCount(a);
-            if (diff !== 0) return diff;
-            const at = (a.title || "").toString();
-            const bt = (b.title || "").toString();
-            return at.localeCompare(bt, "ko");
-        });
         renderIndex = 0;
         document.getElementById('results').innerHTML = "";
     }
@@ -145,7 +135,7 @@ function applyFilters(reset = true) {
     const prefix = currentQueryText ? `'${currentQueryText}'` : "";
     const refineLabel = refineQueryText ? ` + '${refineQueryText}'` : "";
     const label = prefix ? `${prefix}${refineLabel} ` : "";
-    document.getElementById('status').innerText = `${label}\uAC80\uC0C9 \uACB0\uACFC ${countText}\uAD8C`;
+    document.getElementById('status').innerText = `${label}검색 결과 ${countText}권`;
     updateFilterSummary();
 
     const loadMoreBtn = document.getElementById('load-more');
@@ -177,6 +167,12 @@ function fetchSearch(query, refine) {
     params.set("limit", PAGE_SIZE.toString());
     params.set("offset", "0");
     if (refine) params.set("refine", refine);
+    if (selectedProviders.size > 0) {
+        params.set("providers", [...selectedProviders].join(","));
+    }
+    if (selectedLibraries.size > 0) {
+        params.set("libraries", [...selectedLibraries].join(","));
+    }
     fetch(`/api/search?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
@@ -189,7 +185,7 @@ function fetchSearch(query, refine) {
             const totalValue = Number(data.total);
             totalCount = Number.isFinite(totalValue) ? totalValue : 0;
             if (items.length === 0) {
-                statusDiv.innerText = `'${query}' \uAC80\uC0C9 \uACB0\uACFC 0\uAD8C`;
+                statusDiv.innerText = `'${query}' 검색 결과 0권`;
                 return;
             }
             currentResults = items;
@@ -207,11 +203,9 @@ function fetchSearch(query, refine) {
 
 function search() {
     const query = document.getElementById('query').value.trim();
-    if (!query) return alert("???? ??????");
+    if (!query) return alert("검색어를 입력해주세요.");
     currentQueryText = query;
     refineQueryText = "";
-    const refineInput = document.getElementById("refine-query");
-    if (refineInput) refineInput.value = "";
     fetchSearch(query, "");
 }
 
@@ -267,12 +261,18 @@ function renderMore() {
     const resultsDiv = document.getElementById('results');
     const loadMoreBtn = document.getElementById('load-more');
     const slice = filteredResults.slice(renderIndex, renderIndex + PAGE_SIZE);
-    if (slice.length === 0) { loadMoreBtn.style.display = "none"; return; }
+    if (slice.length === 0) {
+        if (loadMoreBtn) {
+            setLoadMoreLoading(false);
+            loadMoreBtn.style.display = "none";
+        }
+        return;
+    }
 
     slice.forEach(book => {
         const bookId = book.book_id || "";
         const imgHtml = book.image_url
-            ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'no-img\\'>이미지 없음</div>'">`
+            ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'no-img\'>이미지 없음</div>'">`
             : `<div class="no-img">이미지 없음</div>`;
 
     const libs = uniqueLibraries(book);
@@ -322,30 +322,58 @@ function renderMore() {
     const loaded = currentResults.length;
     const canLoadMore = totalCount === 0 ? renderIndex < filteredResults.length : loaded < totalCount;
     loadMoreBtn.style.display = canLoadMore ? "block" : "none";
+    if (!canLoadMore) setLoadMoreLoading(false);
+}
+
+function setLoadMoreLoading(isLoading) {
+    const loadMoreBtn = document.getElementById('load-more');
+    if (!loadMoreBtn) return;
+    if (!loadMoreBtn.dataset.label) {
+        loadMoreBtn.dataset.label = loadMoreBtn.textContent.trim();
+    }
+    if (isLoading) {
+        loadMoreBtn.classList.add("is-loading");
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.innerHTML = '<span class="load-more-spinner" aria-hidden="true"></span><span class="load-more-text">불러오는 중...</span>';
+    } else {
+        loadMoreBtn.classList.remove("is-loading");
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = loadMoreBtn.dataset.label || "더 보기";
+    }
 }
 
 function loadMoreFromServer() {
     if (!currentQueryText) return;
-    const loader = document.getElementById('loading-spinner');
+    if (loadMoreInFlight) return;
+    loadMoreInFlight = true;
+    setLoadMoreLoading(true);
     const params = new URLSearchParams();
     params.set("query", currentQueryText);
     params.set("field", selectedField);
     params.set("limit", PAGE_SIZE.toString());
     params.set("offset", String(currentResults.length));
     if (refineQueryText) params.set("refine", refineQueryText);
-    loader.style.display = "block";
+    if (selectedProviders.size > 0) {
+        params.set("providers", [...selectedProviders].join(","));
+    }
+    if (selectedLibraries.size > 0) {
+        params.set("libraries", [...selectedLibraries].join(","));
+    }
     fetch(`/api/search?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
-            loader.style.display = "none";
             if (data.error) {
                 showResultsMessage(MSG_ERROR_PREFIX + data.error, "error");
+                setLoadMoreLoading(false);
+                loadMoreInFlight = false;
                 return;
             }
             const items = Array.isArray(data.items) ? data.items : [];
             if (items.length === 0) {
                 const loadMoreBtn = document.getElementById('load-more');
                 if (loadMoreBtn) loadMoreBtn.style.display = "none";
+                setLoadMoreLoading(false);
+                loadMoreInFlight = false;
                 return;
             }
             const totalValue = Number(data.total);
@@ -355,11 +383,14 @@ function loadMoreFromServer() {
             currentResults = currentResults.concat(items);
             buildFilters(currentResults, data.filters || null);
             applyFilters(false);
+            setLoadMoreLoading(false);
+            loadMoreInFlight = false;
         })
         .catch(err => {
-            loader.style.display = "none";
             showResultsMessage(MSG_ERROR, "error");
             console.error(err);
+            setLoadMoreLoading(false);
+            loadMoreInFlight = false;
         });
 }
 
@@ -384,27 +415,53 @@ document.addEventListener("DOMContentLoaded", () => {
     search();
 });
 
-const refineInput = document.getElementById("refine-query");
-const refineApply = document.getElementById("refine-apply");
-function applyRefineQuery() {
-    if (!refineInput) return;
-    refineQueryText = (refineInput.value || "").trim();
-    if (!currentQueryText) return;
-    fetchSearch(currentQueryText, refineQueryText);
+const refineToggle = document.getElementById("refine-toggle");
+const searchTopInput = document.getElementById("query");
+const searchTopBtn = document.querySelector(".search-top-btn");
+
+function isRefineMode() {
+    return !!(refineToggle && refineToggle.checked);
 }
-if (refineApply) {
-    refineApply.addEventListener("click", applyRefineQuery);
+
+function syncRefineUI() {
+    if (!searchTopInput) return;
+    if (isRefineMode()) {
+        searchTopInput.placeholder = "결과 내 재검색";
+        if (searchTopBtn) searchTopBtn.textContent = "재검색";
+    } else {
+        searchTopInput.placeholder = "검색어를 입력하세요";
+        if (searchTopBtn) searchTopBtn.textContent = "검색";
+    }
 }
-if (refineInput) {
-    refineInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") applyRefineQuery();
-    });
+
+function runTopSearch() {
+    if (!searchTopInput) return;
+    const value = searchTopInput.value.trim();
+    if (isRefineMode()) {
+        if (!currentQueryText) {
+            alert("먼저 검색어를 입력해 검색을 시작해주세요.");
+            return;
+        }
+        if (!value) {
+            alert("결과 내 재검색어를 입력해주세요.");
+            return;
+        }
+        refineQueryText = value;
+        fetchSearch(currentQueryText, refineQueryText);
+        return;
+    }
+    search();
+}
+
+if (refineToggle) {
+    refineToggle.addEventListener("change", syncRefineUI);
+    syncRefineUI();
 }
 
 function toggleFilters() {
 }
 
-// 필터 시트
+// filter sheet
 let currentSheet = null; // field, provider, library
 
 const SHEET_LABELS = {
@@ -431,7 +488,7 @@ function openFilterSheet(type) {
 
     renderSheetOptions(currentSheet);
 
-    // 다중 선택: 기존 상태 유지, applySheet에서만 반영
+    // temp selection applies only on confirm
     document.getElementById("sheet-overlay").classList.add("show");
     document.getElementById("filter-sheet").classList.add("show");
 }
@@ -448,7 +505,11 @@ function applySheet() {
     selectedProviders = new Set(tempSelectedProviders);
     selectedLibraries = new Set(tempSelectedLibraries);
     closeSheet();
-    applyFilters();
+    if (currentQueryText) {
+        fetchSearch(currentQueryText, refineQueryText);
+    } else {
+        applyFilters();
+    }
 }
 
 function renderSheetOptions(type) {
@@ -458,7 +519,7 @@ function renderSheetOptions(type) {
     optsEl.innerHTML = "";
     if (type === "field") {
         const options = [
-            { value: "title_author", label: "제목+저자 (기본)" },
+            { value: "title_author", label: "제목+저자(기본)" },
             { value: "title", label: "제목" },
             { value: "author", label: "저자" },
             { value: "publisher", label: "출판사" },
@@ -470,7 +531,9 @@ function renderSheetOptions(type) {
             `);
         });
     } else if (type === "provider") {
-        const items = Array.from(new Set(currentResults.map(r => r.provider).filter(Boolean).map(providerLabel))).sort();
+        const items = currentFilters.providers.length
+            ? currentFilters.providers
+            : Array.from(new Set(currentResults.map(r => r.provider).filter(Boolean).map(providerLabel))).sort();
         items.forEach(val => {
             const checked = tempSelectedProviders.has(val) ? "checked" : "";
             optsEl.insertAdjacentHTML("beforeend", `
@@ -478,7 +541,9 @@ function renderSheetOptions(type) {
             `);
         });
     } else if (type === "library") {
-        const items = Array.from(new Set(currentResults.flatMap(r => extractLibraries(r).map(l => l.short || l.name)))).sort();
+        const items = currentFilters.libraries.length
+            ? currentFilters.libraries
+            : Array.from(new Set(currentResults.flatMap(r => extractLibraries(r).map(l => l.short || l.name)))).sort();
         items.forEach(val => {
             const checked = tempSelectedLibraries.has(val) ? "checked" : "";
             optsEl.insertAdjacentHTML("beforeend", `
@@ -503,7 +568,17 @@ function renderSheetOptions(type) {
     });
 }
 
-document.getElementById('query').addEventListener('keypress', (e) => { if (e.key === 'Enter') search(); });
+const queryInput = document.getElementById('query');
+if (queryInput) {
+    queryInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') runTopSearch(); });
+}
+const searchTopForm = document.getElementById('search-top-form');
+if (searchTopForm) {
+    searchTopForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        runTopSearch();
+    });
+}
 
 document.querySelectorAll(".sheet-tab").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -519,7 +594,6 @@ function updateFilterSummary() {
     if (!filterSummary || !filterSummaryText) return;
     const titleEl = filterSummary.querySelector(".filter-title");
     if (titleEl) titleEl.remove();
-    // 요약은 단순히 "필터 ▾"만 표시
-    filterSummaryText.innerText = "필터 ▾";
+    filterSummaryText.innerText = "필터";
     filterSummary.style.display = "flex";
 }

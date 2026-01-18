@@ -9,7 +9,7 @@ start "" http://127.0.0.1:%LIBRARY_SEARCH_PORT%/
 :: 1-1) Default PostgreSQL connection for local testing (override if needed)
 if "%DB_HOST%"=="" set DB_HOST=localhost
 if "%DB_PORT%"=="" set DB_PORT=5432
-if "%DB_NAME%"=="" set DB_NAME=postgres
+if "%DB_NAME%"=="" set DB_NAME=soulib_test
 if "%DB_USER%"=="" set DB_USER=root
 if "%DB_PASSWORD%"=="" set DB_PASSWORD=localpass
 

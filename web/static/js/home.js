@@ -1,4 +1,4 @@
-function escHtml(value) {
+﻿function escHtml(value) {
     return String(value || "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
@@ -331,4 +331,3 @@ async function initCurations() {
 }
 
 document.addEventListener("DOMContentLoaded", initCurations);
-
