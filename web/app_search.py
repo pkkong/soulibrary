@@ -3,7 +3,7 @@ import json
 import re
 from db import get_db, using_postgres
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
 
 app = Flask(__name__)
@@ -257,6 +257,16 @@ def search_page():
         topbar_desc="",
         active_tab="search",
     )
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    return send_from_directory(os.path.join(app.root_path, "static"), "robots.txt")
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    return send_from_directory(os.path.join(app.root_path, "static"), "sitemap.xml")
 
 
 @app.route('/book/<int:book_id>')
