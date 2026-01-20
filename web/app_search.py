@@ -269,6 +269,16 @@ def sitemap_xml():
     return send_from_directory(os.path.join(app.root_path, "static"), "sitemap.xml")
 
 
+@app.route('/naver502d24e941f50b3d3341745ef4de5f43.html')
+def naver_verify():
+    return send_from_directory(os.path.join(app.root_path, "static"), "naver502d24e941f50b3d3341745ef4de5f43.html")
+
+
+@app.route('/naver520d24e941f50b3d3341745ef4de5f43.html')
+def naver_verify_alt():
+    return send_from_directory(os.path.join(app.root_path, "static"), "naver520d24e941f50b3d3341745ef4de5f43.html")
+
+
 @app.route('/book/<int:book_id>')
 def book_detail(book_id: int):
     detail = get_book_detail(book_id)
