@@ -1,4 +1,4 @@
-﻿const PAGE_SIZE = 40;
+const PAGE_SIZE = 20;
 const PROVIDER_LABELS = {
     "교보": "교보",
     "교보문고": "교보",
@@ -273,13 +273,21 @@ function renderMore() {
         const bookId = book.book_id || "";
         const imgHtml = book.image_url
             ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'no-img\'>이미지 없음</div>'">`
-            : `<div class="no-img">이미지 없음</div>`;
-
-    const libs = uniqueLibraries(book);
-    const groups = groupLibraries(libs);
-    const kyoboCount = groups.kyobo.length;
-    const yes24Count = groups.yes24.length;
-    const otherCount = groups.other.length + groups.special.length;
+            : `<div class="no-img">이미지 없음</div>`;
+    let kyoboCount = 0;
+    let yes24Count = 0;
+    let otherCount = 0;
+    if (book.counts) {
+        kyoboCount = Number(book.counts.kyobo) || 0;
+        yes24Count = Number(book.counts.yes24) || 0;
+        otherCount = Number(book.counts.other) || 0;
+    } else {
+        const libs = uniqueLibraries(book);
+        const groups = groupLibraries(libs);
+        kyoboCount = groups.kyobo.length;
+        yes24Count = groups.yes24.length;
+        otherCount = groups.other.length + groups.special.length;
+    }
     const totalLibs = kyoboCount + yes24Count + otherCount;
     const kyoboOn = kyoboCount > 0;
     const yes24On = yes24Count > 0;
@@ -569,9 +577,6 @@ function renderSheetOptions(type) {
 }
 
 const queryInput = document.getElementById('query');
-if (queryInput) {
-    queryInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') runTopSearch(); });
-}
 const searchTopForm = document.getElementById('search-top-form');
 if (searchTopForm) {
     searchTopForm.addEventListener('submit', (e) => {
@@ -596,4 +601,6 @@ function updateFilterSummary() {
     if (titleEl) titleEl.remove();
     filterSummaryText.innerText = "필터";
     filterSummary.style.display = "flex";
-}
+}
+
+

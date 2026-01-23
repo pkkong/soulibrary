@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 import math
 import re
 from urllib.parse import urlencode
@@ -6,14 +7,7 @@ import scrapy
 
 
 class BookcubeBaseSpider(scrapy.Spider):
-    """
-    공통 Bookcube/FxLibrary 리스트 크롤러 베이스.
-    서브클래스에서 다음 속성을 지정합니다:
-      - name
-      - allowed_domains
-      - base_url (예: https://elib.geumcheonlib.seoul.kr/FxLibrary/product/list/)
-      - library_name (CSV에 기록할 도서관 이름)
-    """
+    """Common Bookcube/FxLibrary list crawler base."""
 
     custom_settings = {
         "FEED_EXPORT_ENCODING": "utf-8-sig",
@@ -23,6 +17,7 @@ class BookcubeBaseSpider(scrapy.Spider):
     max_pages_fallback = 1000
     provider_default = "북큐브"
     platform = "Bookcube"
+    export_content_id = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -57,7 +52,12 @@ class BookcubeBaseSpider(scrapy.Spider):
             "terminal": "",
         }
         url = f"{self.base_url}?{urlencode(params)}"
-        return scrapy.Request(url, callback=self.parse, meta={"page": page, "total_pages": total_pages}, dont_filter=True)
+        return scrapy.Request(
+            url,
+            callback=self.parse,
+            meta={"page": page, "total_pages": total_pages},
+            dont_filter=True,
+        )
 
     def parse_total_count(self, response):
         text = response.css("h2 span em::text").get() or ""
@@ -73,7 +73,6 @@ class BookcubeBaseSpider(scrapy.Spider):
         page = response.meta.get("page", 1)
         total_pages = response.meta.get("total_pages")
 
-        # 첫 페이지에서 전체 페이지 계산
         if total_pages is None and page == 1:
             total_count = self.parse_total_count(response)
             if total_count:
@@ -91,7 +90,6 @@ class BookcubeBaseSpider(scrapy.Spider):
             self.logger.info("[Bookcube] page %s: %s items", page, len(books))
 
         for book in books:
-            # 콘텐츠 고유 ID 추출(goView('123456') 혹은 이미지 URL의 숫자)
             content_id = ""
             for href in book.css("a::attr(href)").getall():
                 m = re.search(r"goView\('(\d+)'", href)
@@ -100,7 +98,7 @@ class BookcubeBaseSpider(scrapy.Spider):
                     break
             if not content_id:
                 img_try = book.css("img::attr(src)").get() or ""
-                m = re.search(r"/(\d{5,})", img_try)
+                m = re.search(r"/(\d(5,))", img_try)
                 if m:
                     content_id = m.group(1)
 
@@ -110,7 +108,6 @@ class BookcubeBaseSpider(scrapy.Spider):
                 self._seen_ids.add(content_id)
 
             title = (book.css(".subject a::text").get() or "").strip()
-
             author = (book.css(".info ul.i1:nth-of-type(1) li:nth-child(1) ::text").get() or "").strip()
             publisher = (book.css(".info ul.i1:nth-of-type(1) li:nth-child(2) ::text").get() or "").strip()
 
@@ -125,11 +122,10 @@ class BookcubeBaseSpider(scrapy.Spider):
             if image_url and image_url.startswith("//"):
                 image_url = "https:" + image_url
 
-            isbn = ""  # 이미지/링크에서 추출하지 않고 빈칸 유지
+            isbn = ""
 
             if title:
-                yield {
-                    "content_id": content_id,
+                item = {
                     "title": title,
                     "author": author,
                     "publisher": publisher,
@@ -139,6 +135,9 @@ class BookcubeBaseSpider(scrapy.Spider):
                     "provider": provider,
                     "platform": self.platform,
                 }
+                if self.export_content_id:
+                    item["content_id"] = content_id
+                yield item
 
         next_page = page + 1
         if total_pages and next_page <= total_pages:

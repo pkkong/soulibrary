@@ -1,6 +1,7 @@
 ﻿import os
 import json
 import re
+import traceback
 from db import get_db, using_postgres
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -49,8 +50,22 @@ def normalize_search_text(text: str) -> str:
         return ""
     text = str(text).lower().strip()
     text = re.sub(r"[\u200b\ufeff]", "", text)
-    text = re.sub(r"[\\s\\[\\]\\(\\){}<>.,/|\\\\\\-_:;\"'`~!?]", "", text)
+    text = re.sub(r"[\s\[\]\(\){}<>.,/|\\\-_:\;\"'`~!?]", "", text)
     return text
+
+
+def normalize_search_tokens(text: str) -> list[str]:
+    if not text:
+        return []
+    raw = str(text).lower().strip()
+    raw = re.sub(r"[\u200b\ufeff]", "", raw)
+    parts = re.split(r"[\s\[\]\(\){}<>.,/|\\\-_:\;\"'`~!?]+", raw)
+    tokens = []
+    for part in parts:
+        norm = normalize_search_text(part)
+        if norm:
+            tokens.append(norm)
+    return tokens
 
 
 def normalize_provider(raw_value):
@@ -118,6 +133,45 @@ def get_counts():
         finally:
             conn.close()
     return lib_total, book_total
+
+
+def get_holdings_total():
+    total = None
+    if using_postgres() or os.path.exists(DB_PATH):
+        conn = get_db_conn()
+        try:
+            cur = conn.execute("SELECT COUNT(*) AS count FROM holdings;")
+            row = cur.fetchone()
+            if using_postgres():
+                total = row["count"] if row else 0
+            else:
+                total = row[0] if row else 0
+        finally:
+            conn.close()
+    return total
+
+
+def get_library_holdings_counts():
+    results = []
+    if using_postgres() or os.path.exists(DB_PATH):
+        conn = get_db_conn()
+        try:
+            cur = conn.execute(
+                "SELECT library, COUNT(*) AS count FROM holdings "
+                "WHERE library IS NOT NULL AND library != '' "
+                "GROUP BY library;"
+            )
+            rows = cur.fetchall()
+            if using_postgres():
+                results = [
+                    {"library": r.get("library") or "", "count": r.get("count") or 0}
+                    for r in rows
+                ]
+            else:
+                results = [{"library": r[0] or "", "count": r[1] or 0} for r in rows]
+        finally:
+            conn.close()
+    return results
 
 
 def get_book_detail(book_id: int):
@@ -259,6 +313,26 @@ def search_page():
     )
 
 
+@app.route('/guide')
+def guide_page():
+    lib_total, book_total = get_counts()
+    holdings_total = get_holdings_total()
+    library_counts = get_library_holdings_counts()
+    library_counts = sorted(library_counts, key=lambda item: (item.get("library") or ""))
+    library_url_map = {info.get("library_name"): info.get("homepage_url") for info in LIBRARIES.values()}
+    return render_template(
+        "guide.html",
+        library_count=lib_total,
+        book_count=book_total,
+        holdings_total=holdings_total,
+        library_counts=library_counts,
+        library_url_map=library_url_map,
+        show_topbar=True,
+        topbar_desc=f"{lib_total}개 도서관" if lib_total else "",
+        active_tab="guide",
+    )
+
+
 @app.route('/robots.txt')
 def robots_txt():
     return send_from_directory(os.path.join(app.root_path, "static"), "robots.txt")
@@ -309,10 +383,10 @@ def search():
 
     field = request.args.get('field', 'title_author')
     refine = request.args.get('refine', '').strip()
-    norm_query = normalize_search_text(query)
-    if not norm_query:
+    query_tokens = normalize_search_tokens(query)
+    if not query_tokens:
         return jsonify({"total": 0, "items": []})
-    refine_norm = normalize_search_text(refine) if refine else ""
+    refine_tokens = normalize_search_tokens(refine) if refine else []
     providers_raw = request.args.get('providers', '').strip()
     libraries_raw = request.args.get('libraries', '').strip()
     providers_selected = [p for p in providers_raw.split(",") if p]
@@ -329,29 +403,52 @@ def search():
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
 
-    def build_where(norm_value):
-        pattern = f"%{norm_value}%"
-        clauses = []
+    use_trgm = using_postgres()
+
+    def build_where(tokens):
+        if not tokens:
+            return "1=0", []
+        groups = []
         params = []
-        if field in ("title", "title_author"):
-            clauses.append("b.title_norm LIKE ?")
-            params.append(pattern)
-        if field in ("author", "title_author"):
-            clauses.append("b.author_norm LIKE ?")
-            params.append(pattern)
-        if field == "publisher":
-            clauses.append("b.publisher_norm LIKE ?")
-            params.append(pattern)
-        if not clauses:
-            clauses.append("b.title_norm LIKE ?")
-            params.append(pattern)
-        return "(" + " OR ".join(clauses) + ")", params
+        for token in tokens:
+            pattern = f"%{token}%"
+            clauses = []
+            if field in ("title", "title_author"):
+                if use_trgm:
+                    clauses.append("(b.title_norm LIKE ? OR b.title_norm %% ?)")
+                    params.extend([pattern, token])
+                else:
+                    clauses.append("(b.title_norm LIKE ?)")
+                    params.append(pattern)
+            if field in ("author", "title_author"):
+                if use_trgm:
+                    clauses.append("(b.author_norm LIKE ? OR b.author_norm %% ?)")
+                    params.extend([pattern, token])
+                else:
+                    clauses.append("(b.author_norm LIKE ?)")
+                    params.append(pattern)
+            if field == "publisher":
+                if use_trgm:
+                    clauses.append("(b.publisher_norm LIKE ? OR b.publisher_norm %% ?)")
+                    params.extend([pattern, token])
+                else:
+                    clauses.append("(b.publisher_norm LIKE ?)")
+                    params.append(pattern)
+            if not clauses:
+                if use_trgm:
+                    clauses.append("(b.title_norm LIKE ? OR b.title_norm %% ?)")
+                    params.extend([pattern, token])
+                else:
+                    clauses.append("(b.title_norm LIKE ?)")
+                    params.append(pattern)
+            groups.append("(" + " OR ".join(clauses) + ")")
+        return "(" + " AND ".join(groups) + ")", params
 
     conn = get_db_conn()
     try:
-        where_sql, params = build_where(norm_query)
-        if refine_norm:
-            refine_sql, refine_params = build_where(refine_norm)
+        where_sql, params = build_where(query_tokens)
+        if refine_tokens:
+            refine_sql, refine_params = build_where(refine_tokens)
             where_sql = f"{where_sql} AND {refine_sql}"
             params = params + refine_params
         filter_clauses = []
@@ -396,18 +493,50 @@ def search():
         ).fetchone()
         total = count_row["total"] if count_row and count_row["total"] else 0
 
+        trgm_query = "".join(query_tokens)
+        order_sql = "lib_count DESC, b.title ASC"
+        order_params = []
+        if use_trgm and trgm_query:
+            if field == "title":
+                order_sql = "similarity(b.title_norm, ?) DESC, lib_count DESC, b.title ASC"
+                order_params = [trgm_query]
+            elif field == "author":
+                order_sql = "similarity(b.author_norm, ?) DESC, lib_count DESC, b.title ASC"
+                order_params = [trgm_query]
+            elif field == "publisher":
+                order_sql = "similarity(b.publisher_norm, ?) DESC, lib_count DESC, b.title ASC"
+                order_params = [trgm_query]
+            else:
+                order_sql = "GREATEST(similarity(b.title_norm, ?), similarity(b.author_norm, ?)) DESC, lib_count DESC, b.title ASC"
+                order_params = [trgm_query, trgm_query]
+
         paged_sql = f"""
             SELECT
-                b.id, b.title, b.author, b.publisher, b.image_url, b.isbn,
-                COUNT(DISTINCT h.library_code) AS lib_count
+                b.id,
+                b.title,
+                b.author,
+                b.publisher,
+                b.image_url,
+                COUNT(DISTINCT h.library_code) AS lib_count,
+                COUNT(DISTINCT CASE
+                    WHEN h.platform IN ('Kyobo', 'Kyobo_New') THEN h.library_code
+                END) AS kyobo_count,
+                COUNT(DISTINCT CASE
+                    WHEN h.platform = 'YES24' THEN h.library_code
+                END) AS yes24_count,
+                COUNT(DISTINCT CASE
+                    WHEN h.library_code IS NOT NULL
+                        AND (h.platform IS NULL OR h.platform = '' OR h.platform NOT IN ('Kyobo', 'Kyobo_New', 'YES24'))
+                    THEN h.library_code
+                END) AS other_count
             FROM books b
             LEFT JOIN holdings h ON h.book_id = b.id
             WHERE {where_sql}
-            GROUP BY b.id, b.title, b.author, b.publisher, b.image_url, b.isbn
-            ORDER BY lib_count DESC, b.title ASC
+            GROUP BY b.id, b.title, b.author, b.publisher, b.image_url
+            ORDER BY {order_sql}
             LIMIT ? OFFSET ?
         """
-        paged_params = params + [limit, offset]
+        paged_params = params + order_params + [limit, offset]
         cur = conn.execute(paged_sql, paged_params)
         rows = cur.fetchall()
 
@@ -443,89 +572,29 @@ def search():
             filter_providers = sorted(providers)
             filter_libraries = sorted(libraries)
 
-        book_ids = [r["id"] for r in rows]
-        holdings_map = {}
-        if book_ids:
-            placeholders = ",".join("?" for _ in book_ids)
-            hcur = conn.execute(
-                f"SELECT book_id, library_code, library, provider, platform, image_url, isbn FROM holdings WHERE book_id IN ({placeholders})",
-                book_ids,
-            )
-            for h in hcur.fetchall():
-                holdings_map.setdefault(h["book_id"], []).append(h)
-
         results = []
         for row in rows:
-            item = {
+            kyobo_count = row.get("kyobo_count") or 0
+            yes24_count = row.get("yes24_count") or 0
+            other_count = row.get("other_count") or 0
+            total_libs = row.get("lib_count") or (kyobo_count + yes24_count + other_count)
+            results.append({
                 "book_id": row["id"],
                 "title": row["title"] or "",
                 "author": row["author"] or "",
                 "publisher": row["publisher"] or "",
-                "provider": "",
                 "image_url": row["image_url"] or "",
-                "libraries": [],
-                "platforms": set(),
-            }
-            for h in holdings_map.get(row["id"], []):
-                prov = normalize_provider(h["provider"] or "")
-                if prov and not item["provider"]:
-                    item["provider"] = prov
-                lib_code = h["library_code"] or ""
-                lib_name = h["library"] or ""
-                item["libraries"].append({"name": lib_name, "code": lib_code})
-                plat = h["platform"] or ""
-                if plat:
-                    item["platforms"].add(plat)
-                if not item["image_url"] and h["image_url"]:
-                    item["image_url"] = h["image_url"]
-
-            lib_details = []
-            platforms = set()
-            for lib in item["libraries"]:
-                lib_code = lib.get("code") or ""
-                lib_name = lib.get("name") or ""
-                meta = LIB_META_BY_CODE.get(lib_code) if lib_code else None
-                if not meta:
-                    meta = LIB_NAME_LOOKUP.get(lib_name)
-                    if meta:
-                        meta = {
-                            "code": lib_code or None,
-                            "name": lib_name or lib_code,
-                            "short": meta.get("short", lib_name or lib_code),
-                            "homepage_url": "#",
-                            "platform_code": meta.get("platform_code", "Unknown"),
-                            "platform_label": meta.get("platform_label", "기타"),
-                        }
-                if meta:
-                    lib_details.append(meta)
-                    platforms.add(meta["platform_code"])
-                else:
-                    short = LIBRARY_SHORT.get(lib_code, lib_name)
-                    lib_details.append({
-                        "code": lib_code or None,
-                        "name": lib_name or lib_code,
-                        "short": short or lib_name or lib_code,
-                        "homepage_url": "#",
-                        "platform_code": "Unknown",
-                        "platform_label": "기타",
-                    })
-            if not platforms:
-                for meta in lib_details:
-                    platforms.add(meta.get("platform_code", "Unknown"))
-            provider = item["provider"] or provider_from_platforms(platforms or item["platforms"])
-            results.append({
-                "book_id": item.get("book_id"),
-                "title": item["title"],
-                "author": item["author"],
-                "publisher": item["publisher"],
-                "provider": provider,
-                "image_url": item["image_url"],
-                "libraries": lib_details,
-                "platforms": list(platforms or item["platforms"]),
+                "counts": {
+                    "kyobo": kyobo_count,
+                    "yes24": yes24_count,
+                    "other": other_count,
+                    "total": total_libs,
+                },
             })
         return jsonify({"total": total, "items": results, "filters": {"providers": filter_providers, "libraries": filter_libraries}})
     except Exception as e:
         print(f"[오류] 검색 실패: {e}")
+        print(traceback.format_exc())
         return jsonify({"error": "검색 처리 오류 발생"})
     finally:
         conn.close()

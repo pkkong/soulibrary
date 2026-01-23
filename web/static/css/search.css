@@ -22,6 +22,7 @@
 body {
     margin: 0;
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+    font-variant-numeric: tabular-nums;
     background: var(--bg);
     color: var(--text-main);
     padding: 0;
@@ -268,6 +269,139 @@ body.has-topbar .app-main {
 }
 .nav-item-search .nav-label {
     font-size: 12px;
+}
+
+.page-guide .app-main {
+    padding-top: calc(var(--topbar-h) + 12px);
+}
+
+.guide-hero {
+    padding: 10px 0 6px;
+}
+.guide-title {
+    margin: 0 0 6px;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    line-height: 1.3;
+}
+.guide-sub {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 400;
+    color: #6b7280;
+    line-height: 1.5;
+}
+.guide-section {
+    margin: 18px 0;
+}
+.guide-section-title {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+}
+.guide-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+.guide-card {
+    border: 1px solid #e7e9ee;
+    border-radius: 14px;
+    padding: 12px;
+    background: #fff;
+}
+.guide-card h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+.guide-card p {
+    margin: 0;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.5;
+}
+.guide-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+}
+.guide-stat {
+    border: 1px solid #e7e9ee;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.guide-stat .label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 500;
+}
+.guide-stat .value {
+    font-size: 16px;
+    font-weight: 600;
+}
+.guide-note {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: #6b7280;
+}
+.guide-table {
+    border: 1px solid #e7e9ee;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+}
+.guide-table-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+}
+.guide-table-body {
+    display: grid;
+}
+.guide-table-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    padding: 10px 12px;
+    border-top: 1px solid #eef2f7;
+    align-items: center;
+}
+.guide-table-row:first-child {
+    border-top: none;
+}
+.guide-table-row .name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827;
+    text-decoration: none;
+}
+.guide-table-row a.name:hover,
+.guide-table-row a.name:focus {
+    text-decoration: underline;
+}
+.guide-table-row .count {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 500;
+}
+.guide-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.6;
 }
 
 .home-blank { min-height: 24px; }
@@ -518,31 +652,31 @@ body.has-topbar .app-main {
 .curation-track-hero { background: #ffffff; padding-bottom: 0; }
 .curation-card-hero { width: 280px; }
 .curation-hero {
-    width: 100%;
-    aspect-ratio: 1 / 1.2;
-    border-radius: 18px;
-    overflow: hidden;
-    background: #111827;
-    position: relative;
-    box-shadow: none;
-    border: 1px solid #e5e7eb;
-}
+      width: 100%;
+      aspect-ratio: 1 / 1.2;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #f3f4f6;
+      position: relative;
+      box-shadow: none;
+      border: 1px solid #e5e7eb;
+  }
 .curation-hero-bg {
-    position: absolute;
-    inset: -18px;
-    background-image: var(--bg);
-    background-size: cover;
-    background-position: center;
-    filter: blur(18px) saturate(1.05);
-    transform: scale(1.08);
-    opacity: 0.92;
-}
+      position: absolute;
+      inset: -18px;
+      background-image: var(--bg);
+      background-size: cover;
+      background-position: center;
+      filter: blur(20px) saturate(0.95);
+      transform: scale(1.08);
+      opacity: 0.85;
+  }
 .curation-hero-bg::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.68) 100%);
-}
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 45%, rgba(0,0,0,0.28) 100%);
+  }
 .curation-hero-cover {
     position: absolute;
     left: 50%;

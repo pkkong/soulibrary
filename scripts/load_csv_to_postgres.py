@@ -4,6 +4,7 @@ Load CSV data into PostgreSQL with books/holdings split and de-dup logic.
 Env:
   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
   CSV_DIR (default: data)
+  CSV_ONLY (optional: comma-separated list of csv basenames or library codes)
   MIGRATE_DROP (1/true/yes to drop tables first)
 """
 
@@ -19,6 +20,7 @@ from psycopg2.extras import execute_values
 ROOT = Path(__file__).resolve().parent.parent
 CSV_DIR = Path(os.environ.get("CSV_DIR", ROOT / "data"))
 SKIP_CODES = {"songpa", "yangcheon"}
+CSV_ONLY = os.environ.get("CSV_ONLY", "")
 
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
@@ -27,6 +29,23 @@ DB_USER = os.environ.get("DB_USER", "root")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 DROP_EXISTING = os.environ.get("MIGRATE_DROP", "").lower() in {"1", "true", "yes"}
 HOLDINGS_BATCH = int(os.environ.get("HOLDINGS_BATCH", "5000"))
+
+
+def _normalize_csv_only(value: str):
+    if not value:
+        return set()
+    raw = [v.strip() for v in value.split(",") if v.strip()]
+    normalized = set()
+    for item in raw:
+        if item.endswith(".csv"):
+            stem = Path(item).stem
+        else:
+            stem = item
+        normalized.add(stem.replace("_db", ""))
+    return normalized
+
+
+CSV_ONLY_SET = _normalize_csv_only(CSV_ONLY)
 
 
 def normalize_text(value: str) -> str:
@@ -94,6 +113,8 @@ def iter_rows():
             continue
         lib_code = path.stem.replace("_db", "")
         if lib_code in SKIP_CODES:
+            continue
+        if CSV_ONLY_SET and lib_code not in CSV_ONLY_SET:
             continue
         if path.stat().st_size == 0:
             continue
@@ -169,11 +190,22 @@ def init_schema(cur):
     cur.execute("CREATE INDEX IF NOT EXISTS idx_holdings_book_id ON holdings(book_id);")
 
 
+def purge_holdings(cur, library_codes):
+    if not library_codes:
+        return
+    cur.execute(
+        "DELETE FROM holdings WHERE library_code = ANY(%s)",
+        (list(library_codes),),
+    )
+
+
 def main():
     conn = connect_pg()
     conn.autocommit = True
     cur = conn.cursor()
     init_schema(cur)
+    if CSV_ONLY_SET and not DROP_EXISTING:
+        purge_holdings(cur, CSV_ONLY_SET)
 
     book_map = {}
     holdings_buf = []
