@@ -1,10 +1,13 @@
 ﻿import os
 import json
 import re
+import time
 import traceback
 from db import get_db, using_postgres
 from pathlib import Path
+from urllib.parse import urlparse, urlencode
 from flask import Flask, render_template, request, jsonify, send_from_directory
+import requests
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
 
 app = Flask(__name__)
@@ -13,6 +16,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
 LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
 DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
+STATUS_TTL_SEC = int(os.environ.get("KYOBO_STATUS_TTL", "120"))
+STATUS_CACHE = {}
 
 
 def get_db_conn():
@@ -118,6 +123,35 @@ def platform_to_provider_label(platform_code: str) -> str:
     if code == "Aladin":
         return "알라딘"
     return "기타"
+
+
+def _kyobo_base_url(library_code: str) -> str:
+    info = LIBRARIES.get(library_code)
+    if not info:
+        return ""
+    raw_url = info.get("homepage_url") or info.get("url_prefix") or info.get("total_count_url")
+    if not raw_url:
+        return ""
+    parsed = urlparse(raw_url)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _parse_kyobo_status(html: str):
+    if not html:
+        return None
+    match = re.search(r'<p class="use">.*?</p>', html, re.S)
+    text = match.group(0) if match else html
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    numbers = re.search(r"대출\s*:\s*([\d,]+)\s*/\s*([\d,]+)\s*예약\s*:\s*([\d,]+)", text)
+    if not numbers:
+        return None
+    loaned = int(numbers.group(1).replace(",", ""))
+    total = int(numbers.group(2).replace(",", ""))
+    reserved = int(numbers.group(3).replace(",", ""))
+    return {"loaned": loaned, "total": total, "reserved": reserved}
 def get_counts():
     lib_total = len(LIBRARIES)
     book_total = None
@@ -207,8 +241,10 @@ def get_book_detail(book_id: int):
                     "platform_code": "Unknown",
                     "platform_label": "기타",
                 }
-            libraries.append(meta)
-            platform = meta.get("platform_code") or "Unknown"
+            entry = dict(meta)
+            entry["platform_code"] = h.get("platform") or entry.get("platform_code") or "Unknown"
+            libraries.append(entry)
+            platform = entry.get("platform_code") or "Unknown"
             if platform in {"Kyobo", "Kyobo_New"}:
                 kyobo_count += 1
             elif platform == "YES24":
@@ -375,6 +411,51 @@ def book_detail(book_id: int):
     )
 
 
+@app.route("/api/kyobo_status")
+def api_kyobo_status():
+    library_code = (request.args.get("library_code") or "").strip()
+    brcd = (request.args.get("brcd") or "").strip()
+    ctts_dvsn_code = (request.args.get("ctts_dvsn_code") or "").strip()
+    ctgr_id = (request.args.get("ctgr_id") or "").strip()
+    sntn_auth_code = (request.args.get("sntn_auth_code") or "").strip()
+    if not library_code or not brcd or not ctts_dvsn_code or not ctgr_id:
+        return jsonify({"error": "missing_params"}), 400
+
+    cache_key = (library_code, brcd, ctts_dvsn_code, ctgr_id, sntn_auth_code)
+    cached = STATUS_CACHE.get(cache_key)
+    now = time.time()
+    if cached and now - cached["ts"] < STATUS_TTL_SEC:
+        return jsonify(cached["data"])
+
+    base_url = _kyobo_base_url(library_code)
+    if not base_url:
+        return jsonify({"error": "unsupported_library"}), 404
+
+    params = {
+        "cttsDvsnCode": ctts_dvsn_code,
+        "brcd": brcd,
+        "ctgrId": ctgr_id,
+    }
+    if sntn_auth_code:
+        params["sntnAuthCode"] = sntn_auth_code
+    detail_url = f"{base_url}/elibrary-front/content/contentView.ink?{urlencode(params)}"
+    try:
+        res = requests.get(
+            detail_url,
+            timeout=7,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+        )
+        res.raise_for_status()
+        status = _parse_kyobo_status(res.text)
+        if not status:
+            return jsonify({"error": "parse_failed"}), 502
+        payload = {"library_code": library_code, "brcd": brcd, "status": status}
+        STATUS_CACHE[cache_key] = {"ts": now, "data": payload}
+        return jsonify(payload)
+    except Exception:
+        return jsonify({"error": "fetch_failed"}), 502
+
+
 @app.route('/api/search')
 def search():
     query = request.args.get('query', '').strip()
@@ -413,34 +494,31 @@ def search():
         for token in tokens:
             pattern = f"%{token}%"
             clauses = []
-            if field in ("title", "title_author"):
-                if use_trgm:
-                    clauses.append("(b.title_norm LIKE ? OR b.title_norm %% ?)")
-                    params.extend([pattern, token])
-                else:
+            if use_trgm:
+                if len(token) < 3:
+                    pattern = f"{token}%"
+                if field in ("title", "title_author"):
                     clauses.append("(b.title_norm LIKE ?)")
                     params.append(pattern)
-            if field in ("author", "title_author"):
-                if use_trgm:
-                    clauses.append("(b.author_norm LIKE ? OR b.author_norm %% ?)")
-                    params.extend([pattern, token])
-                else:
+                if field in ("author", "title_author"):
                     clauses.append("(b.author_norm LIKE ?)")
                     params.append(pattern)
-            if field == "publisher":
-                if use_trgm:
-                    clauses.append("(b.publisher_norm LIKE ? OR b.publisher_norm %% ?)")
-                    params.extend([pattern, token])
-                else:
+                if field == "publisher":
+                    clauses.append("(b.publisher_norm LIKE ?)")
+                    params.append(pattern)
+            else:
+                if field in ("title", "title_author"):
+                    clauses.append("(b.title_norm LIKE ?)")
+                    params.append(pattern)
+                if field in ("author", "title_author"):
+                    clauses.append("(b.author_norm LIKE ?)")
+                    params.append(pattern)
+                if field == "publisher":
                     clauses.append("(b.publisher_norm LIKE ?)")
                     params.append(pattern)
             if not clauses:
-                if use_trgm:
-                    clauses.append("(b.title_norm LIKE ? OR b.title_norm %% ?)")
-                    params.extend([pattern, token])
-                else:
-                    clauses.append("(b.title_norm LIKE ?)")
-                    params.append(pattern)
+                clauses.append("(b.title_norm LIKE ?)")
+                params.append(pattern)
             groups.append("(" + " OR ".join(clauses) + ")")
         return "(" + " AND ".join(groups) + ")", params
 
