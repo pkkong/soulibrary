@@ -7,4 +7,4 @@ class GeumcheonBookcubeSpider(BookcubeBaseSpider):
     allowed_domains = ["elib.geumcheonlib.seoul.kr", "bookimg.bookcube.com"]
     base_url = "https://elib.geumcheonlib.seoul.kr/FxLibrary/product/list/"
     library_name = "금천구립도서관"
-    export_content_id = False
+    export_content_id = True

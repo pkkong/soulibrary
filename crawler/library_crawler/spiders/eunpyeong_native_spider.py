@@ -123,6 +123,7 @@ class EunpyeongNativeSpider(scrapy.Spider):
                 or item.get("ContentCoverUrlS")
                 or ""
             )
+            content_id = (item.get("ContentKey") or "").strip()
             owner_code = item.get("OwnerCode") or ""
             provider_raw = (item.get("OwnerCodeDesc") or "").strip()
             provider = self._normalize_provider(owner_code, provider_raw)
@@ -137,6 +138,7 @@ class EunpyeongNativeSpider(scrapy.Spider):
                     "provider": provider,
                     "image_url": image_url,
                     "isbn": "",
+                    "content_id": content_id,
                 }
 
         next_page = page + 1

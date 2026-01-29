@@ -1,4 +1,5 @@
 import math
+import re
 from urllib.parse import urlencode
 
 import scrapy
@@ -15,6 +16,7 @@ class GangnamNativeSpider(scrapy.Spider):
     max_pages_fallback = 1500
 
     def start_requests(self):
+        self._seen_ids = set()
         yield self._make_request(1)
 
     def _make_request(self, page: int):
@@ -59,6 +61,15 @@ class GangnamNativeSpider(scrapy.Spider):
 
         for book in books:
             title = book.css("div.book_title a::text").get()
+            content_id = ""
+            detail_href = book.css("div.book_title a::attr(href)").get() or ""
+            m = re.search(r"book_num=([A-Za-z0-9]+)", detail_href)
+            if m:
+                content_id = m.group(1)
+            if content_id and content_id in self._seen_ids:
+                continue
+            if content_id:
+                self._seen_ids.add(content_id)
             author = (book.css("div.writer::text").get() or "").strip()
 
             publish_text = book.css("div.publish_date::text").get() or ""
@@ -92,6 +103,7 @@ class GangnamNativeSpider(scrapy.Spider):
                     "provider": provider,
                     "image_url": image_url,
                     "isbn": isbn,
+                    "content_id": content_id,
                 }
 
         next_page = page + 1

@@ -60,6 +60,12 @@ def init_db(conn: sqlite3.Connection):
             platform TEXT,
             image_url TEXT,
             isbn TEXT,
+            brcd TEXT,
+            ctts_dvsn_code TEXT,
+            ctgr_id TEXT,
+            sntn_auth_code TEXT,
+            goods_id TEXT,
+            content_id TEXT,
             FOREIGN KEY(book_id) REFERENCES books(id)
         );
         CREATE INDEX idx_holdings_book_id ON holdings(book_id);
@@ -92,6 +98,12 @@ def iter_rows():
                     "publisher": publisher,
                     "image_url": row.get("image_url", "") or "",
                     "isbn": row.get("isbn", "") or "",
+                    "brcd": row.get("brcd", "") or "",
+                    "ctts_dvsn_code": row.get("ctts_dvsn_code", "") or "",
+                    "ctgr_id": row.get("ctgr_id", "") or "",
+                    "sntn_auth_code": row.get("sntn_auth_code", "") or "",
+                    "goods_id": row.get("goods_id", "") or "",
+                    "content_id": row.get("content_id", "") or "",
                     "provider": row.get("provider", "") or "",
                     "platform": row.get("platform", "") or "",
                     "library": row.get("library", "") or "",
@@ -154,6 +166,12 @@ def main():
                     row["platform"],
                     row["image_url"],
                     row["isbn"],
+                    row["brcd"],
+                    row["ctts_dvsn_code"],
+                    row["ctgr_id"],
+                    row["sntn_auth_code"],
+                    row["goods_id"],
+                    row["content_id"],
                 )
             )
 
@@ -161,8 +179,8 @@ def main():
                 cur.executemany(
                     """
                     INSERT INTO holdings
-                    (book_id, library_code, library, provider, platform, image_url, isbn)
-                    VALUES (?,?,?,?,?,?,?)
+                    (book_id, library_code, library, provider, platform, image_url, isbn, brcd, ctts_dvsn_code, ctgr_id, sntn_auth_code, goods_id, content_id)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                     """,
                     holdings_buf,
                 )
@@ -174,8 +192,8 @@ def main():
             cur.executemany(
                 """
                 INSERT INTO holdings
-                (book_id, library_code, library, provider, platform, image_url, isbn)
-                VALUES (?,?,?,?,?,?,?)
+                (book_id, library_code, library, provider, platform, image_url, isbn, brcd, ctts_dvsn_code, ctgr_id, sntn_auth_code, goods_id, content_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 holdings_buf,
             )

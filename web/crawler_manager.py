@@ -30,13 +30,6 @@ try:
 except Exception:
     get_seoul_total_count = None
 
-SEOUL_API_KEY = None
-try:
-    from web.config import SEOUL_API_KEY as _SEOUL_API_KEY
-    SEOUL_API_KEY = _SEOUL_API_KEY
-except Exception:
-    pass
-
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 ROOT_DIR = os.path.dirname(CRAWLER_DIR)
@@ -266,8 +259,36 @@ def fetch_total_count_from_api(lib_code, config):
     API 기반 도서관 총권수 구하기. 실패 시 -1.
     """
     try:
-        if lib_code == "seoul" and get_seoul_total_count:
-            return get_seoul_total_count() or -1
+        if lib_code == "seoul":
+            # elib 기준 전자책 총권수(카테고리 합산)
+            try:
+                session = requests.Session()
+                session.trust_env = False
+                url = "https://elib.seoul.go.kr/api/category/main"
+                params = {"contentType": "EB"}
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Referer": "https://elib.seoul.go.kr/",
+                    "Accept": "application/json, text/plain, */*",
+                }
+                res = session.get(url, params=params, headers=headers, timeout=15)
+                res.raise_for_status()
+                data = res.json()
+                categories = data.get("ContentDataList") or []
+                total = 0
+                for item in categories:
+                    count = item.get("contentCount")
+                    try:
+                        total += int(count)
+                    except Exception:
+                        continue
+                if total > 0:
+                    return total
+            except Exception as e:
+                print(f"[total_count api] seoul elib 실패: {e}")
+            # fallback: 기존 OpenAPI helper (있을 때만)
+            if get_seoul_total_count:
+                return get_seoul_total_count() or -1
 
         # 서울교육청 소장/구독: 간단히 totalCount 유사 필드를 시도
         if lib_code in {"sen_owned", "sen_subs"}:

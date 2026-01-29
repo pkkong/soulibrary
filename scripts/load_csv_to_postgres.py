@@ -53,7 +53,7 @@ def normalize_text(value: str) -> str:
         return ""
     text = str(value).lower()
     text = re.sub(r"[\u200b\ufeff]", "", text)
-    text = re.sub(r"[\\s\\[\\]\\(\\){}<>.,/|\\\\\\-_:;\"'`~!?]", "", text)
+    text = re.sub(r"[\s\[\]\(\){}<>.,/|\\\-_:\;\"'`~!?]", "", text)
     return text
 
 
@@ -121,6 +121,12 @@ def iter_rows():
         with path.open("r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
+                def _norm_empty(value: str):
+                    if value is None:
+                        return None
+                    text = str(value).strip()
+                    return text if text else None
+
                 title = row.get("title", "") or ""
                 author = row.get("author", "") or ""
                 publisher = row.get("publisher", "") or ""
@@ -129,7 +135,13 @@ def iter_rows():
                     "author": author,
                     "publisher": publisher,
                     "image_url": row.get("image_url", "") or "",
-                    "isbn": row.get("isbn", "") or "",
+                    "isbn": _norm_empty(row.get("isbn", "")),
+                    "brcd": _norm_empty(row.get("brcd", "")),
+                    "ctts_dvsn_code": _norm_empty(row.get("ctts_dvsn_code", "")),
+                    "ctgr_id": _norm_empty(row.get("ctgr_id", "")),
+                    "sntn_auth_code": _norm_empty(row.get("sntn_auth_code", "")),
+                    "goods_id": _norm_empty(row.get("goods_id", "")),
+                    "content_id": _norm_empty(row.get("content_id", "")),
                     "provider": normalize_provider(row.get("provider", "") or ""),
                     "platform": row.get("platform", "") or "",
                     "library": row.get("library", "") or "",
@@ -180,7 +192,13 @@ def init_schema(cur):
             provider TEXT,
             platform TEXT,
             image_url TEXT,
-            isbn TEXT
+            isbn TEXT,
+            brcd TEXT,
+            ctts_dvsn_code TEXT,
+            ctgr_id TEXT,
+            sntn_auth_code TEXT,
+            goods_id TEXT,
+            content_id TEXT
         );
         """
     )
@@ -188,6 +206,23 @@ def init_schema(cur):
     cur.execute("CREATE INDEX IF NOT EXISTS idx_books_author_norm ON books(author_norm);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_books_publisher_norm ON books(publisher_norm);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_holdings_book_id ON holdings(book_id);")
+
+
+def has_books_unique_index(cur):
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM pg_indexes
+            WHERE tablename = 'books'
+              AND indexdef ILIKE '%unique%'
+              AND indexdef ILIKE '%(title_norm, author_norm, publisher_norm)%'
+            LIMIT 1
+            """
+        )
+        return cur.fetchone() is not None
+    except Exception:
+        return False
 
 
 def purge_holdings(cur, library_codes):
@@ -204,6 +239,7 @@ def main():
     conn.autocommit = True
     cur = conn.cursor()
     init_schema(cur)
+    use_unique = has_books_unique_index(cur)
     if CSV_ONLY_SET and not DROP_EXISTING:
         purge_holdings(cur, CSV_ONLY_SET)
 
@@ -215,35 +251,64 @@ def main():
         key = (row["title_norm"], row["author_norm"], row["publisher_norm"])
         book_id = book_map.get(key)
         if not book_id:
-            cur.execute(
-                """
-                INSERT INTO books
-                (title, author, publisher, image_url, isbn, title_norm, author_norm, publisher_norm)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (title_norm, author_norm, publisher_norm)
-                DO NOTHING
-                RETURNING id
-                """,
-                (
-                    row["title"],
-                    row["author"],
-                    row["publisher"],
-                    row["image_url"],
-                    row["isbn"],
-                    row["title_norm"],
-                    row["author_norm"],
-                    row["publisher_norm"],
-                ),
-            )
-            res = cur.fetchone()
-            if res:
-                book_id = res[0]
+            if use_unique:
+                cur.execute(
+                    """
+                    INSERT INTO books
+                    (title, author, publisher, image_url, isbn, title_norm, author_norm, publisher_norm)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (title_norm, author_norm, publisher_norm)
+                    DO NOTHING
+                    RETURNING id
+                    """,
+                    (
+                        row["title"],
+                        row["author"],
+                        row["publisher"],
+                        row["image_url"],
+                        row["isbn"],
+                        row["title_norm"],
+                        row["author_norm"],
+                        row["publisher_norm"],
+                    ),
+                )
+                res = cur.fetchone()
+                if res:
+                    book_id = res[0]
+                else:
+                    cur.execute(
+                        "SELECT id FROM books WHERE title_norm=%s AND author_norm=%s AND publisher_norm=%s",
+                        key,
+                    )
+                    book_id = cur.fetchone()[0]
             else:
                 cur.execute(
                     "SELECT id FROM books WHERE title_norm=%s AND author_norm=%s AND publisher_norm=%s",
                     key,
                 )
-                book_id = cur.fetchone()[0]
+                res = cur.fetchone()
+                if res:
+                    book_id = res[0]
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO books
+                        (title, author, publisher, image_url, isbn, title_norm, author_norm, publisher_norm)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                        RETURNING id
+                        """,
+                        (
+                            row["title"],
+                            row["author"],
+                            row["publisher"],
+                            row["image_url"],
+                            row["isbn"],
+                            row["title_norm"],
+                            row["author_norm"],
+                            row["publisher_norm"],
+                        ),
+                    )
+                    book_id = cur.fetchone()[0]
             book_map[key] = book_id
 
         holdings_buf.append(
@@ -255,6 +320,12 @@ def main():
                 row["platform"],
                 row["image_url"],
                 row["isbn"],
+                row["brcd"],
+                row["ctts_dvsn_code"],
+                row["ctgr_id"],
+                row["sntn_auth_code"],
+                row["goods_id"],
+                row["content_id"],
             )
         )
         if len(holdings_buf) >= HOLDINGS_BATCH:
@@ -262,7 +333,7 @@ def main():
                 cur,
                 """
                 INSERT INTO holdings
-                (book_id, library_code, library, provider, platform, image_url, isbn)
+                (book_id, library_code, library, provider, platform, image_url, isbn, brcd, ctts_dvsn_code, ctgr_id, sntn_auth_code, goods_id, content_id)
                 VALUES %s
                 """,
                 holdings_buf,
@@ -276,7 +347,7 @@ def main():
             cur,
             """
             INSERT INTO holdings
-            (book_id, library_code, library, provider, platform, image_url, isbn)
+            (book_id, library_code, library, provider, platform, image_url, isbn, brcd, ctts_dvsn_code, ctgr_id, sntn_auth_code, goods_id, content_id)
             VALUES %s
             """,
             holdings_buf,

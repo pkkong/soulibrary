@@ -80,6 +80,7 @@ def download_sen_api(url, content_type, label):
                     "library": "서울시교육청 (구독)",
                     "image_url": book_json.get("ucm_cover_url") or "",
                     "isbn": _extract_isbn(book_json),
+                    "content_id": book_json.get("ucm_code") or "",
                     "provider": book_json.get("ucm_publisher") or "",
                     "platform": "서울시교육청",
                 })
@@ -116,6 +117,7 @@ def save_to_csv(books):
         "library",
         "image_url",
         "isbn",
+        "content_id",
         "provider",
         "platform",
     ]]

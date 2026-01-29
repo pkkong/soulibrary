@@ -2,80 +2,80 @@
   "yongsan": {
     "name": "용산구 (교보)",
     "status": "done",
-    "last_run": "2025-12-31 11:46:11",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 22:36:54",
+    "msg": "done"
   },
   "seoul": {
     "name": "서울도서관",
     "status": "done",
-    "last_run": "2026-01-06 14:32:28",
-    "msg": "정상 완료"
+    "last_run": "2026-01-26 15:56:56",
+    "msg": "done"
   },
   "sen_owned": {
     "name": "서울교육청 (소장)",
     "status": "done",
-    "last_run": "2026-01-13 16:05:33",
-    "msg": "정상 완료"
+    "last_run": "2026-01-26 14:59:48",
+    "msg": "done"
   },
   "sen_subs": {
     "name": "서울교육청 (구독)",
     "status": "done",
-    "last_run": "2026-01-06 16:43:28",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 22:32:05",
+    "msg": "done"
   },
   "seongbuk": {
     "name": "성북구 (교보 신버전)",
     "status": "done",
-    "last_run": "2026-01-13 16:08:12",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 22:24:31",
+    "msg": "done"
   },
   "gangnam": {
     "name": "강남구 전자도서관",
     "status": "done",
-    "last_run": "2025-12-31 13:31:44",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 21:07:54",
+    "msg": "done"
   },
   "yeongdeungpo": {
     "name": "영등포구 (YES24)",
     "status": "done",
-    "last_run": "2026-01-06 11:39:18",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 06:11:46",
+    "msg": "done"
   },
   "dongdaemun": {
     "name": "동대문구 (교보 신버전)",
     "status": "done",
-    "last_run": "2025-12-31 16:04:29",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 23:15:34",
+    "msg": "done"
   },
   "dongjak": {
     "name": "동작구 (교보 신버전)",
     "status": "done",
-    "last_run": "2025-12-31 16:03:53",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 23:16:25",
+    "msg": "done"
   },
   "gangseo": {
     "name": "강서구 (YES24)",
     "status": "done",
-    "last_run": "2026-01-06 11:48:11",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 07:17:49",
+    "msg": "done"
   },
   "seocho": {
     "name": "서초구 (교보 신버전)",
     "status": "done",
-    "last_run": "2025-12-31 16:50:25",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 00:39:50",
+    "msg": "done"
   },
   "eunpyeong": {
     "name": "은평구 (기타)",
     "status": "done",
-    "last_run": "2025-12-30 10:44:51",
-    "msg": "정상 완료"
+    "last_run": "2026-01-26 14:25:31",
+    "msg": "done"
   },
   "jongno": {
     "name": "종로구 (YES24)",
     "status": "done",
-    "last_run": "2026-01-06 13:39:45",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 08:07:29",
+    "msg": "done"
   },
   "songpa": {
     "name": "송파구 (교보)",
@@ -86,8 +86,8 @@
   "geumcheon": {
     "name": "금천구(북큐브)",
     "status": "done",
-    "last_run": "2025-12-30 10:47:41",
-    "msg": "정상 완료"
+    "last_run": "2026-01-26 15:56:43",
+    "msg": "done"
   },
   "yangcheon": {
     "name": "양천구 (YES24)",
@@ -98,115 +98,115 @@
   "mapo": {
     "name": "마포구 (교보)",
     "status": "done",
-    "last_run": "2025-12-31 11:40:55",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 22:23:24",
+    "msg": "done"
   },
   "gangbuk": {
     "name": "강북구 (교보)",
     "status": "done",
-    "last_run": "2025-12-31 11:31:45",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 22:23:24",
+    "msg": "done"
   },
   "gwangjin": {
     "name": "광진구 (소장)",
     "status": "done",
-    "last_run": "2025-12-31 13:34:57",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 23:19:59",
+    "msg": "done"
   },
   "gwangjin_subs": {
     "name": "광진구 (구독)",
     "status": "done",
-    "last_run": "2025-12-31 13:12:04",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 01:36:26",
+    "msg": "done"
   },
   "seongdong": {
     "name": "성동구 (북큐브)",
     "status": "done",
-    "last_run": "2025-12-30 11:58:38",
-    "msg": "정상 완료"
+    "last_run": "2026-01-26 15:40:59",
+    "msg": "done"
   },
   "gangdong_owned": {
     "name": "강동구 (YES24)",
     "status": "done",
-    "last_run": "2026-01-06 09:50:42",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 06:07:15",
+    "msg": "done"
   },
   "gangdong_subs": {
     "name": "강동구 (구독)",
     "status": "done",
-    "last_run": "2025-12-31 13:08:16",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 01:33:25",
+    "msg": "done"
   },
   "dobong": {
     "name": "도봉구 (교보)",
     "status": "done",
-    "last_run": "2026-01-13 19:08:08",
-    "msg": "정상 완료"
+    "last_run": "2026-01-26 16:45:11",
+    "msg": "done"
   },
   "seodaemun_subs": {
     "name": "서대문구 (구독)",
     "status": "done",
-    "last_run": "2025-12-31 13:14:24",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 01:36:43",
+    "msg": "done"
   },
   "seodaemun_owned": {
     "name": "서대문구 (소장)",
     "status": "done",
-    "last_run": "2025-12-31 11:42:11",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 23:15:34",
+    "msg": "done"
   },
   "junggu": {
     "name": "중구 (교보)",
     "status": "done",
-    "last_run": "2025-12-31 11:42:18",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 22:33:52",
+    "msg": "done"
   },
   "jungnang": {
     "name": "중랑구 (교보)",
     "status": "done",
-    "last_run": "2025-12-31 11:56:12",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 23:32:26",
+    "msg": "done"
   },
   "gwanak": {
     "name": "관악구 (YES24)",
     "status": "done",
-    "last_run": "2026-01-06 11:28:55",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 05:59:28",
+    "msg": "done"
   },
   "nowon": {
     "name": "노원구 (교보)",
     "status": "done",
-    "last_run": "2025-12-31 11:21:42",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 22:23:22",
+    "msg": "done"
   },
   "guro": {
     "name": "구로구 (교보)",
     "status": "done",
-    "last_run": "2025-12-31 11:50:08",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 23:17:02",
+    "msg": "done"
   },
   "songpa_subs": {
     "name": "송파구 (구독)",
     "status": "done",
-    "last_run": "2026-01-13 17:50:03",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 01:34:10",
+    "msg": "done"
   },
   "songpa_owned": {
     "name": "송파구 (소장)",
     "status": "done",
-    "last_run": "2026-01-06 12:41:04",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 07:10:28",
+    "msg": "done"
   },
   "yangcheon_subs": {
     "name": "양천구 (구독)",
     "status": "done",
-    "last_run": "2025-12-31 16:14:43",
-    "msg": "정상 완료"
+    "last_run": "2026-01-25 01:29:44",
+    "msg": "done"
   },
   "yangcheon_owned": {
     "name": "양천구 (소장)",
     "status": "done",
-    "last_run": "2025-12-31 16:03:06",
-    "msg": "정상 완료"
+    "last_run": "2026-01-24 22:23:21",
+    "msg": "done"
   }
 }

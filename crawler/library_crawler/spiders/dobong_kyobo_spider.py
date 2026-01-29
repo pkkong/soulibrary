@@ -59,16 +59,17 @@ class DobongKyoboSpider(scrapy.Spider):
                 author = m.group(1).strip()
                 publisher = m.group(2).strip()
 
-            content_id = book.attrib.get("id", "")
             isbn = ""
-            m = re.search(r"content_(\d{10,13})", content_id)
+            brcd = ""
+            detail_href = book.css("p.pic a::attr(href)").get() or ""
+            m = re.search(r"barcode=([A-Za-z0-9]+)", detail_href)
             if m:
-                isbn = m.group(1)
-            if not isbn:
+                brcd = m.group(1)
+            if not brcd:
                 img_url = book.css("p.pic img::attr(src)").get() or ""
-                m = re.search(r"/(\d{10,13})/", img_url)
+                m = re.search(r"/([A-Za-z0-9]{10,})/", img_url)
                 if m:
-                    isbn = m.group(1)
+                    brcd = m.group(1)
 
             image_url = book.css("p.pic img::attr(src)").get()
             if image_url and image_url.startswith("//"):
@@ -84,6 +85,7 @@ class DobongKyoboSpider(scrapy.Spider):
                     "provider": "교보문고",
                     "image_url": image_url,
                     "isbn": isbn,
+                    "brcd": brcd,
                 }
 
         next_page = page + 1

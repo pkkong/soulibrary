@@ -1,0 +1,7 @@
+ALTER TABLE books
+  ADD COLUMN IF NOT EXISTS canonical_id TEXT,
+  ADD COLUMN IF NOT EXISTS merge_group_id TEXT;
+
+ALTER TABLE holdings
+  ADD COLUMN IF NOT EXISTS canonical_id TEXT,
+  ADD COLUMN IF NOT EXISTS content_id TEXT;

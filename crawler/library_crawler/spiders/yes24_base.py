@@ -116,6 +116,12 @@ class Yes24BaseSpider(scrapy.Spider):
 
         for book in books:
             title = book.css(".tit a::text").get()
+            goods_href = book.css(".tit a::attr(href)").get() or book.css(".thumb::attr(href)").get() or ""
+            goods_id = ""
+            if goods_href:
+                match = re.search(r"goods_id=(\d+)", goods_href)
+                if match:
+                    goods_id = match.group(1)
             writer_text = book.css(".writer::text").get()
             author = ""
             if writer_text:
@@ -142,4 +148,5 @@ class Yes24BaseSpider(scrapy.Spider):
                     "platform": "YES24",
                     "image_url": image_url,
                     "isbn": isbn,
+                    "goods_id": goods_id,
                 }

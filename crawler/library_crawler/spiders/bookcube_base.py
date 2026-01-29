@@ -92,13 +92,18 @@ class BookcubeBaseSpider(scrapy.Spider):
         for book in books:
             content_id = ""
             for href in book.css("a::attr(href)").getall():
-                m = re.search(r"goView\('(\d+)'", href)
+                m = re.search(r"goView\('([A-Za-z0-9]+)'", href)
                 if m:
                     content_id = m.group(1)
                     break
             if not content_id:
+                html = book.get() or ""
+                m = re.search(r"num=([A-Za-z0-9]+)", html)
+                if m:
+                    content_id = m.group(1)
+            if not content_id:
                 img_try = book.css("img::attr(src)").get() or ""
-                m = re.search(r"/(\d(5,))", img_try)
+                m = re.search(r"/(\d{6,})", img_try)
                 if m:
                     content_id = m.group(1)
 

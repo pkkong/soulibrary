@@ -38,6 +38,9 @@ class PgConn:
         cur.execute(_convert_placeholders(sql), params or [])
         return cur
 
+    def rollback(self):
+        self._conn.rollback()
+
     def close(self):
         self._conn.close()
 

@@ -2,8 +2,10 @@
 import requests
 import pandas as pd
 import time
+from pathlib import Path
 
-OUTPUT_FILE = "../data/sen_owned_db.csv"
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+OUTPUT_FILE = DATA_DIR / "sen_owned_db.csv"
 
 URL_OWNED = "https://e-lib.sen.go.kr/api/contents/page-data"
 CONTENT_TYPE_OWNED = "TY01"
@@ -75,6 +77,7 @@ def download_sen_api(url, content_type, label):
                     "library": "서울시교육청 (소장)",
                     "image_url": book_json.get("coverUrl") or "",
                     "isbn": _extract_isbn(book_json),
+                    "content_id": book_json.get("contentsKey") or "",
                     "provider": book_json.get("ownerDesc") or "",
                     "platform": "서울시교육청",
                 })
@@ -108,10 +111,12 @@ def save_to_csv(books):
         "library",
         "image_url",
         "isbn",
+        "content_id",
         "provider",
         "platform",
     ]]
 
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     final_df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8-sig")
     print(f"Saved: {OUTPUT_FILE}")
 

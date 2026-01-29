@@ -69,7 +69,13 @@ def init_schema(pg_conn):
             provider TEXT,
             platform TEXT,
             image_url TEXT,
-            isbn TEXT
+            isbn TEXT,
+            brcd TEXT,
+            ctts_dvsn_code TEXT,
+            ctgr_id TEXT,
+            sntn_auth_code TEXT,
+            goods_id TEXT,
+            content_id TEXT
         );
         """
     )
@@ -136,6 +142,12 @@ def main():
                 "platform",
                 "image_url",
                 "isbn",
+                "brcd",
+                "ctts_dvsn_code",
+                "ctgr_id",
+                "sntn_auth_code",
+                "goods_id",
+                "content_id",
             ],
         )
         print("[done] migration complete")

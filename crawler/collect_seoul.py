@@ -1,78 +1,117 @@
 ﻿# -*- coding: utf-8 -*-
 import csv
-import math
+import time
+from pathlib import Path
 import requests
 
-API_KEY = "745942496d6b6f6e383774624c4c56"
-SERVICE_NAME = "SeoulLibraryBookSearchInfo"
-BASE_URL = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE_NAME}"
-BOOKS_PER_PAGE = 1000
+BASE_URL = "https://elib.seoul.go.kr/api"
+CONTENT_TYPE_EBOOK = "EB"
+BOOKS_PER_PAGE = 100
 
-OUTPUT_FILE = "../data/seoul_db.csv"
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+OUTPUT_FILE = DATA_DIR / "seoul_db.csv"
 
-EBOOK_FILTER_CODE = "ze"
-FILTER_PATH = f" / / / /{EBOOK_FILTER_CODE}/"
-
-
-def get_total_ebook_count():
-    try:
-        test_url = f"{BASE_URL}/1/1/{FILTER_PATH}"
-        print(f"API test request... ({test_url})")
-        response = requests.get(test_url, timeout=10)
-        response.raise_for_status()
-
-        data = response.json()
-        if SERVICE_NAME in data:
-            total_count = data[SERVICE_NAME].get("list_total_count")
-            if total_count:
-                return total_count
-        print("Error: missing 'list_total_count'.")
-        return None
-    except Exception as e:
-        print(f"API request error: {e}")
-        return None
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://elib.seoul.go.kr/",
+}
 
 
-def download_all_ebooks(total_ebook_count):
-    total_pages = math.ceil(total_ebook_count / BOOKS_PER_PAGE)
-    print(f"Total {total_ebook_count} items, about {total_pages} pages...")
+def _get_content_list(data):
+    if isinstance(data.get("ContentDataList"), list):
+        return data.get("ContentDataList", [])
+    if isinstance(data.get("ContentDataList"), dict):
+        return data.get("ContentDataList", {}).get("responses", [])
+    return []
+
+
+def fetch_categories(session):
+    url = f"{BASE_URL}/category/main"
+    params = {"contentType": CONTENT_TYPE_EBOOK}
+    response = session.get(url, params=params, headers=HEADERS, timeout=30)
+    response.raise_for_status()
+    data = response.json()
+    return data.get("ContentDataList", [])
+
+
+def fetch_category_page(session, category_no, page_no):
+    url = f"{BASE_URL}/contents/catesearch"
+    params = {
+        "libCode": "",
+        "majorCategory": category_no,
+        "subCategory": "",
+        "innerKeyword": "",
+        "orderOption": "1",
+        "loanable": "",
+        "currentCount": page_no,
+        "pageCount": BOOKS_PER_PAGE,
+        "_": int(time.time() * 1000),
+    }
+    response = session.get(url, params=params, headers=HEADERS, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
+def download_all_ebooks():
+    session = requests.Session()
+    session.trust_env = False
+
+    categories = fetch_categories(session)
+    if not categories:
+        print("No categories found.")
+        return []
+
+    print(f"Found {len(categories)} categories.")
 
     final_ebook_list = []
+    seen_keys = set()
 
-    for i in range(total_pages):
-        start_index = (i * BOOKS_PER_PAGE) + 1
-        end_index = (i + 1) * BOOKS_PER_PAGE
-        end_index = min(end_index, total_ebook_count)
+    for category in categories:
+        category_no = category.get("categoryNo")
+        category_name = category.get("categoryName")
+        if not category_no:
+            continue
 
-        request_url = f"{BASE_URL}/{start_index}/{end_index}/{FILTER_PATH}"
-        print(f"({i + 1}/{total_pages}) Range: {start_index}~{end_index}")
+        page_no = 1
+        total_page = 1
+        print(f"[{category_no}] {category_name} start...")
 
-        try:
-            response = requests.get(request_url, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            books_in_page = data.get(SERVICE_NAME, {}).get("row", [])
+        while page_no <= total_page:
+            try:
+                data = fetch_category_page(session, category_no, page_no)
+                total_page = int(data.get("totalPage") or 1)
+                items = _get_content_list(data)
 
-            if not books_in_page:
-                print(f"  -> Page {i + 1} empty. (Total {total_pages} pages)")
-                continue
+                if not items:
+                    print(f"  - Page {page_no} empty.")
+                    break
 
-            print(f"  -> Received {len(books_in_page)} items")
-            for book in books_in_page:
-                final_ebook_list.append(
-                    {
-                        "title": book.get("TITLE") or "",
-                        "author": book.get("AUTHOR") or "",
-                        "publisher": book.get("PUBLER") or "",
-                        "library": "서울도서관",
-                        "image_url": "",
-                        "isbn": "",
-                        "provider": "",
-                        "platform": "Mixed",
-                    }
-                )
-        except Exception as e:
-            print(f"  -> Page {i + 1} failed: {e}")
+                print(f"  - Page {page_no}/{total_page}: {len(items)} items")
+                for item in items:
+                    content_key = item.get("contentsKey") or ""
+                    if not content_key or content_key in seen_keys:
+                        continue
+
+                    seen_keys.add(content_key)
+                    final_ebook_list.append(
+                        {
+                            "title": item.get("title") or "",
+                            "author": item.get("author") or "",
+                            "publisher": item.get("publisher") or "",
+                            "library": "서울도서관",
+                            "image_url": item.get("coverUrl") or "",
+                            "isbn": item.get("isbn") or "",
+                            "content_id": content_key,
+                            "provider": item.get("ownerCode") or "",
+                            "platform": "서울도서관",
+                        }
+                    )
+
+                page_no += 1
+                time.sleep(0.2)
+            except Exception as e:
+                print(f"  - Page {page_no} failed: {e}")
+                break
 
     return final_ebook_list
 
@@ -84,6 +123,7 @@ def save_ebooks_to_csv(final_ebook_list):
 
     print(f"\nSaving {len(final_ebook_list)} rows to CSV...")
 
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(
             f,
@@ -94,6 +134,7 @@ def save_ebooks_to_csv(final_ebook_list):
                 "library",
                 "image_url",
                 "isbn",
+                "content_id",
                 "provider",
                 "platform",
             ],
@@ -105,11 +146,6 @@ def save_ebooks_to_csv(final_ebook_list):
 
 
 if __name__ == "__main__":
-    print("--- Seoul Library API crawl ---")
-    total_ebook_count = get_total_ebook_count()
-
-    if total_ebook_count:
-        final_ebook_list = download_all_ebooks(total_ebook_count)
-        save_ebooks_to_csv(final_ebook_list)
-    else:
-        print("Failed to read total count.")
+    print("--- Seoul Library elib API crawl ---")
+    final_ebook_list = download_all_ebooks()
+    save_ebooks_to_csv(final_ebook_list)

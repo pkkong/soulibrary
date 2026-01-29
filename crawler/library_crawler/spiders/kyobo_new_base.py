@@ -4,6 +4,10 @@ from urllib.parse import urlencode
 
 import scrapy
 
+CLICK_PATTERN = re.compile(
+    r"fnContentClick\([^,]*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'"
+)
+
 
 class KyoboNewBaseSpider(scrapy.Spider):
     """
@@ -101,6 +105,13 @@ class KyoboNewBaseSpider(scrapy.Spider):
             author = writer_texts[0].strip() if writer_texts else ""
             publisher = book.css("li.writer span::text").get() or ""
             provider = book.css("span.store::text").get() or self.provider
+            onclick = book.css("a[onclick*='fnContentClick']::attr(onclick)").get() or ""
+            ctts_dvsn_code = ""
+            brcd = ""
+            ctgr_id = ""
+            match = CLICK_PATTERN.search(onclick)
+            if match:
+                ctts_dvsn_code, brcd, ctgr_id = match.groups()
 
             image_url = book.css("div.img a img::attr(src)").get()
             if image_url:
@@ -108,6 +119,10 @@ class KyoboNewBaseSpider(scrapy.Spider):
                     image_url = "https:" + image_url
                 elif self.image_prefix and image_url.startswith("/"):
                     image_url = f"{self.image_prefix}{image_url}"
+            if not brcd and image_url:
+                match = re.search(r"/ebook/(\d{10,13})/", image_url)
+                if match:
+                    brcd = match.group(1)
             # Kyobo New image URLs do not embed ISBN; leave blank.
             isbn = ""
 
@@ -121,6 +136,9 @@ class KyoboNewBaseSpider(scrapy.Spider):
                     "provider": provider,
                     "image_url": image_url,
                     "isbn": isbn,
+                    "brcd": brcd,
+                    "ctts_dvsn_code": ctts_dvsn_code,
+                    "ctgr_id": ctgr_id,
                 }
 
         # Schedule next page lazily; obey detected total pages if available.
