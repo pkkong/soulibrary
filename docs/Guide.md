@@ -1,4 +1,4 @@
-﻿# Guide.md
+﻿﻿# Guide.md
 
 서비스 개요, 구조, 운영 흐름을 빠르게 이해할 수 있는 가이드입니다.
 
@@ -92,7 +92,15 @@ DB_PASSWORD=localpass
 - 그 외(북큐브/서울/교육청/은평/강남 등): `content_id`
 - 구독형(일부 플랫폼)은 상태 조회 제한 있음(필요 시 UI에서 조회 시도 차단).
 
-## 13) 현재 진행 상황 (2026-01-27)
+## 13) 진행 상황 업데이트 (2026-01-29)
+- 버그 수정: status_parsers/normalize/providers 한글 정규식 깨짐 복구(대출/예약/보유 파싱 정상화).
+- 상태 조회: YES24/Bookcube/Gangnam detail-first로 우선 조회, Bookcube/Gangnam 페이지 탐색 상한 축소(속도 개선).
+- UI/UX: 상세 페이지 도서관 배지 2줄(도서관명/상태), 색상·테두리·정렬 개선, 4열/6열 그리드 적용.
+- UI/UX: 플랫폼 아이콘 제거 → “교보/YES24/기타 도서관” 텍스트 그룹 타이틀로 변경.
+- UI/UX: 상태 로딩 시 스피너 표시 후 정렬 완료된 상태로 노출(중간 리플로우/정렬 보이는 문제 완화).
+- 표시 규칙: 예약이 있으면 예약만 표기(대출가능 표기 숨김), 구독형은 “대출가능(구독)” 표기.
+
+## 14) 진행 상황 업데이트 (2026-01-27)
 - 교보/YES24: 크롤링 + 대출현황 조회 완료.
 - 비(교보/YES24) 8개: 도봉/금천/성동/강남/은평/서울/서울교육청 구독/소장 크롤링 완료.
 - 서울/교육청/은평: content_id 기반 상세 링크/상태 조회 API 추가.
@@ -103,10 +111,21 @@ DB_PASSWORD=localpass
 - 과제: 기타 8개 도서관 상세 페이지/상태 현황 코드 전반 점검 필요.
 - 과제: DB 적재/중복 병합 로직 대규모 수정 필요.
 
-## 14) 진행 상황 업데이트 (2026-01-26)
+## 15) 진행 상황 업데이트 (2026-01-26)
 - 서울도서관: elib API 전환(content_id=contentsKey) 완료, 체커는 카테고리 합산 방식으로 총권수 확인.
 - 서울시교육청: 소장/구독 content_id 수집 완료(소장은 실시간 조회 가능, 구독은 무조건 대출가능 처리).
 - 은평구립: content_id=ContentKey 수집 및 상세 링크/상태 조회 API 추가.
 - 도봉: 상세 링크 모바일 버전으로 전환, brcd 문자 혼합/DRMContent 보정 완료.
 - 적재: 8개 도서관 CSV만 로컬 PostgreSQL 적재 실행(진행 확인 필요).
 - 남은 작업: 적재 완료 확인 후 상세/상태 샘플 테스트, 도봉 대출현황 API 여부 추가 확인.
+
+## Cloudtype 외부 접속(운영)
+HOST=svc.sel3.cloudtype.app
+PORT=31659
+DB_NAME=soulib_test
+DB_USER=root
+DB_PASSWORD=mkfleo93fe570fad
+
+복원 명령:
+docker exec -e PGPASSWORD=mkfleo93fe570fad soulib-postgres pg_restore -h svc.sel3.cloudtype.app -p 31659 -U root -d soulib_test --clean --if-exists /tmp/soulib_test.dump
+

@@ -63,9 +63,8 @@
             <div class="detail-inner">
             <div class="detail-section-head">
                 <div class="detail-section-title">소장 도서관</div>
-                <button class="detail-toggle" type="button" id="lib-detail-toggle">상세 보기</button>
             </div>
-            <div class="detail-section-sub">도서관 클릭 시 해당 홈페이지로 이동합니다.</div>
+            <div class="detail-section-sub">클릭 시 도서의 상세 페이지로 이동합니다.</div>
 
             {% set ns = namespace(kyobo=[], yes24=[], other=[]) %}
             {% for lib in book.libraries %}
@@ -81,129 +80,138 @@
             <div class="lib-groups">
                 {% if ns.kyobo %}
                     <div class="lib-group-row">
-                        <div class="lib-provider">
-                            <div class="prov-chip kyobo"><img src="/static/img/kyobo.webp" alt="교보"></div>
-                        </div>
+                        <div class="lib-group-title">교보 도서관</div>
                         <div class="lib-grid" data-lib-group="kyobo">
             {% for lib in ns.kyobo %}
                                 {% set has_dobong_status = lib.code == "dobong" and lib.brcd %}
                                 {% set has_status = lib.brcd and lib.ctts_dvsn_code and lib.ctgr_id and lib.service_type != "Subscription" %}
-                                <div class="lib-card">
-                                    <a class="badge lib-name"
-                                       href="{{ lib.detail_url or lib.homepage_url }}"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       {% if has_dobong_status %}
-                                       data-dobong-status="1"
-                                       data-brcd="{{ lib.brcd }}"
-                                       {% elif has_status %}
-                                       data-kyobo-status="1"
-                                       data-library-code="{{ lib.code }}"
-                                       data-brcd="{{ lib.brcd }}"
-                                       data-ctts="{{ lib.ctts_dvsn_code }}"
-                                       data-ctgr="{{ lib.ctgr_id }}"
-                                       data-sntn="{{ lib.sntn_auth_code }}"
-                                       {% endif %}>{{ lib.short }}</a>
-                                    <div class="lib-details">
-                                        {% if has_dobong_status %}
-                                            <span class="lib-status" data-dobong-status-text>대출 현황 조회 중...</span>
-                                        {% elif has_status %}
-                                            <span class="lib-status" data-kyobo-status-text>대출 현황 조회 중...</span>
-                                        {% else %}
-                                            <span class="lib-status is-muted">상태 정보 없음</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
+                                {% set is_subscription = lib.service_type == "Subscription" %}
+                                <a class="lib-card"
+                                   href="{{ lib.detail_url or lib.homepage_url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   {% if is_subscription %}
+                                   data-subscription="1"
+                                   {% endif %}
+                                   {% if has_dobong_status %}
+                                   data-dobong-status="1"
+                                   data-brcd="{{ lib.brcd }}"
+                                   {% elif has_status %}
+                                   data-kyobo-status="1"
+                                   data-library-code="{{ lib.code }}"
+                                   data-brcd="{{ lib.brcd }}"
+                                   data-ctts="{{ lib.ctts_dvsn_code }}"
+                                   data-ctgr="{{ lib.ctgr_id }}"
+                                   data-sntn="{{ lib.sntn_auth_code }}"
+                                   {% endif %}>
+                                    <span class="lib-badge-name">{{ lib.short }}</span>
+                                    {% if is_subscription %}
+                                        <span class="lib-status" data-status-kind="subscription">대출가능 (구독)</span>
+                                    {% elif has_dobong_status %}
+                                        <span class="lib-status is-loading" data-dobong-status-text>조회 중...</span>
+                                    {% elif has_status %}
+                                        <span class="lib-status is-loading" data-kyobo-status-text>조회 중...</span>
+                                    {% else %}
+                                        <span class="lib-status is-muted">상태 정보 없음</span>
+                                    {% endif %}
+                                </a>
                             {% endfor %}
                         </div>
+                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
                     </div>
                 {% endif %}
 
                 {% if ns.yes24 %}
                     <div class="lib-group-row">
-                        <div class="lib-provider">
-                            <div class="prov-chip yes24"><img src="/static/img/yes24.webp" alt="YES24"></div>
-                        </div>
+                        <div class="lib-group-title">예스24 도서관</div>
                         <div class="lib-grid" data-lib-group="yes24">
                             {% for lib in ns.yes24 %}
                                 {% set has_status = lib.goods_id %}
-                                <div class="lib-card">
-                                    <a class="badge lib-name"
-                                       href="{{ lib.detail_url or lib.homepage_url }}"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       {% if has_status %}
-                                       data-yes24-status="1"
-                                       data-library-code="{{ lib.code }}"
-                                       data-goods-id="{{ lib.goods_id }}"
-                                       {% endif %}>{{ lib.short }}</a>
-                                    <div class="lib-details">
-                                        {% if has_status %}
-                                            <span class="lib-status" data-yes24-status-text>대출 현황 조회 중...</span>
-                                        {% else %}
-                                            <span class="lib-status is-muted">외부 사이트</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
+                                {% set is_subscription = lib.service_type == "Subscription" %}
+                                <a class="lib-card"
+                                   href="{{ lib.detail_url or lib.homepage_url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   {% if is_subscription %}
+                                   data-subscription="1"
+                                   {% endif %}
+                                   {% if has_status %}
+                                   data-yes24-status="1"
+                                   data-library-code="{{ lib.code }}"
+                                   data-goods-id="{{ lib.goods_id }}"
+                                   {% endif %}>
+                                    <span class="lib-badge-name">{{ lib.short }}</span>
+                                    {% if is_subscription %}
+                                        <span class="lib-status" data-status-kind="subscription">대출가능 (구독)</span>
+                                    {% elif has_status %}
+                                        <span class="lib-status is-loading" data-yes24-status-text>조회 중...</span>
+                                    {% else %}
+                                        <span class="lib-status is-muted">상태 정보 없음</span>
+                                    {% endif %}
+                                </a>
                             {% endfor %}
                         </div>
+                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
                     </div>
                 {% endif %}
                 {% if ns.other %}
                     <div class="lib-group-row">
-                        <div class="lib-provider">
-                            <div class="prov-chip other" aria-label="기타" title="기타">기타</div>
-                        </div>
+                        <div class="lib-group-title">기타 도서관</div>
                         <div class="lib-grid" data-lib-group="other">
                             {% for lib in ns.other %}
                                 {% set is_bookcube = lib.platform_code in ["Bookcube", "FxLibrary"] %}
                                 {% set has_bookcube_status = is_bookcube and lib.content_id %}
                                 {% set has_gangnam_status = lib.code == "gangnam" and lib.content_id %}
                                 {% set has_seoul_status = lib.code == "seoul" and lib.content_id %}
-                                {% set has_sen_status = lib.code in ["sen_owned", "sen_subs"] %}
+                                {% set has_sen_status = lib.code == "sen_owned" and lib.content_id and lib.service_type != "Subscription" %}
                                 {% set has_eunpyeong_status = lib.code == "eunpyeong" and lib.content_id %}
-                                <div class="lib-card">
-                                    <a class="badge lib-name"
-                                       href="{{ lib.detail_url or lib.homepage_url }}"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       {% if has_gangnam_status %}
-                                       data-gangnam-status="1"
-                                       data-library-code="{{ lib.code }}"
-                                       data-content-id="{{ lib.content_id }}"
-                                       {% elif has_seoul_status %}
-                                       data-seoul-status="1"
-                                       data-content-id="{{ lib.content_id }}"
-                                       {% elif has_sen_status %}
-                                       data-sen-status="1"
-                                       data-library-code="{{ lib.code }}"
-                                       data-content-id="{{ lib.content_id }}"
-                                       {% elif has_eunpyeong_status %}
-                                       data-eunpyeong-status="1"
-                                       data-content-id="{{ lib.content_id }}"
-                                       {% elif has_bookcube_status %}
-                                       data-bookcube-status="1"
-                                       data-library-code="{{ lib.code }}"
-                                       data-content-id="{{ lib.content_id }}"
-                                       {% endif %}>{{ lib.short }}</a>
-                                    <div class="lib-details">
-                                        {% if has_gangnam_status %}
-                                            <span class="lib-status" data-gangnam-status-text>대출 현황 조회 중...</span>
-                                        {% elif has_seoul_status %}
-                                            <span class="lib-status" data-seoul-status-text>대출 현황 조회 중...</span>
-                                        {% elif has_sen_status %}
-                                            <span class="lib-status" data-sen-status-text>대출 현황 조회 중...</span>
-                                        {% elif has_eunpyeong_status %}
-                                            <span class="lib-status" data-eunpyeong-status-text>대출 현황 조회 중...</span>
-                                        {% elif has_bookcube_status %}
-                                            <span class="lib-status" data-bookcube-status-text>대출 현황 조회 중...</span>
-                                        {% else %}
-                                            <span class="lib-status is-muted">외부 사이트</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
+                                {% set is_subscription = lib.service_type == "Subscription" %}
+                                <a class="lib-card"
+                                   href="{{ lib.detail_url or lib.homepage_url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   {% if is_subscription %}
+                                   data-subscription="1"
+                                   {% endif %}
+                                   {% if has_gangnam_status %}
+                                   data-gangnam-status="1"
+                                   data-library-code="{{ lib.code }}"
+                                   data-content-id="{{ lib.content_id }}"
+                                   {% elif has_seoul_status %}
+                                   data-seoul-status="1"
+                                   data-content-id="{{ lib.content_id }}"
+                                   {% elif has_sen_status %}
+                                   data-sen-status="1"
+                                   data-library-code="{{ lib.code }}"
+                                   data-content-id="{{ lib.content_id }}"
+                                   {% elif has_eunpyeong_status %}
+                                   data-eunpyeong-status="1"
+                                   data-content-id="{{ lib.content_id }}"
+                                   {% elif has_bookcube_status %}
+                                   data-bookcube-status="1"
+                                   data-library-code="{{ lib.code }}"
+                                   data-content-id="{{ lib.content_id }}"
+                                   {% endif %}>
+                                    <span class="lib-badge-name">{{ lib.short }}</span>
+                                    {% if is_subscription %}
+                                        <span class="lib-status" data-status-kind="subscription">대출가능 (구독)</span>
+                                    {% elif has_gangnam_status %}
+                                        <span class="lib-status is-loading" data-gangnam-status-text>조회 중...</span>
+                                    {% elif has_seoul_status %}
+                                        <span class="lib-status is-loading" data-seoul-status-text>조회 중...</span>
+                                    {% elif has_sen_status %}
+                                        <span class="lib-status is-loading" data-sen-status-text>조회 중...</span>
+                                    {% elif has_eunpyeong_status %}
+                                        <span class="lib-status is-loading" data-eunpyeong-status-text>조회 중...</span>
+                                    {% elif has_bookcube_status %}
+                                        <span class="lib-status is-loading" data-bookcube-status-text>조회 중...</span>
+                                    {% else %}
+                                        <span class="lib-status is-muted">상태 정보 없음</span>
+                                    {% endif %}
+                                </a>
                             {% endfor %}
                         </div>
+                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
                     </div>
                 {% endif %}
             </div>
@@ -227,44 +235,135 @@
         const toggle = document.getElementById("lib-detail-toggle");
         const section = document.querySelector(".detail-libs");
         const groups = document.querySelectorAll("[data-lib-group]");
+        const GROUP_REVEAL_TIMEOUT = 1200;
+        const revealTimers = new Map();
 
         function ensureKind(node, kind) {
             node.dataset.statusKind = kind;
             node.dataset.statusOrder = kind === "available" ? "0" : kind === "reservable" ? "1" : "2";
         }
 
+        function applyKind(card, kind, reserved) {
+            if (!card) return;
+            card.classList.remove("status-available", "status-reserved", "status-unknown");
+            if (reserved != null) {
+                card.dataset.reserved = String(reserved);
+            }
+            if (kind === "available") {
+                card.classList.add("status-available");
+            } else if (kind === "reservable") {
+                card.classList.add("status-reserved");
+            } else {
+                card.classList.add("status-unknown");
+            }
+            ensureKind(card, kind);
+        }
+
+        function formatAvailability(loaned, total, reserved) {
+            if (total > loaned && reserved === 0) {
+                const available = Math.max(total - loaned, 0);
+                return `대출가능 (${available}/${total})`;
+            }
+            return `예약 ${reserved}`;
+        }
+
         function sortGroup(group) {
+            if (!group) return;
             const cards = Array.from(group.querySelectorAll(".lib-card"));
             cards.sort((a, b) => {
                 const aOrder = a.dataset.statusOrder || "2";
                 const bOrder = b.dataset.statusOrder || "2";
                 if (aOrder !== bOrder) return aOrder.localeCompare(bOrder);
-                const aName = (a.querySelector(".lib-name")?.textContent || "").trim();
-                const bName = (b.querySelector(".lib-name")?.textContent || "").trim();
+                const aReserved = parseInt(a.dataset.reserved || "0", 10);
+                const bReserved = parseInt(b.dataset.reserved || "0", 10);
+                if (aReserved !== bReserved) return aReserved - bReserved;
+                const aName = (a.querySelector(".lib-badge-name")?.textContent || "").trim();
+                const bName = (b.querySelector(".lib-badge-name")?.textContent || "").trim();
                 return aName.localeCompare(bName);
             });
             cards.forEach((card) => group.appendChild(card));
         }
 
+        const pendingByGroup = new Map();
+        function ensurePendingState(group) {
+            const row = group.closest(".lib-group-row");
+            if (!row) return;
+            if (!row.classList.contains("is-pending")) {
+                row.classList.add("is-pending");
+            }
+            if (!revealTimers.has(group)) {
+                const timer = setTimeout(() => {
+                    if ((pendingByGroup.get(group) || 0) > 0) {
+                        row.classList.remove("is-pending");
+                        row.dataset.revealedEarly = "1";
+                    }
+                }, GROUP_REVEAL_TIMEOUT);
+                revealTimers.set(group, timer);
+            }
+        }
+        function resolvePending(node) {
+            const group = node.closest("[data-lib-group]");
+            if (!group) return;
+            const left = (pendingByGroup.get(group) || 0) - 1;
+            if (left <= 0) {
+                pendingByGroup.set(group, 0);
+                const row = group.closest(".lib-group-row");
+                const early = row && row.dataset.revealedEarly === "1";
+                if (!early) {
+                    sortGroup(group);
+                }
+                if (row) row.classList.remove("is-pending");
+                if (revealTimers.has(group)) {
+                    clearTimeout(revealTimers.get(group));
+                    revealTimers.delete(group);
+                }
+            } else {
+                pendingByGroup.set(group, left);
+            }
+        }
+
         groups.forEach((group) => {
-            group.querySelectorAll(".lib-card").forEach((card) => ensureKind(card, "unknown"));
+            group.querySelectorAll(".lib-card").forEach((card) => {
+                if (card.dataset.subscription === "1") {
+                    applyKind(card, "available", 0);
+                } else {
+                    applyKind(card, "unknown", 0);
+                }
+            });
             sortGroup(group);
         });
+
+        function initPending(nodes) {
+            nodes.forEach((node) => {
+                const group = node.closest("[data-lib-group]");
+                if (!group) return;
+                pendingByGroup.set(group, (pendingByGroup.get(group) || 0) + 1);
+                ensurePendingState(group);
+            });
+        }
+
+        initPending(nodes);
+        initPending(yes24Nodes);
+        initPending(dobongNodes);
+        initPending(bookcubeNodes);
+        initPending(gangnamNodes);
+        initPending(seoulNodes);
+        initPending(senNodes);
+        initPending(eunpyeongNodes);
+
+        // pending state is handled per-group with a reveal timeout
 
         function updateStatus(node, text, isError) {
             const card = node.closest(".lib-card");
             const holder = card && card.querySelector("[data-kyobo-status-text]");
             if (!holder) return;
             holder.textContent = text;
+            holder.classList.remove("is-loading");
             if (isError) {
                 holder.classList.add("is-error");
             }
             if (card) {
-                if (isError) {
-                    ensureKind(card, "unknown");
-                }
-                const group = card.closest("[data-lib-group]");
-                if (group) sortGroup(group);
+                if (isError) applyKind(card, "unknown", 0);
             }
         }
 
@@ -284,20 +383,17 @@
                 if (status.loaned == null || status.total == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.total} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.total, status.reserved);
                 updateStatus(node, text, false);
                 const card = node.closest(".lib-card");
                 if (card) {
-                    if (status.total > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
-                updateStatus(node, "대출 현황 조회 실패", true);
+                updateStatus(node, "상태 정보 없음", true);
+            } finally {
+                resolvePending(node);
             }
         }
 
@@ -317,33 +413,29 @@
                 if (status.loaned == null || status.total == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.total} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.total, status.reserved);
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-dobong-status-text]");
                 if (holder) {
                     holder.textContent = text;
+                    holder.classList.remove("is-loading");
                 }
                 if (card) {
-                    if (status.total > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-dobong-status-text]");
                 if (holder) {
-                    holder.textContent = "대출 현황 조회 실패";
+                    holder.textContent = "상태 정보 없음";
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    ensureKind(card, "unknown");
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    applyKind(card, "unknown", 0);
                 }
+            } finally {
+                resolvePending(node);
             }
         }
 
@@ -364,33 +456,29 @@
                 if (status.owned == null || status.loaned == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.owned} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.owned, status.reserved);
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-yes24-status-text]");
                 if (holder) {
                     holder.textContent = text;
+                    holder.classList.remove("is-loading");
                 }
                 if (card) {
-                    if (status.owned > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.owned > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-yes24-status-text]");
                 if (holder) {
-                    holder.textContent = "대출 현황 조회 실패";
+                    holder.textContent = "상태 정보 없음";
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    ensureKind(card, "unknown");
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    applyKind(card, "unknown", 0);
                 }
+            } finally {
+                resolvePending(node);
             }
         }
 
@@ -411,33 +499,29 @@
                 if (status.loaned == null || status.total == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.total} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.total, status.reserved);
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-bookcube-status-text]");
                 if (holder) {
                     holder.textContent = text;
+                    holder.classList.remove("is-loading");
                 }
                 if (card) {
-                    if (status.total > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-bookcube-status-text]");
                 if (holder) {
-                    holder.textContent = "대출 현황 조회 실패";
+                    holder.textContent = "상태 정보 없음";
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    ensureKind(card, "unknown");
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    applyKind(card, "unknown", 0);
                 }
+            } finally {
+                resolvePending(node);
             }
         }
 
@@ -458,33 +542,29 @@
                 if (status.loaned == null || status.owned == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.owned} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.owned, status.reserved);
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-gangnam-status-text]");
                 if (holder) {
                     holder.textContent = text;
+                    holder.classList.remove("is-loading");
                 }
                 if (card) {
-                    if (status.owned > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.owned > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-gangnam-status-text]");
                 if (holder) {
-                    holder.textContent = "대출 현황 조회 실패";
+                    holder.textContent = "상태 정보 없음";
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    ensureKind(card, "unknown");
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    applyKind(card, "unknown", 0);
                 }
+            } finally {
+                resolvePending(node);
             }
         }
 
@@ -504,33 +584,29 @@
                 if (status.loaned == null || status.total == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.total} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.total, status.reserved);
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-seoul-status-text]");
                 if (holder) {
                     holder.textContent = text;
+                    holder.classList.remove("is-loading");
                 }
                 if (card) {
-                    if (status.total > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-seoul-status-text]");
                 if (holder) {
-                    holder.textContent = "대출 현황 조회 실패";
+                    holder.textContent = "상태 정보 없음";
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    ensureKind(card, "unknown");
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    applyKind(card, "unknown", 0);
                 }
+            } finally {
+                resolvePending(node);
             }
         }
 
@@ -551,33 +627,29 @@
                 if (status.loaned == null || status.total == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.total} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.total, status.reserved);
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-sen-status-text]");
                 if (holder) {
                     holder.textContent = text;
+                    holder.classList.remove("is-loading");
                 }
                 if (card) {
-                    if (status.total > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-sen-status-text]");
                 if (holder) {
-                    holder.textContent = "대출 현황 조회 실패";
+                    holder.textContent = "상태 정보 없음";
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    ensureKind(card, "unknown");
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    applyKind(card, "unknown", 0);
                 }
+            } finally {
+                resolvePending(node);
             }
         }
 
@@ -597,38 +669,41 @@
                 if (status.loaned == null || status.total == null || status.reserved == null) {
                     throw new Error("status_missing");
                 }
-                const text = `대출 ${status.loaned}/${status.total} · 예약 ${status.reserved}`;
+                const text = formatAvailability(status.loaned, status.total, status.reserved);
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-eunpyeong-status-text]");
                 if (holder) {
                     holder.textContent = text;
+                    holder.classList.remove("is-loading");
                 }
                 if (card) {
-                    if (status.total > status.loaned) {
-                        ensureKind(card, "available");
-                    } else {
-                        ensureKind(card, "reservable");
-                    }
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                    applyKind(card, kind, status.reserved || 0);
                 }
             } catch (err) {
                 const card = node.closest(".lib-card");
                 const holder = card && card.querySelector("[data-eunpyeong-status-text]");
                 if (holder) {
-                    holder.textContent = "대출 현황 조회 실패";
+                    holder.textContent = "상태 정보 없음";
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    ensureKind(card, "unknown");
-                    const group = card.closest("[data-lib-group]");
-                    if (group) sortGroup(group);
+                    applyKind(card, "unknown", 0);
                 }
+            } finally {
+                resolvePending(node);
             }
         }
 
         eunpyeongNodes.forEach((node) => {
             fetchEunpyeongStatus(node);
+        });
+
+        groups.forEach((group) => {
+            if ((pendingByGroup.get(group) || 0) === 0) {
+                const row = group.closest(".lib-group-row");
+                if (row) row.classList.remove("is-pending");
+            }
         });
 
         if (toggle && section) {

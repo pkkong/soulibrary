@@ -2,15 +2,35 @@
 import json
 import re
 import time
-import ssl
 import traceback
 from db import get_db, using_postgres
 from pathlib import Path
 from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 from flask import Flask, render_template, request, jsonify, send_from_directory
-import requests
-import urllib3
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
+from utils.http import get_status_session, http_fallback, DEFAULT_HEADERS, DOBONG_HEADERS
+from utils.normalize import (
+    normalize_title,
+    normalize_author,
+    normalize_search_text,
+    normalize_search_tokens,
+    normalize_provider,
+)
+from utils.providers import provider_from_platforms, platform_to_provider_label
+from adapters.status_parsers import (
+    parse_kyobo_status,
+    parse_bookcube_status,
+    parse_bookcube_detail_status,
+    parse_gangnam_status,
+    parse_gangnam_detail_status,
+    parse_yes24_status,
+    parse_seoul_status,
+    parse_sen_status,
+    parse_sen_xml_status,
+    parse_eunpyeong_status,
+    parse_eunpyeong_html_status,
+    parse_dobong_status,
+)
 
 app = Flask(__name__)
 
@@ -20,43 +40,7 @@ LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
 DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
 STATUS_TTL_SEC = int(os.environ.get("KYOBO_STATUS_TTL", "120"))
 STATUS_CACHE = {}
-STATUS_SESSION = None
 HOLDINGS_COLUMNS = None
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-
-class TLSAdapter(requests.adapters.HTTPAdapter):
-    """Allow weaker TLS ciphers for legacy library servers."""
-
-    def __init__(self, ssl_context=None, **kwargs):
-        self.ssl_context = ssl_context
-        super().__init__(**kwargs)
-
-    def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
-        pool_kwargs["ssl_context"] = self.ssl_context
-        return super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
-
-
-def _get_status_session():
-    global STATUS_SESSION
-    if STATUS_SESSION:
-        return STATUS_SESSION
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    try:
-        ctx.minimum_version = ssl.TLSVersion.TLSv1
-    except Exception:
-        pass
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    try:
-        ctx.set_ciphers("DEFAULT:@SECLEVEL=0")
-    except ssl.SSLError:
-        pass
-    session = requests.Session()
-    session.trust_env = False
-    session.mount("https://", TLSAdapter(ssl_context=ctx))
-    STATUS_SESSION = session
-    return STATUS_SESSION
 
 
 def _get_holdings_columns(conn):
@@ -69,7 +53,9 @@ def _get_holdings_columns(conn):
         )
         rows = cur.fetchall()
         HOLDINGS_COLUMNS = {r.get("column_name") for r in rows if r.get("column_name")}
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         HOLDINGS_COLUMNS = set()
     return HOLDINGS_COLUMNS
 
@@ -78,105 +64,6 @@ def get_db_conn():
     return get_db(DB_PATH)
 
 
-def normalize_title(text):
-    if not text:
-        return ""
-    text = str(text).lower()
-    text = re.sub(r"\[.*?\]|\(.*?\)", "", text)
-    text = re.sub(r"(\d)\s*(권|冊|권수)", r"\1", text)
-    text = re.sub(r"[^\w\s]", "", text).strip()
-    text = re.sub(r"\s+", "", text)
-    return text
-
-
-def normalize_author(text):
-    if not text:
-        return ""
-    text = str(text)
-    text = re.sub(r"[<>\(\)\[\]]", " ", text)
-    split_chars = r"[,/|]"
-    if re.search(split_chars, text):
-        text = re.split(split_chars, text, 1)[0]
-    roles = r"(지음|글|그림|그림책|옮김|엮음|편집)"
-    text = re.sub(roles, "", text)
-    text = re.sub(r"[^\w\s]", "", text).lower().strip()
-    text = re.sub(r"\s+", "", text)
-    return text
-
-
-def normalize_search_text(text: str) -> str:
-    if not text:
-        return ""
-    text = str(text).lower().strip()
-    text = re.sub(r"[\u200b\ufeff]", "", text)
-    text = re.sub(r"[\s\[\]\(\){}<>.,/|\\\-_:\;\"'`~!?]", "", text)
-    return text
-
-
-def normalize_search_tokens(text: str) -> list[str]:
-    if not text:
-        return []
-    raw = str(text).lower().strip()
-    raw = re.sub(r"[\u200b\ufeff]", "", raw)
-    parts = re.split(r"[\s\[\]\(\){}<>.,/|\\\-_:\;\"'`~!?]+", raw)
-    tokens = []
-    for part in parts:
-        norm = normalize_search_text(part)
-        if norm:
-            tokens.append(norm)
-    return tokens
-
-
-def normalize_provider(raw_value):
-    mapping = {
-        "교보문고": "교보",
-        "교보": "교보",
-        "kyobo": "교보",
-        "교보도서관": "교보",
-        "yes24": "YES24",
-        "YES24": "YES24",
-        "예스24": "YES24",
-        "예스이십사": "YES24",
-        "예스": "YES24",
-        "aladin": "알라딘",
-        "알라딘": "알라딘",
-    }
-    if raw_value:
-        key = str(raw_value).strip()
-        norm = mapping.get(key) or mapping.get(key.lower())
-        return norm or key
-    return ""
-
-
-def provider_from_platforms(platforms):
-    for code in platforms:
-        if code in {"Kyobo", "Kyobo_New"}:
-            return "교보"
-        if code == "YES24":
-            return "YES24"
-        if code == "Aladin":
-            return "알라딘"
-        if code == "Bookcube":
-            return "북큐브"
-    return "기타"
-
-
-
-
-
-def platform_to_provider_label(platform_code: str) -> str:
-    if not platform_code:
-        return "기타"
-    code = str(platform_code)
-    if code in {"Kyobo", "Kyobo_New"}:
-        return "교보"
-    if code == "YES24":
-        return "YES24"
-    if code == "Bookcube":
-        return "북큐브"
-    if code == "Aladin":
-        return "알라딘"
-    return "기타"
 
 
 def _kyobo_base_url(library_code: str) -> str:
@@ -192,22 +79,6 @@ def _kyobo_base_url(library_code: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-def _parse_kyobo_status(html: str):
-    if not html:
-        return None
-    match = re.search(r'<p class="use">.*?</p>', html, re.S)
-    text = match.group(0) if match else html
-    text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    numbers = re.search(r"대출\s*:\s*([\d,]+)\s*/\s*([\d,]+)\s*예약\s*:\s*([\d,]+)", text)
-    if not numbers:
-        return None
-    loaned = int(numbers.group(1).replace(",", ""))
-    total = int(numbers.group(2).replace(",", ""))
-    reserved = int(numbers.group(3).replace(",", ""))
-    return {"loaned": loaned, "total": total, "reserved": reserved}
-
-
 def _build_kyobo_detail_url(library_code: str, params: dict) -> str:
     base_url = _kyobo_base_url(library_code)
     if not base_url:
@@ -217,12 +88,6 @@ def _build_kyobo_detail_url(library_code: str, params: dict) -> str:
     if not content_path.startswith("/"):
         content_path = "/" + content_path
     return f"{base_url}{content_path}?{urlencode(params)}"
-
-
-def _http_fallback(url: str) -> str:
-    if url.startswith("https://"):
-        return "http://" + url[len("https://"):]
-    return url
 
 
 def _yes24_base_url(library_code: str) -> str:
@@ -280,7 +145,9 @@ def _bookcube_page_size(list_url: str) -> int:
     try:
         size = int(value)
         return max(1, size)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         return 20
 
 
@@ -317,85 +184,6 @@ def _bookcube_search_list_url(list_url: str, keyword: str, keyoption2: str = "1"
     return urlunparse(parsed._replace(query=new_query))
 
 
-def _parse_bookcube_status(html: str, content_id: str):
-    if not html or not content_id:
-        return None
-    blocks = re.findall(r"<li class=\"item\".*?</li>", html, re.S)
-    for block in blocks:
-        if content_id not in block:
-            continue
-        text = re.sub(r"<[^>]+>", " ", block)
-        text = re.sub(r"\s+", " ", text)
-        loan_match = re.search(r"대출\s*([0-9,]+)\s*/\s*([0-9,]+)", text)
-        reserve_match = re.search(r"예약\s*([0-9,]+)", text)
-        if loan_match:
-            return {
-                "loaned": int(loan_match.group(1).replace(",", "")),
-                "total": int(loan_match.group(2).replace(",", "")),
-                "reserved": int(reserve_match.group(1).replace(",", "")) if reserve_match else 0,
-            }
-
-    idx = html.find(content_id)
-    if idx == -1:
-        return None
-    start = max(idx - 4000, 0)
-    end = min(idx + 4000, len(html))
-    chunk = html[start:end]
-    text = re.sub(r"<[^>]+>", " ", chunk)
-    text = re.sub(r"\s+", " ", text)
-    loan_match = re.search(r"대출\s*([0-9,]+)\s*/\s*([0-9,]+)", text)
-    reserve_match = re.search(r"예약\s*([0-9,]+)", text)
-    if loan_match:
-        return {
-            "loaned": int(loan_match.group(1).replace(",", "")),
-            "total": int(loan_match.group(2).replace(",", "")),
-            "reserved": int(reserve_match.group(1).replace(",", "")) if reserve_match else 0,
-        }
-    return None
-
-
-def _parse_bookcube_detail_status(html: str):
-    if not html:
-        return None
-    def _sanitize_status(status):
-        if not status:
-            return None
-        if status.get("loaned") == 0 and status.get("total") == 0 and status.get("reserved") == 0:
-            return None
-        return status
-    # Try state list block first
-    block_match = re.search(r"<ul[^>]*class=[\"']state[\"'][^>]*>(.*?)</ul>", html, re.I | re.S)
-    block = block_match.group(1) if block_match else ""
-    if block:
-        m = re.search(r"<p[^>]*>\\s*대출\\s*</p>\\s*([0-9,]+)\\s*/\\s*([0-9,]+)", block, re.I)
-        r = re.search(r"<p[^>]*>\\s*예약\\s*</p>\\s*([0-9,]+)", block, re.I)
-        if m:
-            return _sanitize_status({
-                "loaned": int(m.group(1).replace(",", "")),
-                "total": int(m.group(2).replace(",", "")),
-                "reserved": int(r.group(1).replace(",", "")) if r else 0,
-            })
-        m = re.search(r"대출[^0-9]*([0-9,]+)\\s*/\\s*([0-9,]+)", block, re.I | re.S)
-        r = re.search(r"예약[^0-9]*([0-9,]+)", block, re.I | re.S)
-        if m:
-            return _sanitize_status({
-                "loaned": int(m.group(1).replace(",", "")),
-                "total": int(m.group(2).replace(",", "")),
-                "reserved": int(r.group(1).replace(",", "")) if r else 0,
-            })
-    text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"\s+", " ", text)
-    loan_match = re.search(r"대출\s*([0-9,]+)\s*/\s*([0-9,]+)", text)
-    reserve_match = re.search(r"예약\s*([0-9,]+)", text)
-    if loan_match:
-        return _sanitize_status({
-            "loaned": int(loan_match.group(1).replace(",", "")),
-            "total": int(loan_match.group(2).replace(",", "")),
-            "reserved": int(reserve_match.group(1).replace(",", "")) if reserve_match else 0,
-        })
-    return None
-
-
 def _gangnam_list_url(library_code: str) -> str:
     info = LIBRARIES.get(library_code) or {}
     url = info.get("total_count_url")
@@ -415,172 +203,6 @@ def _gangnam_page_url(list_url: str, page: int) -> str:
     return urlunparse(parsed._replace(query=new_query))
 
 
-def _parse_gangnam_status(html: str, content_id: str):
-    if not html or not content_id:
-        return None
-    needle = f"book_num={content_id}"
-    idx = html.find(needle)
-    if idx == -1:
-        return None
-    start = max(idx - 5000, 0)
-    end = min(idx + 5000, len(html))
-    chunk = html[start:end]
-    text = re.sub(r"<[^>]+>", " ", chunk)
-    text = re.sub(r"\s+", " ", text)
-    owned_match = re.search(r"보유\s*(\d+)", text)
-    loan_match = re.search(r"대출\s*(\d+)", text)
-    reserve_match = re.search(r"예약\s*(\d+)", text)
-    if not loan_match or not owned_match:
-        return None
-    return {
-        "owned": int(owned_match.group(1)),
-        "loaned": int(loan_match.group(1)),
-        "reserved": int(reserve_match.group(1)) if reserve_match else 0,
-    }
-
-
-def _parse_gangnam_detail_status(html: str):
-    if not html:
-        return None
-    text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"\s+", " ", text)
-    owned_match = re.search(r"보유\s*(\d+)", text)
-    loan_match = re.search(r"대출\s*(\d+)", text)
-    reserve_match = re.search(r"예약\s*(\d+)", text)
-    if not loan_match or not owned_match:
-        return None
-    return {
-        "owned": int(owned_match.group(1)),
-        "loaned": int(loan_match.group(1)),
-        "reserved": int(reserve_match.group(1)) if reserve_match else 0,
-    }
-
-
-def _parse_yes24_status(html: str, goods_id: str = ""):
-    if not html:
-        return None
-    # 1) Detail page: a single stat block.
-    stat_match = re.search(r'<div class="stat[^"]*">.*?</div>', html, re.S)
-    if stat_match:
-        stat_html = stat_match.group(0)
-        def pick(label):
-            m = re.search(rf"<li>\s*{label}\s*<strong>(\d+)</strong>", stat_html)
-            return int(m.group(1)) if m else 0
-        return {
-            "owned": pick("보유"),
-            "loaned": pick("대출"),
-            "reserved": pick("예약"),
-        }
-
-    # 2) List page: find the block by goods_id.
-    if goods_id:
-        parts = html.split('<div class="bx')
-        for part in parts[1:]:
-            block = '<div class="bx' + part
-            if f"goods_id={goods_id}" not in block:
-                continue
-            stat_match = re.search(r'<div class="stat">.*?</div>', block, re.S)
-            if not stat_match:
-                return None
-            stat_html = stat_match.group(0)
-            def pick(label):
-                m = re.search(rf"<li>\s*{label}\s*<strong>(\d+)</strong>", stat_html)
-                return int(m.group(1)) if m else 0
-            return {
-                "owned": pick("보유"),
-                "loaned": pick("대출"),
-                "reserved": pick("예약"),
-            }
-    return None
-
-
-def _to_int(value, default=0):
-    try:
-        return int(str(value).replace(",", "").strip())
-    except Exception:
-        return default
-
-
-def _parse_seoul_status(data: dict):
-    contents = data.get("Contents") if isinstance(data, dict) else None
-    if isinstance(contents, list) and contents:
-        contents = contents[0]
-    if not isinstance(contents, dict):
-        return None
-    return {
-        "loaned": _to_int(contents.get("currentLoanCount")),
-        "total": _to_int(contents.get("contentsCopys")),
-        "reserved": _to_int(contents.get("currentResvCount")),
-    }
-
-
-def _parse_sen_status(data: dict):
-    contents = data.get("Contents") if isinstance(data, dict) else None
-    if isinstance(contents, list) and contents:
-        contents = contents[0]
-    if isinstance(contents, dict):
-        return {
-            "loaned": _to_int(contents.get("currentLoanCount")),
-            "total": _to_int(contents.get("contentsCopys")),
-            "reserved": _to_int(contents.get("currentResvCount")),
-        }
-    return {
-        "loaned": _to_int(data.get("currentLoanCount")),
-        "total": _to_int(data.get("contentsCopys")),
-        "reserved": _to_int(data.get("currentResvCount")),
-    }
-
-
-def _parse_eunpyeong_status(data: dict):
-    contents = data.get("Contents") if isinstance(data, dict) else None
-    if isinstance(contents, dict):
-        return {
-            "loaned": _to_int(contents.get("ContentLoanCount")),
-            "total": _to_int(contents.get("Copys")),
-            "reserved": _to_int(contents.get("ContentResevCount")),
-        }
-    return None
-
-
-def _parse_eunpyeong_html_status(html: str):
-    if not html:
-        return None
-    text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"\s+", " ", text)
-    loan_match = re.search(r"대출\s*(\d+)\s*/\s*(\d+)", text)
-    reserve_match = re.search(r"예약\s*(\d+)", text)
-    if loan_match:
-        return {
-            "loaned": int(loan_match.group(1)),
-            "total": int(loan_match.group(2)),
-            "reserved": int(reserve_match.group(1)) if reserve_match else 0,
-        }
-    return None
-
-
-def _parse_dobong_status(html: str):
-    if not html:
-        return None
-    text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"\s+", " ", text)
-    loan_match = re.search(r"대출\s*(\d+)\s*/\s*(\d+)", text)
-    reserve_match = re.search(r"예약\s*(\d+)", text)
-    if loan_match:
-        return {
-            "loaned": int(loan_match.group(1)),
-            "total": int(loan_match.group(2)),
-            "reserved": int(reserve_match.group(1)) if reserve_match else 0,
-        }
-    rent_match = re.search(r'class=["\']rentEbook["\'][^>]*>\s*(\d+)\s*<', html, re.I)
-    reserve_match = re.search(r'class=["\']reserveEbook["\'][^>]*>\s*(\d+)\s*<', html, re.I)
-    total_match = re.search(r'class=["\']book_present["\'][^>]*>.*?/\\s*(\d+)', html, re.I | re.S)
-    if rent_match and total_match:
-        return {
-            "loaned": int(rent_match.group(1)),
-            "total": int(total_match.group(1)),
-            "reserved": int(reserve_match.group(1)) if reserve_match else 0,
-        }
-    return None
 def get_counts():
     lib_total = len(LIBRARIES)
     book_total = None
@@ -672,8 +294,21 @@ def get_book_detail(book_id: int):
         )
         holdings = [dict(r) for r in hcur.fetchall()]
 
-        libraries = []
+        # Deduplicate by library_code, prefer rows with more identifiers.
+        best_by_code = {}
         for h in holdings:
+            lib_code = (h.get("library_code") or "").strip()
+            score = 0
+            for key in ("content_id", "goods_id", "brcd", "ctts_dvsn_code", "ctgr_id", "sntn_auth_code"):
+                if (h.get(key) or "").strip():
+                    score += 1
+            prev = best_by_code.get(lib_code)
+            if not prev or score > prev["score"]:
+                best_by_code[lib_code] = {"score": score, "row": h}
+        deduped_holdings = [v["row"] for v in best_by_code.values()]
+
+        libraries = []
+        for h in deduped_holdings:
             lib_code = (h.get("library_code") or "").strip()
             meta = LIB_META_BY_CODE.get(lib_code)
             if not meta:
@@ -730,8 +365,8 @@ def get_book_detail(book_id: int):
                 entry["detail_url"] = f"https://e-lib.sen.go.kr/contents/detail?no={entry['content_id']}&type=TY02"
             if lib_code == "eunpyeong" and entry["content_id"]:
                 entry["detail_url"] = (
-                    "http://epbook.eplib.or.kr:8100/ebookPlatform/Homepage/ContentsDetail.do"
-                    f"?contentKey={entry['content_id']}&libCode=111042&userId=null"
+                    "https://epbook.eplib.or.kr/ebookPlatform/home/detail.do"
+                    f"?no={entry['content_id']}"
                 )
             libraries.append(entry)
 
@@ -966,30 +601,35 @@ def api_kyobo_status():
         params["sntnAuthCode"] = sntn_auth_code
     detail_url = f"{base_url}/elibrary-front/content/contentView.ink?{urlencode(params)}"
     try:
-        session = _get_status_session()
+        session = get_status_session()
         res = session.get(
             detail_url,
             timeout=7,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+            headers=DEFAULT_HEADERS,
             verify=False,
         )
         if res.status_code != 200:
             raise RuntimeError("status_code")
-        status = _parse_kyobo_status(res.text)
+        status = parse_kyobo_status(res.text)
         if not status:
             raise RuntimeError("parse_failed")
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         try:
-            fallback_url = _http_fallback(detail_url)
+            fallback_url = http_fallback(detail_url)
             res = session.get(
                 fallback_url,
                 timeout=7,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+                headers=DEFAULT_HEADERS,
+                verify=False,
             )
             if res.status_code != 200:
                 raise RuntimeError("status_code")
-            status = _parse_kyobo_status(res.text)
-        except Exception:
+            status = parse_kyobo_status(res.text)
+        except Exception as e:
+            print(f"[status error] {e}")
+            print(traceback.format_exc())
             return jsonify({"error": "fetch_failed"}), 502
     try:
         if not status:
@@ -997,7 +637,9 @@ def api_kyobo_status():
         payload = {"library_code": library_code, "brcd": brcd, "status": status}
         STATUS_CACHE[cache_key] = {"ts": now, "data": payload}
         return jsonify(payload)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         return jsonify({"error": "fetch_failed"}), 502
 
 
@@ -1027,42 +669,45 @@ def api_yes24_status():
         status = None
         source = None
         attempted = []
-        for url, kind in ((list_url, "list"), (detail_url, "detail")):
+        for url, kind in ((detail_url, "detail"), (list_url, "list")):
             if not url:
                 continue
-            for candidate in (url, _http_fallback(url)):
+            for candidate in (url, http_fallback(url)):
                 attempted.append(candidate)
                 try:
-                    res = _get_status_session().get(
+                    res = get_status_session().get(
                         candidate,
                         timeout=7,
-                        headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+                        headers=DEFAULT_HEADERS,
                         verify=False,
                     )
                     res.raise_for_status()
-                    status = _parse_yes24_status(res.text, goods_id)
+                    status = parse_yes24_status(res.text, goods_id)
                     if status:
                         source = f"{kind}:{'http' if candidate.startswith('http://') else 'https'}"
                         break
-                except Exception:
+                except Exception as e:
+                    # Upstream timeouts are common on some YES24 hosts; don't fail hard.
+                    print(f"[status error] {e}")
                     status = None
             if status:
                 break
         if not status:
-            payload = {"error": "parse_failed"}
+            payload = {"library_code": library_code, "goods_id": goods_id, "status": None}
             if debug:
-                payload.update({"library_code": library_code, "goods_id": goods_id, "attempted": attempted})
-            return jsonify(payload), 502
+                payload.update({"error": "parse_failed", "attempted": attempted})
+            return jsonify(payload)
         payload = {"library_code": library_code, "goods_id": goods_id, "status": status}
         if debug:
             payload.update({"source": source, "attempted": attempted})
         STATUS_CACHE[cache_key] = {"ts": now, "data": payload}
         return jsonify(payload)
-    except Exception:
-        payload = {"error": "fetch_failed"}
+    except Exception as e:
+        print(f"[status error] {e}")
+        payload = {"library_code": library_code, "goods_id": goods_id, "status": None}
         if debug:
-            payload.update({"library_code": library_code, "goods_id": goods_id})
-        return jsonify(payload), 502
+            payload.update({"error": "fetch_failed"})
+        return jsonify(payload)
 
 
 @app.route("/api/bookcube_status")
@@ -1084,8 +729,12 @@ def api_bookcube_status():
         return jsonify({"error": "unsupported_library"}), 404
 
     list_url = _bookcube_status_list_url(list_url)
+    headers = dict(DEFAULT_HEADERS)
+    base_referer = _bookcube_base_url(library_code)
+    if base_referer:
+        headers["Referer"] = base_referer.rstrip("/") + "/"
     page_size = _bookcube_page_size(list_url)
-    max_pages = int(os.environ.get("BOOKCUBE_STATUS_MAX_PAGES", "10"))
+    max_pages = int(os.environ.get("BOOKCUBE_STATUS_MAX_PAGES", "3"))
     status = None
     source = None
     attempted = []
@@ -1101,93 +750,85 @@ def api_bookcube_status():
             )
             row = cur.fetchone()
             title = (row.get("title") if row else "") or ""
-        except Exception:
+        except Exception as e:
+            print(f"[status error] {e}")
+            print(traceback.format_exc())
             title = ""
         finally:
             if conn:
                 try:
                     conn.close()
-                except Exception:
+                except Exception as e:
+                    print(f"[status error] {e}")
+                    print(traceback.format_exc())
                     pass
 
-        if title:
-            search_url = _bookcube_search_list_url(list_url, title)
-            attempted.append(search_url)
-            res = _get_status_session().get(
-                search_url,
+        if not status:
+            detail_url = f"{_bookcube_base_url(library_code)}/FxLibrary/product/view/?num={content_id}&category=&category_type=book"
+            attempted.append(detail_url)
+            res = get_status_session().get(
+                detail_url,
                 timeout=7,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+                headers=headers,
                 verify=False,
             )
             res.raise_for_status()
             if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
                 res.encoding = "euc-kr"
-            status = _parse_bookcube_status(res.text, content_id)
+            status = parse_bookcube_detail_status(res.text)
+            if status:
+                source = "detail"
+
+        if not status and title:
+            search_url = _bookcube_search_list_url(list_url, title)
+            attempted.append(search_url)
+            res = get_status_session().get(
+                search_url,
+                timeout=7,
+                headers=headers,
+                verify=False,
+            )
+            res.raise_for_status()
+            if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
+                res.encoding = "euc-kr"
+            status = parse_bookcube_status(res.text, content_id)
             if status:
                 source = "search:title"
 
         if not status:
             first_url = _bookcube_page_url(list_url, 1)
             attempted.append(first_url)
-            res = _get_status_session().get(
+            res = get_status_session().get(
                 first_url,
                 timeout=7,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+                headers=headers,
                 verify=False,
             )
             res.raise_for_status()
             if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
                 res.encoding = "euc-kr"
-            status = _parse_bookcube_status(res.text, content_id)
+            status = parse_bookcube_status(res.text, content_id)
             if status:
                 source = "list"
 
         if not status:
-            total_count = None
-            m = re.search(r"총\\s*([\\d,]+)종", res.text)
-            if m:
-                try:
-                    total_count = int(m.group(1).replace(",", ""))
-                except Exception:
-                    total_count = None
-            total_pages = None
-            if total_count:
-                total_pages = max(1, (total_count + page_size - 1) // page_size)
-            if total_pages is None:
-                total_pages = max_pages
-
+            total_pages = max_pages
             for page in range(2, min(total_pages, max_pages) + 1):
                 url = _bookcube_page_url(list_url, page)
                 attempted.append(url)
-                res = _get_status_session().get(
+                res = get_status_session().get(
                     url,
                     timeout=7,
-                    headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+                    headers=headers,
                     verify=False,
                 )
                 res.raise_for_status()
                 if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
                     res.encoding = "euc-kr"
-                status = _parse_bookcube_status(res.text, content_id)
+                status = parse_bookcube_status(res.text, content_id)
                 if status:
                     source = "list"
                     break
-
-        if not status:
-            detail_url = f"{_bookcube_base_url(library_code)}/FxLibrary/product/view/?num={content_id}&category=&category_type=book"
-            attempted.append(detail_url)
-            res = _get_status_session().get(
-                detail_url,
-                timeout=7,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
-                verify=False,
-            )
-            res.raise_for_status()
-            if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
-                res.encoding = "euc-kr"
-            status = _parse_bookcube_detail_status(res.text)
-            if status:
-                source = "detail"
 
         if not status:
             payload = {"error": "parse_failed"}
@@ -1199,7 +840,9 @@ def api_bookcube_status():
             payload.update({"source": source, "attempted": attempted})
         STATUS_CACHE[cache_key] = {"ts": now, "data": payload}
         return jsonify(payload)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         payload = {"error": "fetch_failed"}
         if debug:
             payload.update({"library_code": library_code, "content_id": content_id, "attempted": attempted})
@@ -1224,22 +867,40 @@ def api_gangnam_status():
     if not list_url:
         return jsonify({"error": "unsupported_library"}), 404
 
-    max_pages = int(os.environ.get("GANGNAM_STATUS_MAX_PAGES", "20"))
+    max_pages = int(os.environ.get("GANGNAM_STATUS_MAX_PAGES", "3"))
     status = None
     attempted = []
     try:
-        first_url = _gangnam_page_url(list_url, 1)
-        attempted.append(first_url)
-        res = _get_status_session().get(
-            first_url,
+        detail_url = f"{_bookcube_base_url(library_code)}/elibbook/book_detail.asp?book_num={content_id}"
+        attempted.append(detail_url)
+        res = get_status_session().get(
+            detail_url,
             timeout=7,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+            headers=DEFAULT_HEADERS,
             verify=False,
         )
         res.raise_for_status()
         if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
             res.encoding = "euc-kr"
-        status = _parse_gangnam_status(res.text, content_id)
+        elif (res.encoding or "").lower() == "iso-8859-1" and (res.apparent_encoding or "").lower() == "euc-kr":
+            res.encoding = "euc-kr"
+        status = parse_gangnam_detail_status(res.text)
+
+        if not status:
+            first_url = _gangnam_page_url(list_url, 1)
+            attempted.append(first_url)
+            res = get_status_session().get(
+                first_url,
+                timeout=7,
+                headers=DEFAULT_HEADERS,
+                verify=False,
+            )
+            res.raise_for_status()
+            if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
+                res.encoding = "euc-kr"
+            elif (res.encoding or "").lower() == "iso-8859-1" and (res.apparent_encoding or "").lower() == "euc-kr":
+                res.encoding = "euc-kr"
+            status = parse_gangnam_status(res.text, content_id)
 
         if not status:
             total_pages = None
@@ -1248,39 +909,29 @@ def api_gangnam_status():
                 try:
                     total_count = int(m.group(1).replace(",", ""))
                     total_pages = max(1, (total_count + 19) // 20)
-                except Exception:
+                except Exception as e:
+                    print(f"[status error] {e}")
+                    print(traceback.format_exc())
                     total_pages = None
             if total_pages is None:
                 total_pages = max_pages
             for page in range(2, min(total_pages, max_pages) + 1):
                 url = _gangnam_page_url(list_url, page)
                 attempted.append(url)
-                res = _get_status_session().get(
+                res = get_status_session().get(
                     url,
                     timeout=7,
-                    headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
+                    headers=DEFAULT_HEADERS,
                     verify=False,
                 )
                 res.raise_for_status()
                 if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
                     res.encoding = "euc-kr"
-                status = _parse_gangnam_status(res.text, content_id)
+                elif (res.encoding or "").lower() == "iso-8859-1" and (res.apparent_encoding or "").lower() == "euc-kr":
+                    res.encoding = "euc-kr"
+                status = parse_gangnam_status(res.text, content_id)
                 if status:
                     break
-
-        if not status:
-            detail_url = f"{_bookcube_base_url(library_code)}/elibbook/book_detail.asp?book_num={content_id}"
-            attempted.append(detail_url)
-            res = _get_status_session().get(
-                detail_url,
-                timeout=7,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; SoulibStatus/1.0)"},
-                verify=False,
-            )
-            res.raise_for_status()
-            if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
-                res.encoding = "euc-kr"
-            status = _parse_gangnam_detail_status(res.text)
 
         if not status:
             payload = {"error": "parse_failed"}
@@ -1290,7 +941,9 @@ def api_gangnam_status():
         payload = {"library_code": library_code, "content_id": content_id, "status": status}
         STATUS_CACHE[cache_key] = {"ts": now, "data": payload}
         return jsonify(payload)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         payload = {"error": "fetch_failed"}
         if debug:
             payload.update({"library_code": library_code, "content_id": content_id, "attempted": attempted})
@@ -1309,18 +962,20 @@ def api_seoul_status():
         return jsonify(cached["payload"])
 
     try:
-        session = _get_status_session()
+        session = get_status_session()
         url = f"https://elib.seoul.go.kr/api/contents/{content_id}"
-        res = session.get(url, timeout=15)
+        res = session.get(url, timeout=15, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
         data = res.json()
-        status = _parse_seoul_status(data)
+        status = parse_seoul_status(data)
         if not status:
             raise RuntimeError("status_missing")
         payload = {"content_id": content_id, "status": status}
         STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
         return jsonify(payload)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         return jsonify({"content_id": content_id, "status": None}), 502
 
 
@@ -1342,18 +997,32 @@ def api_sen_status():
         return jsonify(cached["payload"])
 
     try:
-        session = _get_status_session()
+        session = get_status_session()
         url = f"https://e-lib.sen.go.kr/api/contents/{content_id}/TY01"
-        res = session.get(url, timeout=15)
+        res = session.get(url, timeout=15, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
-        data = res.json()
-        status = _parse_sen_status(data)
+        status = None
+        data = None
+        content_type = (res.headers.get("Content-Type", "") or "").lower()
+        if "json" in content_type and not res.text.lstrip().startswith("<"):
+            try:
+                data = res.json()
+            except Exception as e:
+                print(f"[status error] {e}")
+                print(traceback.format_exc())
+                data = None
+        if data is not None:
+            status = parse_sen_status(data)
+        if not status:
+            status = parse_sen_xml_status(res.text)
         if not status:
             raise RuntimeError("status_missing")
         payload = {"library_code": library_code, "content_id": content_id, "status": status}
         STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
         return jsonify(payload)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         return jsonify({"library_code": library_code, "content_id": content_id, "status": None}), 502
 
 
@@ -1371,7 +1040,7 @@ def api_eunpyeong_status():
 
     attempted = []
     try:
-        session = _get_status_session()
+        session = get_status_session()
         url = "http://epbook.eplib.or.kr:8100/ebookPlatform/Homepage/ContentsDetail.do"
         params = {"contentKey": content_id, "libCode": "111042", "userId": "null"}
         attempted.append(url)
@@ -1379,29 +1048,30 @@ def api_eunpyeong_status():
             url,
             params=params,
             timeout=15,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-            },
+            headers=DEFAULT_HEADERS,
+            verify=False,
         )
         res.raise_for_status()
         status = None
         data = None
         try:
             data = res.json()
-        except Exception:
+        except Exception as e:
+            print(f"[status error] {e}")
+            print(traceback.format_exc())
             data = None
         if data is not None:
-            status = _parse_eunpyeong_status(data)
+            status = parse_eunpyeong_status(data)
         if not status:
-            status = _parse_eunpyeong_html_status(res.text)
+            status = parse_eunpyeong_html_status(res.text)
         if not status:
             raise RuntimeError("status_missing")
         payload = {"content_id": content_id, "status": status}
         STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
         return jsonify(payload)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         payload = {"content_id": content_id, "status": None}
         if debug:
             payload.update({"attempted": attempted})
@@ -1422,7 +1092,7 @@ def api_dobong_status():
 
     attempted = []
     try:
-        session = _get_status_session()
+        session = get_status_session()
         url = "https://elib.dobong.kr/Kyobo_T3_Mobile/Phone/Main/Ebook_Detail.asp"
         params = {
             "type": "EBOOK",
@@ -1435,15 +1105,17 @@ def api_dobong_status():
             "sortType": "1",
         }
         attempted.append(url)
-        res = session.get(url, params=params, timeout=15)
+        res = session.get(url, params=params, timeout=15, headers=DOBONG_HEADERS, verify=False)
         res.raise_for_status()
-        status = _parse_dobong_status(res.text)
+        status = parse_dobong_status(res.text)
         if not status:
             raise RuntimeError("status_missing")
         payload = {"brcd": brcd, "status": status}
         STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
         return jsonify(payload)
-    except Exception:
+    except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         payload = {"brcd": brcd, "status": None}
         if debug:
             payload.update({"attempted": attempted})
@@ -1709,6 +1381,8 @@ def search():
             })
         return jsonify({"total": total, "items": results, "filters": {"providers": filter_providers, "libraries": filter_libraries}})
     except Exception as e:
+        print(f"[status error] {e}")
+        print(traceback.format_exc())
         print(f"[오류] 검색 실패: {e}")
         print(traceback.format_exc())
         return jsonify({"error": "검색 처리 오류 발생"})

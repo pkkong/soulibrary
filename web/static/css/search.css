@@ -1060,23 +1060,49 @@ body.has-topbar .app-main {
 .detail-toggle { border: 1px solid #e5e7eb; background:#fff; color:#111827; font-size:12px; font-weight:600; padding:6px 10px; border-radius:999px; }
 .detail-toggle:hover { background:#f9fafb; }
 .lib-groups { display:flex; flex-direction:column; gap:0; }
-.lib-group-row { display:flex; gap:12px; align-items:flex-start; padding: 12px 0; border-top: 1px solid #f1f5f9; }
+.lib-group-row { display:flex; flex-direction:column; gap:6px; align-items:stretch; padding: 12px 0; border-top: 1px solid #f1f5f9; }
 .lib-group-row:first-child { border-top: none; }
 .lib-provider { flex: 0 0 auto; padding-top: 2px; margin-right: 18px; }
 .lib-chips { display:flex; flex-wrap:wrap; gap:8px; align-items:center; min-width:0; }
-.lib-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; width:100%; }
-.lib-card { display:flex; flex-direction:column; gap:6px; padding:10px 12px; border:1px solid #eef0f4; border-radius:12px; background:#ffffff; }
-.lib-name { align-self:flex-start; min-width:52px; text-align:center; font-weight:600; border-radius:10px; }
-.lib-status { font-size:12px; color:#64748b; white-space:nowrap; }
+.lib-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px; width:100%; }
+.lib-group-row { position:relative; }
+.lib-group-row.is-pending .lib-grid { visibility:hidden; }
+.lib-loading { position:absolute; inset:0; display:none; align-items:center; justify-content:center; }
+.lib-group-row.is-pending .lib-loading { display:flex; }
+.lib-spinner { width:20px; height:20px; border:2px solid #e5e7eb; border-top-color:#111827; border-radius:50%; animation:libspin 0.9s linear infinite; }
+
+.lib-status.is-loading { position:relative; padding-left:18px; }
+.lib-status.is-loading::before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:50%;
+  width:12px;
+  height:12px;
+  margin-top:-6px;
+  border:2px solid #e5e7eb;
+  border-top-color:#9ca3af;
+  border-radius:50%;
+  animation:libspin 0.9s linear infinite;
+}
+@keyframes libspin { to { transform:rotate(360deg); } }
+.lib-group-title { font-weight:700; font-size:14px; color:#111827; margin: 6px 0 8px; }
+.lib-card { display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 6px; border:1px solid #e5e7eb; border-radius:10px; background:#ffffff; text-decoration:none; transition:transform .15s ease, border-color .15s ease, color .15s ease, background-color .15s ease; text-align:center; }
+.lib-card:hover { transform:translateY(-1px); }
+.lib-card.status-available { border-color:#111827; color:#111827; background:#ffffff; box-shadow:0 2px 6px rgba(17, 24, 39, 0.08); }
+.lib-card.status-reserved { border-color:#e5e7eb; color:#9ca3af; background:#f8fafc; }
+.lib-card.status-unknown { border-color:#e5e7eb; color:#9ca3af; background:#f8fafc; }
+.lib-badge-name { font-weight:700; font-size:13px; line-height:1.2; }
+.lib-status { font-size:10.5px; color:inherit; white-space:nowrap; min-height:14px; }
+.lib-status.is-loading { color: transparent; }
 .lib-status.is-muted { color:#9ca3af; }
 .lib-status.is-error { color:#b91c1c; }
-.lib-details { display:none; }
-.detail-libs.is-expanded .lib-details { display:block; }
+.lib-details { display:block; }
 .detail-libs .badge { background: #e5e7eb; border: none; border-radius: 0; padding: 4px 6px; }
 .detail-libs .lib-name { border-radius: 10px; }
 
 @media (min-width: 720px) {
-    .lib-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    .lib-grid { grid-template-columns:repeat(6, minmax(0, 1fr)); }
 }
 
 .filter-summary {
