@@ -55,6 +55,47 @@ DB_PASSWORD=localpass
 ### 서버 복원
 `docker exec -e PGPASSWORD=<pw> soulib-postgres pg_restore -h <host> -p <port> -U root -d soulib_test --clean --if-exists /tmp/soulib_test.dump`
 
+## 6-1) 적재/병합/중복/인덱스 (상세)
+
+### A. 적재(books + holdings)
+- CSV → PostgreSQL 적재 스크립트: `scripts/load_csv_to_postgres.py`
+- 적재 테이블: `books`, `holdings`
+- 정규화 컬럼 생성: `title_norm`, `author_norm`, `publisher_norm`
+- 정규화 기준 키: `title_norm + author_norm + publisher_norm`
+
+### B. 병합/중복 정리 로직(개요)
+- 스크립트: `scripts/merge_internal_duplicates.py`
+1) `holdings.canonical_id` 생성
+   - YES24: `yes24:<goods_id>`
+   - 교보: `kyobo:<brcd>`
+   - 북큐브/FxLibrary: `bookcube:<content_id>`
+2) `books.canonical_id` 생성
+   - 같은 상품(플랫폼 단위) 기준으로 book_id를 묶는 1차 식별자
+3) 1차 병합: `books.merge_group_id = books.canonical_id`
+4) 2차 병합(플랫폼 교차 병합)
+   - 기준: `title_norm + author_norm (+ publisher_norm)`
+   - 교보/YES24/북큐브 등 플랫폼을 넘어서 같은 책을 묶음
+5) canonical_id 기준의 book_id 매핑 정리
+   - holdings.canonical_id → books.canonical_id → holdings.book_id 연결
+
+### C. 상세 페이지용 그룹 묶기(현재 서버 로직)
+- `merge_group_id / canonical_id / id`로 그룹 book_id를 찾고,
+  동일 `publisher_norm`까지 조건으로 맞춰서 holdings를 모음.
+- 이 단계가 무거우면 상세 페이지 진입 시 느려질 수 있음.
+
+### D. 인덱스(기본)
+- `books`: title_norm/author_norm/publisher_norm + trgm
+- `holdings`: book_id
+
+### E. 추가 인덱스(속도 개선 후보)
+- 그룹 조회 최적화용:
+  - `books(merge_group_id, publisher_norm)`
+  - `books(canonical_id, publisher_norm)`
+
+### F. 구조 개선 아이디어(선택)
+- `group_key` (예: `merge_group_id + ':' + publisher_norm`)를 사전 계산해
+  서버에서 매번 그룹을 계산하지 않도록 개선 가능.
+
 ## 7) 큐레이션 관리
 - 홈 큐레이션은 book_id 하드코딩
 - 파일: web/static/js/home.js

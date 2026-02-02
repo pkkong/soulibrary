@@ -66,157 +66,13 @@
             </div>
             <div class="detail-section-sub">클릭 시 도서의 상세 페이지로 이동합니다.</div>
 
-            {% set ns = namespace(kyobo=[], yes24=[], other=[]) %}
-            {% for lib in book.libraries %}
-                {% if lib.platform_code in ["Kyobo", "Kyobo_New"] %}
-                    {% set ns.kyobo = ns.kyobo + [lib] %}
-                {% elif lib.platform_code == "YES24" %}
-                    {% set ns.yes24 = ns.yes24 + [lib] %}
-                {% else %}
-                    {% set ns.other = ns.other + [lib] %}
-                {% endif %}
-            {% endfor %}
-
-            <div class="lib-groups">
-                {% if ns.kyobo %}
-                    <div class="lib-group-row">
-                        <div class="lib-group-title">교보 도서관</div>
-                        <div class="lib-grid" data-lib-group="kyobo">
-            {% for lib in ns.kyobo %}
-                                {% set has_dobong_status = lib.code == "dobong" and lib.brcd %}
-                                {% set has_status = lib.brcd and lib.ctts_dvsn_code and lib.ctgr_id and lib.service_type != "Subscription" %}
-                                {% set is_subscription = lib.service_type == "Subscription" %}
-                                <a class="lib-card"
-                                   href="{{ lib.detail_url or lib.homepage_url }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   {% if is_subscription %}
-                                   data-subscription="1"
-                                   {% endif %}
-                                   {% if has_dobong_status %}
-                                   data-dobong-status="1"
-                                   data-brcd="{{ lib.brcd }}"
-                                   {% elif has_status %}
-                                   data-kyobo-status="1"
-                                   data-library-code="{{ lib.code }}"
-                                   data-brcd="{{ lib.brcd }}"
-                                   data-ctts="{{ lib.ctts_dvsn_code }}"
-                                   data-ctgr="{{ lib.ctgr_id }}"
-                                   data-sntn="{{ lib.sntn_auth_code }}"
-                                   {% endif %}>
-                                    <span class="lib-badge-name">{{ lib.short }}</span>
-                                    {% if is_subscription %}
-                                        <span class="lib-status" data-status-kind="subscription">대출가능 (구독)</span>
-                                    {% elif has_dobong_status %}
-                                        <span class="lib-status is-loading" data-dobong-status-text>조회 중...</span>
-                                    {% elif has_status %}
-                                        <span class="lib-status is-loading" data-kyobo-status-text>조회 중...</span>
-                                    {% else %}
-                                        <span class="lib-status is-muted">상태 정보 없음</span>
-                                    {% endif %}
-                                </a>
-                            {% endfor %}
-                        </div>
-                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
-                    </div>
-                {% endif %}
-
-                {% if ns.yes24 %}
-                    <div class="lib-group-row">
-                        <div class="lib-group-title">예스24 도서관</div>
-                        <div class="lib-grid" data-lib-group="yes24">
-                            {% for lib in ns.yes24 %}
-                                {% set has_status = lib.goods_id %}
-                                {% set is_subscription = lib.service_type == "Subscription" %}
-                                <a class="lib-card"
-                                   href="{{ lib.detail_url or lib.homepage_url }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   {% if is_subscription %}
-                                   data-subscription="1"
-                                   {% endif %}
-                                   {% if has_status %}
-                                   data-yes24-status="1"
-                                   data-library-code="{{ lib.code }}"
-                                   data-goods-id="{{ lib.goods_id }}"
-                                   {% endif %}>
-                                    <span class="lib-badge-name">{{ lib.short }}</span>
-                                    {% if is_subscription %}
-                                        <span class="lib-status" data-status-kind="subscription">대출가능 (구독)</span>
-                                    {% elif has_status %}
-                                        <span class="lib-status is-loading" data-yes24-status-text>조회 중...</span>
-                                    {% else %}
-                                        <span class="lib-status is-muted">상태 정보 없음</span>
-                                    {% endif %}
-                                </a>
-                            {% endfor %}
-                        </div>
-                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
-                    </div>
-                {% endif %}
-                {% if ns.other %}
-                    <div class="lib-group-row">
-                        <div class="lib-group-title">기타 도서관</div>
-                        <div class="lib-grid" data-lib-group="other">
-                            {% for lib in ns.other %}
-                                {% set is_bookcube = lib.platform_code in ["Bookcube", "FxLibrary"] %}
-                                {% set has_bookcube_status = is_bookcube and lib.content_id %}
-                                {% set has_gangnam_status = lib.code == "gangnam" and lib.content_id %}
-                                {% set has_seoul_status = lib.code == "seoul" and lib.content_id %}
-                                {% set has_sen_status = lib.code == "sen_owned" and lib.content_id and lib.service_type != "Subscription" %}
-                                {% set has_eunpyeong_status = lib.code == "eunpyeong" and lib.content_id %}
-                                {% set is_subscription = lib.service_type == "Subscription" %}
-                                <a class="lib-card"
-                                   href="{{ lib.detail_url or lib.homepage_url }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   {% if is_subscription %}
-                                   data-subscription="1"
-                                   {% endif %}
-                                   {% if has_gangnam_status %}
-                                   data-gangnam-status="1"
-                                   data-library-code="{{ lib.code }}"
-                                   data-content-id="{{ lib.content_id }}"
-                                   {% elif has_seoul_status %}
-                                   data-seoul-status="1"
-                                   data-content-id="{{ lib.content_id }}"
-                                   {% elif has_sen_status %}
-                                   data-sen-status="1"
-                                   data-library-code="{{ lib.code }}"
-                                   data-content-id="{{ lib.content_id }}"
-                                   {% elif has_eunpyeong_status %}
-                                   data-eunpyeong-status="1"
-                                   data-content-id="{{ lib.content_id }}"
-                                   {% elif has_bookcube_status %}
-                                   data-bookcube-status="1"
-                                   data-library-code="{{ lib.code }}"
-                                   data-content-id="{{ lib.content_id }}"
-                                   {% endif %}>
-                                    <span class="lib-badge-name">{{ lib.short }}</span>
-                                    {% if is_subscription %}
-                                        <span class="lib-status" data-status-kind="subscription">대출가능 (구독)</span>
-                                    {% elif has_gangnam_status %}
-                                        <span class="lib-status is-loading" data-gangnam-status-text>조회 중...</span>
-                                    {% elif has_seoul_status %}
-                                        <span class="lib-status is-loading" data-seoul-status-text>조회 중...</span>
-                                    {% elif has_sen_status %}
-                                        <span class="lib-status is-loading" data-sen-status-text>조회 중...</span>
-                                    {% elif has_eunpyeong_status %}
-                                        <span class="lib-status is-loading" data-eunpyeong-status-text>조회 중...</span>
-                                    {% elif has_bookcube_status %}
-                                        <span class="lib-status is-loading" data-bookcube-status-text>조회 중...</span>
-                                    {% else %}
-                                        <span class="lib-status is-muted">상태 정보 없음</span>
-                                    {% endif %}
-                                </a>
-                            {% endfor %}
-                        </div>
-                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
-                    </div>
-                {% endif %}
-            </div>
-            </div>
-        </section>
+              <div id="lib-groups" class="lib-groups" data-book-id="{{ book.id }}"></div>
+              <div id="lib-groups-loading" class="lib-loading-inline" aria-live="polite">
+                  <span class="lib-spinner"></span>
+                  <span class="lib-loading-text">도서관 현황 조회 중...</span>
+              </div>
+              </div>
+          </section>
     </div>
 {% endif %}
 {% endblock %}
@@ -224,494 +80,684 @@
 {% block scripts %}
 <script>
     (function () {
-        const nodes = document.querySelectorAll("[data-kyobo-status]");
-        const yes24Nodes = document.querySelectorAll("[data-yes24-status]");
-        const dobongNodes = document.querySelectorAll("[data-dobong-status]");
-        const bookcubeNodes = document.querySelectorAll("[data-bookcube-status]");
-        const gangnamNodes = document.querySelectorAll("[data-gangnam-status]");
-        const seoulNodes = document.querySelectorAll("[data-seoul-status]");
-        const senNodes = document.querySelectorAll("[data-sen-status]");
-        const eunpyeongNodes = document.querySelectorAll("[data-eunpyeong-status]");
+        const TEXT = {
+            available: "\uB300\uCD9C\uAC00\uB2A5",
+            reservable: "\uC608\uC57D",
+            loading: "\uC870\uD68C \uC911...",
+            unknown: "\uC0C1\uD0DC \uC815\uBCF4 \uC5C6\uC74C",
+            subscription: "\uB300\uCD9C\uAC00\uB2A5 (\uAD6C\uB3C5)",
+            groupsLoading: "\uB3C4\uC11C\uAD00 \uD604\uD669 \uC870\uD68C \uC911...",
+            groupsError: "\uB3C4\uC11C\uAD00 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+            kyoboTitle: "\uAD50\uBCF4 \uB3C4\uC11C\uAD00",
+            yes24Title: "\uC608\uC2A424 \uB3C4\uC11C\uAD00",
+            otherTitle: "\uAE30\uD0C0 \uB3C4\uC11C\uAD00"
+        };
+
         const toggle = document.getElementById("lib-detail-toggle");
         const section = document.querySelector(".detail-libs");
-        const groups = document.querySelectorAll("[data-lib-group]");
         const GROUP_REVEAL_TIMEOUT = 1200;
-        const revealTimers = new Map();
 
-        function ensureKind(node, kind) {
-            node.dataset.statusKind = kind;
-            node.dataset.statusOrder = kind === "available" ? "0" : kind === "reservable" ? "1" : "2";
-        }
+        function initStatusUI(root) {
+            const nodes = root.querySelectorAll("[data-kyobo-status]");
+            const yes24Nodes = root.querySelectorAll("[data-yes24-status]");
+            const dobongNodes = root.querySelectorAll("[data-dobong-status]");
+            const bookcubeNodes = root.querySelectorAll("[data-bookcube-status]");
+            const gangnamNodes = root.querySelectorAll("[data-gangnam-status]");
+            const seoulNodes = root.querySelectorAll("[data-seoul-status]");
+            const senNodes = root.querySelectorAll("[data-sen-status]");
+            const eunpyeongNodes = root.querySelectorAll("[data-eunpyeong-status]");
+            const groups = root.querySelectorAll("[data-lib-group]");
+            const revealTimers = new Map();
 
-        function applyKind(card, kind, reserved) {
-            if (!card) return;
-            card.classList.remove("status-available", "status-reserved", "status-unknown");
-            if (reserved != null) {
-                card.dataset.reserved = String(reserved);
+            function ensureKind(node, kind) {
+                node.dataset.statusKind = kind;
+                node.dataset.statusOrder = kind === "available" ? "0" : kind === "reservable" ? "1" : "2";
             }
-            if (kind === "available") {
-                card.classList.add("status-available");
-            } else if (kind === "reservable") {
-                card.classList.add("status-reserved");
-            } else {
-                card.classList.add("status-unknown");
-            }
-            ensureKind(card, kind);
-        }
 
-        function formatAvailability(loaned, total, reserved) {
-            if (total > loaned && reserved === 0) {
-                const available = Math.max(total - loaned, 0);
-                return `대출가능 (${available}/${total})`;
-            }
-            return `예약 ${reserved}`;
-        }
-
-        function sortGroup(group) {
-            if (!group) return;
-            const cards = Array.from(group.querySelectorAll(".lib-card"));
-            cards.sort((a, b) => {
-                const aOrder = a.dataset.statusOrder || "2";
-                const bOrder = b.dataset.statusOrder || "2";
-                if (aOrder !== bOrder) return aOrder.localeCompare(bOrder);
-                const aReserved = parseInt(a.dataset.reserved || "0", 10);
-                const bReserved = parseInt(b.dataset.reserved || "0", 10);
-                if (aReserved !== bReserved) return aReserved - bReserved;
-                const aName = (a.querySelector(".lib-badge-name")?.textContent || "").trim();
-                const bName = (b.querySelector(".lib-badge-name")?.textContent || "").trim();
-                return aName.localeCompare(bName);
-            });
-            cards.forEach((card) => group.appendChild(card));
-        }
-
-        const pendingByGroup = new Map();
-        function ensurePendingState(group) {
-            const row = group.closest(".lib-group-row");
-            if (!row) return;
-            if (!row.classList.contains("is-pending")) {
-                row.classList.add("is-pending");
-            }
-            if (!revealTimers.has(group)) {
-                const timer = setTimeout(() => {
-                    if ((pendingByGroup.get(group) || 0) > 0) {
-                        row.classList.remove("is-pending");
-                        row.dataset.revealedEarly = "1";
-                    }
-                }, GROUP_REVEAL_TIMEOUT);
-                revealTimers.set(group, timer);
-            }
-        }
-        function resolvePending(node) {
-            const group = node.closest("[data-lib-group]");
-            if (!group) return;
-            const left = (pendingByGroup.get(group) || 0) - 1;
-            if (left <= 0) {
-                pendingByGroup.set(group, 0);
-                const row = group.closest(".lib-group-row");
-                const early = row && row.dataset.revealedEarly === "1";
-                if (!early) {
-                    sortGroup(group);
+            function applyKind(card, kind, reserved) {
+                if (!card) return;
+                card.classList.remove("status-available", "status-reserved", "status-unknown");
+                if (reserved != null) {
+                    card.dataset.reserved = String(reserved);
                 }
-                if (row) row.classList.remove("is-pending");
-                if (revealTimers.has(group)) {
-                    clearTimeout(revealTimers.get(group));
-                    revealTimers.delete(group);
-                }
-            } else {
-                pendingByGroup.set(group, left);
-            }
-        }
-
-        groups.forEach((group) => {
-            group.querySelectorAll(".lib-card").forEach((card) => {
-                if (card.dataset.subscription === "1") {
-                    applyKind(card, "available", 0);
+                if (kind === "available") {
+                    card.classList.add("status-available");
+                } else if (kind === "reservable") {
+                    card.classList.add("status-reserved");
                 } else {
-                    applyKind(card, "unknown", 0);
+                    card.classList.add("status-unknown");
                 }
-            });
-            sortGroup(group);
-        });
+                ensureKind(card, kind);
+            }
 
-        function initPending(nodes) {
-            nodes.forEach((node) => {
+            function formatAvailability(loaned, total, reserved) {
+                if (total > loaned && reserved === 0) {
+                    const available = Math.max(total - loaned, 0);
+                    return `${TEXT.available} (${available}/${total})`;
+                }
+                return `${TEXT.reservable} ${reserved}`;
+            }
+
+            function sortGroup(group) {
+                if (!group) return;
+                const cards = Array.from(group.querySelectorAll(".lib-card"));
+                cards.sort((a, b) => {
+                    const aOrder = a.dataset.statusOrder || "2";
+                    const bOrder = b.dataset.statusOrder || "2";
+                    if (aOrder !== bOrder) return aOrder.localeCompare(bOrder);
+                    const aReserved = parseInt(a.dataset.reserved || "0", 10);
+                    const bReserved = parseInt(b.dataset.reserved || "0", 10);
+                    if (aReserved !== bReserved) return aReserved - bReserved;
+                    const aName = (a.querySelector(".lib-badge-name")?.textContent || "").trim();
+                    const bName = (b.querySelector(".lib-badge-name")?.textContent || "").trim();
+                    return aName.localeCompare(bName);
+                });
+                cards.forEach((card) => group.appendChild(card));
+            }
+
+            const pendingByGroup = new Map();
+            function ensurePendingState(group) {
+                const row = group.closest(".lib-group-row");
+                if (!row) return;
+                if (!row.classList.contains("is-pending")) {
+                    row.classList.add("is-pending");
+                }
+                if (!revealTimers.has(group)) {
+                    const timer = setTimeout(() => {
+                        if ((pendingByGroup.get(group) || 0) > 0) {
+                            row.classList.remove("is-pending");
+                            row.dataset.revealedEarly = "1";
+                        }
+                    }, GROUP_REVEAL_TIMEOUT);
+                    revealTimers.set(group, timer);
+                }
+            }
+            function isSorted(group) {
+                if (!group) return true;
+                const cards = Array.from(group.querySelectorAll(".lib-card"));
+                const sorted = cards.slice().sort((a, b) => {
+                    const aOrder = a.dataset.statusOrder || "2";
+                    const bOrder = b.dataset.statusOrder || "2";
+                    if (aOrder !== bOrder) return aOrder.localeCompare(bOrder);
+                    const aReserved = parseInt(a.dataset.reserved || "0", 10);
+                    const bReserved = parseInt(b.dataset.reserved || "0", 10);
+                    if (aReserved !== bReserved) return aReserved - bReserved;
+                    const aName = (a.querySelector(".lib-badge-name")?.textContent || "").trim();
+                    const bName = (b.querySelector(".lib-badge-name")?.textContent || "").trim();
+                    return aName.localeCompare(bName);
+                });
+                return cards.every((card, idx) => card === sorted[idx]);
+            }
+
+            function resolvePending(node) {
                 const group = node.closest("[data-lib-group]");
                 if (!group) return;
-                pendingByGroup.set(group, (pendingByGroup.get(group) || 0) + 1);
-                ensurePendingState(group);
-            });
-        }
-
-        initPending(nodes);
-        initPending(yes24Nodes);
-        initPending(dobongNodes);
-        initPending(bookcubeNodes);
-        initPending(gangnamNodes);
-        initPending(seoulNodes);
-        initPending(senNodes);
-        initPending(eunpyeongNodes);
-
-        // pending state is handled per-group with a reveal timeout
-
-        function updateStatus(node, text, isError) {
-            const card = node.closest(".lib-card");
-            const holder = card && card.querySelector("[data-kyobo-status-text]");
-            if (!holder) return;
-            holder.textContent = text;
-            holder.classList.remove("is-loading");
-            if (isError) {
-                holder.classList.add("is-error");
+                const left = (pendingByGroup.get(group) || 0) - 1;
+                if (left <= 0) {
+                    pendingByGroup.set(group, 0);
+                    const row = group.closest(".lib-group-row");
+                    const early = row && row.dataset.revealedEarly === "1";
+                    if (!early) {
+                        sortGroup(group);
+                    } else if (!isSorted(group)) {
+                        // Late, gentle re-sort after content is visible.
+                        setTimeout(() => sortGroup(group), 180);
+                    }
+                    if (row) row.classList.remove("is-pending");
+                    if (revealTimers.has(group)) {
+                        clearTimeout(revealTimers.get(group));
+                        revealTimers.delete(group);
+                    }
+                } else {
+                    pendingByGroup.set(group, left);
+                }
             }
-            if (card) {
-                if (isError) applyKind(card, "unknown", 0);
-            }
-        }
 
-        async function fetchStatus(node) {
-            const params = new URLSearchParams({
-                library_code: node.dataset.libraryCode || "",
-                brcd: node.dataset.brcd || "",
-                ctts_dvsn_code: node.dataset.ctts || "",
-                ctgr_id: node.dataset.ctgr || "",
-                sntn_auth_code: node.dataset.sntn || "",
+            groups.forEach((group) => {
+                group.querySelectorAll(".lib-card").forEach((card) => {
+                    if (card.dataset.subscription === "1") {
+                        applyKind(card, "available", 0);
+                    } else {
+                        applyKind(card, "unknown", 0);
+                    }
+                });
+                sortGroup(group);
             });
-            try {
-                const res = await fetch(`/api/kyobo_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
-                const data = await res.json();
-                const status = data.status || {};
-                if (status.loaned == null || status.total == null || status.reserved == null) {
-                    throw new Error("status_missing");
-                }
-                const text = formatAvailability(status.loaned, status.total, status.reserved);
-                updateStatus(node, text, false);
-                const card = node.closest(".lib-card");
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
-            } catch (err) {
-                updateStatus(node, "상태 정보 없음", true);
-            } finally {
-                resolvePending(node);
+
+            function initPending(nodes) {
+                nodes.forEach((node) => {
+                    const group = node.closest("[data-lib-group]");
+                    if (!group) return;
+                    pendingByGroup.set(group, (pendingByGroup.get(group) || 0) + 1);
+                    ensurePendingState(group);
+                });
             }
-        }
 
-        nodes.forEach((node) => {
-            fetchStatus(node);
-        });
+            initPending(nodes);
+            initPending(yes24Nodes);
+            initPending(dobongNodes);
+            initPending(bookcubeNodes);
+            initPending(gangnamNodes);
+            initPending(seoulNodes);
+            initPending(senNodes);
+            initPending(eunpyeongNodes);
 
-        async function fetchDobongStatus(node) {
-            const params = new URLSearchParams({
-                brcd: node.dataset.brcd || "",
+            groups.forEach((group) => {
+                if ((pendingByGroup.get(group) || 0) === 0) {
+                    const row = group.closest(".lib-group-row");
+                    if (row) row.classList.remove("is-pending");
+                }
             });
-            try {
-                const res = await fetch(`/api/dobong_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
-                const data = await res.json();
-                const status = data.status || {};
-                if (status.loaned == null || status.total == null || status.reserved == null) {
-                    throw new Error("status_missing");
-                }
-                const text = formatAvailability(status.loaned, status.total, status.reserved);
+
+
+            function updateStatus(node, text, isError) {
                 const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-dobong-status-text]");
-                if (holder) {
-                    holder.textContent = text;
-                    holder.classList.remove("is-loading");
-                }
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
-            } catch (err) {
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-dobong-status-text]");
-                if (holder) {
-                    holder.textContent = "상태 정보 없음";
+                const holder = card && card.querySelector("[data-kyobo-status-text]");
+                if (!holder) return;
+                holder.textContent = text;
+                holder.classList.remove("is-loading");
+                if (isError) {
                     holder.classList.add("is-error");
                 }
                 if (card) {
-                    applyKind(card, "unknown", 0);
+                    if (isError) applyKind(card, "unknown", 0);
                 }
-            } finally {
-                resolvePending(node);
             }
-        }
 
-        dobongNodes.forEach((node) => {
-            fetchDobongStatus(node);
-        });
+            async function fetchStatus(node) {
+                const params = new URLSearchParams({
+                    library_code: node.dataset.libraryCode || "",
+                    brcd: node.dataset.brcd || "",
+                    ctts_dvsn_code: node.dataset.ctts || "",
+                    ctgr_id: node.dataset.ctgr || "",
+                    sntn_auth_code: node.dataset.sntn || "",
+                });
+                try {
+                    const res = await fetch(`/api/kyobo_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.loaned == null || status.total == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.total, status.reserved);
+                    updateStatus(node, text, false);
+                    const card = node.closest(".lib-card");
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    updateStatus(node, TEXT.unknown, true);
+                } finally {
+                    resolvePending(node);
+                }
+            }
 
-        async function fetchYes24Status(node) {
-            const params = new URLSearchParams({
-                library_code: node.dataset.libraryCode || "",
-                goods_id: node.dataset.goodsId || "",
+            nodes.forEach((node) => {
+                fetchStatus(node);
             });
-            try {
-                const res = await fetch(`/api/yes24_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
-                const data = await res.json();
-                const status = data.status || {};
-                if (status.owned == null || status.loaned == null || status.reserved == null) {
-                    throw new Error("status_missing");
+
+            async function fetchDobongStatus(node) {
+                const params = new URLSearchParams({
+                    brcd: node.dataset.brcd || "",
+                });
+                try {
+                    const res = await fetch(`/api/dobong_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.loaned == null || status.total == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.total, status.reserved);
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-dobong-status-text]");
+                    if (holder) {
+                        holder.textContent = text;
+                        holder.classList.remove("is-loading");
+                    }
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-dobong-status-text]");
+                    if (holder) {
+                        holder.textContent = TEXT.unknown;
+                        holder.classList.add("is-error");
+                    }
+                    if (card) {
+                        applyKind(card, "unknown", 0);
+                    }
+                } finally {
+                    resolvePending(node);
                 }
-                const text = formatAvailability(status.loaned, status.owned, status.reserved);
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-yes24-status-text]");
-                if (holder) {
-                    holder.textContent = text;
-                    holder.classList.remove("is-loading");
-                }
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.owned > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
-            } catch (err) {
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-yes24-status-text]");
-                if (holder) {
-                    holder.textContent = "상태 정보 없음";
-                    holder.classList.add("is-error");
-                }
-                if (card) {
-                    applyKind(card, "unknown", 0);
-                }
-            } finally {
-                resolvePending(node);
             }
-        }
 
-        yes24Nodes.forEach((node) => {
-            fetchYes24Status(node);
-        });
-
-        async function fetchBookcubeStatus(node) {
-            const params = new URLSearchParams({
-                library_code: node.dataset.libraryCode || "",
-                content_id: node.dataset.contentId || "",
+            dobongNodes.forEach((node) => {
+                fetchDobongStatus(node);
             });
-            try {
-                const res = await fetch(`/api/bookcube_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
-                const data = await res.json();
-                const status = data.status || {};
-                if (status.loaned == null || status.total == null || status.reserved == null) {
-                    throw new Error("status_missing");
+
+            async function fetchYes24Status(node) {
+                const params = new URLSearchParams({
+                    library_code: node.dataset.libraryCode || "",
+                    goods_id: node.dataset.goodsId || "",
+                });
+                try {
+                    const res = await fetch(`/api/yes24_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.owned == null || status.loaned == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.owned, status.reserved);
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-yes24-status-text]");
+                    if (holder) {
+                        holder.textContent = text;
+                        holder.classList.remove("is-loading");
+                    }
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.owned > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-yes24-status-text]");
+                    if (holder) {
+                        holder.textContent = TEXT.unknown;
+                        holder.classList.add("is-error");
+                    }
+                    if (card) {
+                        applyKind(card, "unknown", 0);
+                    }
+                } finally {
+                    resolvePending(node);
                 }
-                const text = formatAvailability(status.loaned, status.total, status.reserved);
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-bookcube-status-text]");
-                if (holder) {
-                    holder.textContent = text;
-                    holder.classList.remove("is-loading");
-                }
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
-            } catch (err) {
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-bookcube-status-text]");
-                if (holder) {
-                    holder.textContent = "상태 정보 없음";
-                    holder.classList.add("is-error");
-                }
-                if (card) {
-                    applyKind(card, "unknown", 0);
-                }
-            } finally {
-                resolvePending(node);
             }
-        }
 
-        bookcubeNodes.forEach((node) => {
-            fetchBookcubeStatus(node);
-        });
-
-        async function fetchGangnamStatus(node) {
-            const params = new URLSearchParams({
-                library_code: node.dataset.libraryCode || "",
-                content_id: node.dataset.contentId || "",
+            yes24Nodes.forEach((node) => {
+                fetchYes24Status(node);
             });
-            try {
-                const res = await fetch(`/api/gangnam_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
-                const data = await res.json();
-                const status = data.status || {};
-                if (status.loaned == null || status.owned == null || status.reserved == null) {
-                    throw new Error("status_missing");
+
+            async function fetchBookcubeStatus(node) {
+                const params = new URLSearchParams({
+                    library_code: node.dataset.libraryCode || "",
+                    content_id: node.dataset.contentId || "",
+                });
+                try {
+                    const res = await fetch(`/api/bookcube_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.loaned == null || status.total == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.total, status.reserved);
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-bookcube-status-text]");
+                    if (holder) {
+                        holder.textContent = text;
+                        holder.classList.remove("is-loading");
+                    }
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-bookcube-status-text]");
+                    if (holder) {
+                        holder.textContent = TEXT.unknown;
+                        holder.classList.add("is-error");
+                    }
+                    if (card) {
+                        applyKind(card, "unknown", 0);
+                    }
+                } finally {
+                    resolvePending(node);
                 }
-                const text = formatAvailability(status.loaned, status.owned, status.reserved);
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-gangnam-status-text]");
-                if (holder) {
-                    holder.textContent = text;
-                    holder.classList.remove("is-loading");
-                }
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.owned > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
-            } catch (err) {
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-gangnam-status-text]");
-                if (holder) {
-                    holder.textContent = "상태 정보 없음";
-                    holder.classList.add("is-error");
-                }
-                if (card) {
-                    applyKind(card, "unknown", 0);
-                }
-            } finally {
-                resolvePending(node);
             }
-        }
 
-        gangnamNodes.forEach((node) => {
-            fetchGangnamStatus(node);
-        });
-
-        async function fetchSeoulStatus(node) {
-            const params = new URLSearchParams({
-                content_id: node.dataset.contentId || "",
+            bookcubeNodes.forEach((node) => {
+                fetchBookcubeStatus(node);
             });
-            try {
-                const res = await fetch(`/api/seoul_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
-                const data = await res.json();
-                const status = data.status || {};
-                if (status.loaned == null || status.total == null || status.reserved == null) {
-                    throw new Error("status_missing");
+
+            async function fetchGangnamStatus(node) {
+                const params = new URLSearchParams({
+                    library_code: node.dataset.libraryCode || "",
+                    content_id: node.dataset.contentId || "",
+                });
+                try {
+                    const res = await fetch(`/api/gangnam_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.loaned == null || status.owned == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.owned, status.reserved);
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-gangnam-status-text]");
+                    if (holder) {
+                        holder.textContent = text;
+                        holder.classList.remove("is-loading");
+                    }
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.owned > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-gangnam-status-text]");
+                    if (holder) {
+                        holder.textContent = TEXT.unknown;
+                        holder.classList.add("is-error");
+                    }
+                    if (card) {
+                        applyKind(card, "unknown", 0);
+                    }
+                } finally {
+                    resolvePending(node);
                 }
-                const text = formatAvailability(status.loaned, status.total, status.reserved);
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-seoul-status-text]");
-                if (holder) {
-                    holder.textContent = text;
-                    holder.classList.remove("is-loading");
-                }
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
-            } catch (err) {
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-seoul-status-text]");
-                if (holder) {
-                    holder.textContent = "상태 정보 없음";
-                    holder.classList.add("is-error");
-                }
-                if (card) {
-                    applyKind(card, "unknown", 0);
-                }
-            } finally {
-                resolvePending(node);
             }
-        }
 
-        seoulNodes.forEach((node) => {
-            fetchSeoulStatus(node);
-        });
-
-        async function fetchSenStatus(node) {
-            const params = new URLSearchParams({
-                library_code: node.dataset.libraryCode || "",
-                content_id: node.dataset.contentId || "",
+            gangnamNodes.forEach((node) => {
+                fetchGangnamStatus(node);
             });
-            try {
-                const res = await fetch(`/api/sen_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
-                const data = await res.json();
-                const status = data.status || {};
-                if (status.loaned == null || status.total == null || status.reserved == null) {
-                    throw new Error("status_missing");
+
+            async function fetchSeoulStatus(node) {
+                const params = new URLSearchParams({
+                    content_id: node.dataset.contentId || "",
+                });
+                try {
+                    const res = await fetch(`/api/seoul_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.loaned == null || status.total == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.total, status.reserved);
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-seoul-status-text]");
+                    if (holder) {
+                        holder.textContent = text;
+                        holder.classList.remove("is-loading");
+                    }
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-seoul-status-text]");
+                    if (holder) {
+                        holder.textContent = TEXT.unknown;
+                        holder.classList.add("is-error");
+                    }
+                    if (card) {
+                        applyKind(card, "unknown", 0);
+                    }
+                } finally {
+                    resolvePending(node);
                 }
-                const text = formatAvailability(status.loaned, status.total, status.reserved);
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-sen-status-text]");
-                if (holder) {
-                    holder.textContent = text;
-                    holder.classList.remove("is-loading");
-                }
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
-            } catch (err) {
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-sen-status-text]");
-                if (holder) {
-                    holder.textContent = "상태 정보 없음";
-                    holder.classList.add("is-error");
-                }
-                if (card) {
-                    applyKind(card, "unknown", 0);
-                }
-            } finally {
-                resolvePending(node);
             }
-        }
 
-        senNodes.forEach((node) => {
-            fetchSenStatus(node);
-        });
-
-        async function fetchEunpyeongStatus(node) {
-            const params = new URLSearchParams({
-                content_id: node.dataset.contentId || "",
+            seoulNodes.forEach((node) => {
+                fetchSeoulStatus(node);
             });
+
+            async function fetchSenStatus(node) {
+                const params = new URLSearchParams({
+                    library_code: node.dataset.libraryCode || "",
+                    content_id: node.dataset.contentId || "",
+                });
+                try {
+                    const res = await fetch(`/api/sen_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.loaned == null || status.total == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.total, status.reserved);
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-sen-status-text]");
+                    if (holder) {
+                        holder.textContent = text;
+                        holder.classList.remove("is-loading");
+                    }
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-sen-status-text]");
+                    if (holder) {
+                        holder.textContent = TEXT.unknown;
+                        holder.classList.add("is-error");
+                    }
+                    if (card) {
+                        applyKind(card, "unknown", 0);
+                    }
+                } finally {
+                    resolvePending(node);
+                }
+            }
+
+            senNodes.forEach((node) => {
+                fetchSenStatus(node);
+            });
+
+            async function fetchEunpyeongStatus(node) {
+                const params = new URLSearchParams({
+                    content_id: node.dataset.contentId || "",
+                });
+                try {
+                    const res = await fetch(`/api/eunpyeong_status?${params.toString()}`);
+                    if (!res.ok) throw new Error("status_fetch_failed");
+                    const data = await res.json();
+                    const status = data.status || {};
+                    if (status.loaned == null || status.total == null || status.reserved == null) {
+                        throw new Error("status_missing");
+                    }
+                    const text = formatAvailability(status.loaned, status.total, status.reserved);
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-eunpyeong-status-text]");
+                    if (holder) {
+                        holder.textContent = text;
+                        holder.classList.remove("is-loading");
+                    }
+                    if (card) {
+                        const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
+                        applyKind(card, kind, status.reserved || 0);
+                    }
+                } catch (err) {
+                    const card = node.closest(".lib-card");
+                    const holder = card && card.querySelector("[data-eunpyeong-status-text]");
+                    if (holder) {
+                        holder.textContent = TEXT.unknown;
+                        holder.classList.add("is-error");
+                    }
+                    if (card) {
+                        applyKind(card, "unknown", 0);
+                    }
+                } finally {
+                    resolvePending(node);
+                }
+            }
+
+            eunpyeongNodes.forEach((node) => {
+                fetchEunpyeongStatus(node);
+            });
+        }
+
+        function createStatusSpan(type, isSubscription) {
+            const span = document.createElement("span");
+            if (isSubscription) {
+                span.className = "lib-status";
+                span.dataset.statusKind = "subscription";
+                span.textContent = TEXT.subscription;
+                return span;
+            }
+            if (type) {
+                span.className = "lib-status is-loading";
+                span.textContent = "";
+                span.setAttribute("aria-label", TEXT.loading);
+                span.setAttribute(type, "");
+                return span;
+            }
+            span.className = "lib-status is-muted";
+            span.textContent = TEXT.unknown;
+            return span;
+        }
+
+        function buildCard(lib) {
+            const isSubscription = lib.service_type === "Subscription";
+            const isBookcube = ["Bookcube", "FxLibrary"].includes(lib.platform_code);
+            const hasDobong = lib.code === "dobong" && lib.brcd;
+            const hasKyobo = lib.brcd && lib.ctts_dvsn_code && lib.ctgr_id && !isSubscription;
+            const hasYes24 = lib.goods_id;
+            const hasGangnam = lib.code === "gangnam" && lib.content_id;
+            const hasSeoul = lib.code === "seoul" && lib.content_id;
+            const hasSen = lib.code === "sen_owned" && lib.content_id && !isSubscription;
+            const hasEunpyeong = lib.code === "eunpyeong" && lib.content_id;
+            const hasBookcube = isBookcube && lib.content_id;
+
+            const card = document.createElement("a");
+            card.className = "lib-card";
+            card.href = lib.detail_url || lib.homepage_url || "#";
+            card.target = "_blank";
+            card.rel = "noopener noreferrer";
+            if (isSubscription) card.dataset.subscription = "1";
+
+            if (hasDobong) {
+                card.dataset.dobongStatus = "1";
+                card.dataset.brcd = lib.brcd || "";
+            } else if (hasKyobo) {
+                card.dataset.kyoboStatus = "1";
+                card.dataset.libraryCode = lib.code || "";
+                card.dataset.brcd = lib.brcd || "";
+                card.dataset.ctts = lib.ctts_dvsn_code || "";
+                card.dataset.ctgr = lib.ctgr_id || "";
+                card.dataset.sntn = lib.sntn_auth_code || "";
+            } else if (hasYes24) {
+                card.dataset.yes24Status = "1";
+                card.dataset.libraryCode = lib.code || "";
+                card.dataset.goodsId = lib.goods_id || "";
+            } else if (hasGangnam) {
+                card.dataset.gangnamStatus = "1";
+                card.dataset.libraryCode = lib.code || "";
+                card.dataset.contentId = lib.content_id || "";
+            } else if (hasSeoul) {
+                card.dataset.seoulStatus = "1";
+                card.dataset.contentId = lib.content_id || "";
+            } else if (hasSen) {
+                card.dataset.senStatus = "1";
+                card.dataset.libraryCode = lib.code || "";
+                card.dataset.contentId = lib.content_id || "";
+            } else if (hasEunpyeong) {
+                card.dataset.eunpyeongStatus = "1";
+                card.dataset.contentId = lib.content_id || "";
+            } else if (hasBookcube) {
+                card.dataset.bookcubeStatus = "1";
+                card.dataset.libraryCode = lib.code || "";
+                card.dataset.contentId = lib.content_id || "";
+            }
+
+            const name = document.createElement("span");
+            name.className = "lib-badge-name";
+            name.textContent = lib.short || lib.name || lib.code || "";
+            card.appendChild(name);
+
+            let statusAttr = "";
+            if (hasDobong) statusAttr = "data-dobong-status-text";
+            else if (hasKyobo) statusAttr = "data-kyobo-status-text";
+            else if (hasYes24) statusAttr = "data-yes24-status-text";
+            else if (hasGangnam) statusAttr = "data-gangnam-status-text";
+            else if (hasSeoul) statusAttr = "data-seoul-status-text";
+            else if (hasSen) statusAttr = "data-sen-status-text";
+            else if (hasEunpyeong) statusAttr = "data-eunpyeong-status-text";
+            else if (hasBookcube) statusAttr = "data-bookcube-status-text";
+
+            card.appendChild(createStatusSpan(statusAttr, isSubscription));
+            return card;
+        }
+
+        function renderGroup(container, title, key, libs) {
+            if (!libs.length) return;
+            const row = document.createElement("div");
+            row.className = "lib-group-row is-pending";
+
+            const groupTitle = document.createElement("div");
+            groupTitle.className = "lib-group-title";
+            groupTitle.textContent = title;
+            row.appendChild(groupTitle);
+
+            const grid = document.createElement("div");
+            grid.className = "lib-grid";
+            grid.dataset.libGroup = key;
+            libs.forEach((lib) => grid.appendChild(buildCard(lib)));
+            row.appendChild(grid);
+
+            const loading = document.createElement("div");
+            loading.className = "lib-loading";
+            loading.setAttribute("aria-hidden", "true");
+            const spinner = document.createElement("span");
+            spinner.className = "lib-spinner";
+            loading.appendChild(spinner);
+            row.appendChild(loading);
+
+            container.appendChild(row);
+        }
+
+        async function loadLibraries() {
+            const container = document.getElementById("lib-groups");
+            const loading = document.getElementById("lib-groups-loading");
+            if (!container) return;
+            const bookId = container.dataset.bookId;
+            if (!bookId) return;
+            if (loading) {
+                const textNode = loading.querySelector(".lib-loading-text");
+                if (textNode) textNode.textContent = TEXT.groupsLoading;
+            }
             try {
-                const res = await fetch(`/api/eunpyeong_status?${params.toString()}`);
-                if (!res.ok) throw new Error("status_fetch_failed");
+                const res = await fetch(`/api/book_libraries?book_id=${bookId}`);
+                if (!res.ok) throw new Error("libraries_fetch_failed");
                 const data = await res.json();
-                const status = data.status || {};
-                if (status.loaned == null || status.total == null || status.reserved == null) {
-                    throw new Error("status_missing");
-                }
-                const text = formatAvailability(status.loaned, status.total, status.reserved);
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-eunpyeong-status-text]");
-                if (holder) {
-                    holder.textContent = text;
-                    holder.classList.remove("is-loading");
-                }
-                if (card) {
-                    const kind = (status.reserved || 0) > 0 ? "reservable" : (status.total > status.loaned ? "available" : "reservable");
-                    applyKind(card, kind, status.reserved || 0);
-                }
+                const libs = data.libraries || [];
+                const kyobo = libs.filter((lib) => ["Kyobo", "Kyobo_New"].includes(lib.platform_code));
+                const yes24 = libs.filter((lib) => lib.platform_code === "YES24");
+                const other = libs.filter((lib) => !["Kyobo", "Kyobo_New", "YES24"].includes(lib.platform_code));
+                renderGroup(container, TEXT.kyoboTitle, "kyobo", kyobo);
+                renderGroup(container, TEXT.yes24Title, "yes24", yes24);
+                renderGroup(container, TEXT.otherTitle, "other", other);
+                initStatusUI(container);
             } catch (err) {
-                const card = node.closest(".lib-card");
-                const holder = card && card.querySelector("[data-eunpyeong-status-text]");
-                if (holder) {
-                    holder.textContent = "상태 정보 없음";
-                    holder.classList.add("is-error");
-                }
-                if (card) {
-                    applyKind(card, "unknown", 0);
-                }
+                const msg = document.createElement("div");
+                msg.className = "lib-error-text";
+                msg.textContent = TEXT.groupsError;
+                container.appendChild(msg);
             } finally {
-                resolvePending(node);
+                if (loading) loading.style.display = "none";
             }
         }
 
-        eunpyeongNodes.forEach((node) => {
-            fetchEunpyeongStatus(node);
-        });
-
-        groups.forEach((group) => {
-            if ((pendingByGroup.get(group) || 0) === 0) {
-                const row = group.closest(".lib-group-row");
-                if (row) row.classList.remove("is-pending");
-            }
-        });
+        loadLibraries();
 
         if (toggle && section) {
             toggle.addEventListener("click", () => {
                 const expanded = section.classList.toggle("is-expanded");
-                toggle.textContent = expanded ? "접기" : "상세 보기";
+                toggle.textContent = expanded ? "\uC811\uAE30" : "\uC0C1\uC138 \uBCF4\uAE30";
             });
         }
     })();
 </script>
 {% endblock %}
+
+

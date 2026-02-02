@@ -69,29 +69,29 @@ def parse_bookcube_detail_status(html: str):
         if status.get("loaned") == 0 and status.get("total") == 0 and status.get("reserved") == 0:
             return None
         return status
-    block_match = re.search(r"<ul[^>]*class=[\"']state[\"'][^>]*>(.*?)</ul>", html, re.I | re.S)
+    block_match = re.search(r"<ul[^>]*class=['\"]state['\"][^>]*>(.*?)</ul>", html, re.I | re.S)
     block = block_match.group(1) if block_match else ""
     if block:
-        m = re.search(r"<p[^>]*>\\s*대출\\s*</p>\\s*([0-9,]+)\\s*/\\s*([0-9,]+)", block, re.I)
-        r = re.search(r"<p[^>]*>\\s*예약\\s*</p>\\s*([0-9,]+)", block, re.I)
+        m = re.search(r"<p[^>]*>\s*\uB300\uCD9C\s*</p>\s*([0-9,]+)\s*/\s*([0-9,]+)", block, re.I)
+        r = re.search(r"<p[^>]*>\s*\uC608\uC57D\s*</p>\s*([0-9,]+)", block, re.I)
         if m:
             return _sanitize_status({
                 "loaned": int(m.group(1).replace(",", "")),
                 "total": int(m.group(2).replace(",", "")),
                 "reserved": int(r.group(1).replace(",", "")) if r else 0,
             })
-        m = re.search(r"대출[^0-9]*([0-9,]+)\\s*/\\s*([0-9,]+)", block, re.I | re.S)
-        r = re.search(r"예약[^0-9]*([0-9,]+)", block, re.I | re.S)
+        m = re.search(r"\uB300\uCD9C[^0-9]*([0-9,]+)\s*/\s*([0-9,]+)", block, re.I | re.S)
+        r = re.search(r"\uC608\uC57D[^0-9]*([0-9,]+)", block, re.I | re.S)
         if m:
             return _sanitize_status({
                 "loaned": int(m.group(1).replace(",", "")),
                 "total": int(m.group(2).replace(",", "")),
                 "reserved": int(r.group(1).replace(",", "")) if r else 0,
             })
-    text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"\s+", " ", text)
-    loan_match = re.search(r"대출\s*([0-9,]+)\s*/\s*([0-9,]+)", text)
-    reserve_match = re.search(r"예약\s*([0-9,]+)", text)
+    text_only = re.sub(r"<[^>]+>", " ", html)
+    text_only = re.sub(r"\s+", " ", text_only)
+    loan_match = re.search(r"\uB300\uCD9C\s*([0-9,]+)\s*/\s*([0-9,]+)", text_only)
+    reserve_match = re.search(r"\uC608\uC57D\s*([0-9,]+)", text_only)
     if loan_match:
         return _sanitize_status({
             "loaned": int(loan_match.group(1).replace(",", "")),

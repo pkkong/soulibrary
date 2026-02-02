@@ -40,6 +40,8 @@ LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
 DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
 STATUS_TTL_SEC = int(os.environ.get("KYOBO_STATUS_TTL", "120"))
 STATUS_CACHE = {}
+LIB_DETAIL_TTL_SEC = int(os.environ.get("LIB_DETAIL_TTL", "300"))
+LIB_DETAIL_CACHE = {}
 HOLDINGS_COLUMNS = None
 
 
@@ -263,34 +265,46 @@ def get_book_detail(book_id: int):
     conn = get_db_conn()
     try:
         cur = conn.execute(
-            "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE id=?",
+            "SELECT id, title, author, publisher, image_url, isbn, merge_group_id, canonical_id, publisher_norm "
+            "FROM books WHERE id=?",
             (book_id,),
         )
         book = cur.fetchone()
         if not book:
             return None
-
-        group_expr = "COALESCE(merge_group_id, canonical_id, CAST(id AS TEXT)) || ':' || COALESCE(publisher_norm, '')"
-        group_row = conn.execute(
-            f"SELECT {group_expr} AS group_id FROM books WHERE id=?",
-            (book_id,),
-        ).fetchone()
-        group_id = group_row["group_id"] if group_row else str(book_id)
+        merge_group_id = book.get("merge_group_id") if isinstance(book, dict) else book["merge_group_id"]
+        canonical_id = book.get("canonical_id") if isinstance(book, dict) else book["canonical_id"]
+        publisher_norm = book.get("publisher_norm") if isinstance(book, dict) else book["publisher_norm"]
 
         optional_cols = ["brcd", "ctts_dvsn_code", "ctgr_id", "sntn_auth_code", "goods_id", "content_id"]
         available = _get_holdings_columns(conn)
         selected_optional = [col for col in optional_cols if col in available]
         base_cols = ["library_code", "library", "provider", "platform", "image_url", "isbn"]
         columns_sql = ", ".join(base_cols + selected_optional)
+        ids = []
+        params = []
+        if merge_group_id:
+            where = "merge_group_id = ?"
+            params.append(merge_group_id)
+        elif canonical_id:
+            where = "canonical_id = ?"
+            params.append(canonical_id)
+        else:
+            where = "id = ?"
+            params.append(book_id)
+        if publisher_norm is None:
+            where = f"{where} AND publisher_norm IS NULL"
+        else:
+            where = f"{where} AND publisher_norm = ?"
+            params.append(publisher_norm)
+        bcur = conn.execute(f"SELECT id FROM books WHERE {where}", params)
+        ids = [r["id"] for r in bcur.fetchall()]
+        if not ids:
+            ids = [book_id]
+        placeholders = ",".join("?" for _ in ids)
         hcur = conn.execute(
-            f"""
-            SELECT {columns_sql}
-            FROM holdings
-            WHERE book_id IN (
-                SELECT id FROM books WHERE {group_expr} = ?
-            )
-            """,
-            (group_id,),
+            f"SELECT {columns_sql} FROM holdings WHERE book_id IN ({placeholders})",
+            ids,
         )
         holdings = [dict(r) for r in hcur.fetchall()]
 
@@ -430,6 +444,30 @@ def get_book_detail(book_id: int):
         conn.close()
 
 
+def get_book_meta(book_id: int):
+    conn = get_db_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, title, author, publisher, image_url, isbn FROM books WHERE id=?",
+            (book_id,),
+        )
+        book = cur.fetchone()
+        if not book:
+            return None
+        return {
+            "id": book["id"],
+            "title": book["title"] or "",
+            "author": book["author"] or "",
+            "publisher": book["publisher"] or "",
+            "image_url": book["image_url"] or "",
+            "isbn": book["isbn"] or "",
+            "libraries": [],
+            "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
+        }
+    finally:
+        conn.close()
+
+
 LIB_NAME_LOOKUP = {}
 for code, info in LIBRARIES.items():
     lib_name = info["library_name"]
@@ -552,7 +590,7 @@ def naver_verify_alt():
 
 @app.route('/book/<int:book_id>')
 def book_detail(book_id: int):
-    detail = get_book_detail(book_id)
+    detail = get_book_meta(book_id)
     if not detail:
         return render_template(
             "book.html",
@@ -570,6 +608,31 @@ def book_detail(book_id: int):
         topbar_desc="",
         active_tab="search",
     )
+
+
+@app.route("/api/book_libraries")
+def api_book_libraries():
+    raw_id = (request.args.get("book_id") or "").strip()
+    try:
+        book_id = int(raw_id)
+    except Exception:
+        return jsonify({"error": "invalid_book_id"}), 400
+
+    cached = LIB_DETAIL_CACHE.get(book_id)
+    now = time.time()
+    if cached and now - cached["ts"] < LIB_DETAIL_TTL_SEC:
+        return jsonify(cached["payload"])
+
+    detail = get_book_detail(book_id)
+    if not detail:
+        return jsonify({"error": "not_found"}), 404
+    payload = {
+        "book_id": detail["id"],
+        "counts": detail.get("counts") or {},
+        "libraries": detail.get("libraries") or [],
+    }
+    LIB_DETAIL_CACHE[book_id] = {"ts": now, "payload": payload}
+    return jsonify(payload)
 
 
 @app.route("/api/kyobo_status")
@@ -739,6 +802,20 @@ def api_bookcube_status():
     source = None
     attempted = []
     try:
+        def decode_html(res):
+            text = res.text or ""
+            if "\uB300\uCD9C" in text or "\uC608\uC57D" in text:
+                return text
+            raw = res.content or b""
+            for enc in ("euc-kr", "cp949", "utf-8"):
+                try:
+                    decoded = raw.decode(enc, errors="ignore")
+                except Exception:
+                    continue
+                if "\uB300\uCD9C" in decoded or "\uC608\uC57D" in decoded:
+                    return decoded
+            return text
+
         title = ""
         conn = None
         try:
@@ -763,22 +840,6 @@ def api_bookcube_status():
                     print(traceback.format_exc())
                     pass
 
-        if not status:
-            detail_url = f"{_bookcube_base_url(library_code)}/FxLibrary/product/view/?num={content_id}&category=&category_type=book"
-            attempted.append(detail_url)
-            res = get_status_session().get(
-                detail_url,
-                timeout=7,
-                headers=headers,
-                verify=False,
-            )
-            res.raise_for_status()
-            if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
-                res.encoding = "euc-kr"
-            status = parse_bookcube_detail_status(res.text)
-            if status:
-                source = "detail"
-
         if not status and title:
             search_url = _bookcube_search_list_url(list_url, title)
             attempted.append(search_url)
@@ -789,11 +850,25 @@ def api_bookcube_status():
                 verify=False,
             )
             res.raise_for_status()
-            if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
-                res.encoding = "euc-kr"
-            status = parse_bookcube_status(res.text, content_id)
+            html = decode_html(res)
+            status = parse_bookcube_status(html, content_id)
             if status:
                 source = "search:title"
+
+        if not status:
+            detail_url = f"{_bookcube_base_url(library_code)}/FxLibrary/product/view/?num={content_id}&category=&category_type=book"
+            attempted.append(detail_url)
+            res = get_status_session().get(
+                detail_url,
+                timeout=7,
+                headers=headers,
+                verify=False,
+            )
+            res.raise_for_status()
+            html = decode_html(res)
+            status = parse_bookcube_detail_status(html)
+            if status:
+                source = "detail"
 
         if not status:
             first_url = _bookcube_page_url(list_url, 1)
@@ -805,9 +880,8 @@ def api_bookcube_status():
                 verify=False,
             )
             res.raise_for_status()
-            if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
-                res.encoding = "euc-kr"
-            status = parse_bookcube_status(res.text, content_id)
+            html = decode_html(res)
+            status = parse_bookcube_status(html, content_id)
             if status:
                 source = "list"
 
@@ -823,9 +897,8 @@ def api_bookcube_status():
                     verify=False,
                 )
                 res.raise_for_status()
-                if "euc-kr" in (res.headers.get("Content-Type", "").lower()):
-                    res.encoding = "euc-kr"
-                status = parse_bookcube_status(res.text, content_id)
+                html = decode_html(res)
+                status = parse_bookcube_status(html, content_id)
                 if status:
                     source = "list"
                     break
