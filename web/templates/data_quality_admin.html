@@ -1,0 +1,288 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>데이터 품질 관리자</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png', v='20260219c') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png', v='20260219c') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png', v='20260219c') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico', v='20260219c') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .ops-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 14px; }
+        .op-card { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 14px; }
+        .op-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+        .op-desc { font-size: 12px; color: var(--muted); min-height: 32px; }
+        .op-cmd { margin-top: 10px; font-size: 11px; line-height: 1.45; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 8px; word-break: break-all; }
+        .row-actions { display: flex; gap: 8px; margin-top: 10px; }
+        .btn-danger-soft { background: #fee2e2; color: #991b1b; }
+        .input-row { display: grid; gap: 6px; margin-top: 10px; }
+        .input-row input {
+            width: 100%;
+            padding: 9px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 12px;
+            font-family: 'Pretendard', 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: #fff;
+        }
+        .btn-link { display: inline-flex; align-items: center; border: 1px solid var(--border); background: #fff; color: #0f172a; border-radius: 8px; padding: 8px 12px; text-decoration: none; font-weight: 700; font-size: 13px; }
+        .btn-link:hover { background: #f8fafc; text-decoration: none; }
+        .top-links { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+        .job-box { margin-top: 14px; }
+        .job-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; font-size: 12px; }
+        pre { margin: 10px 0 0; background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 12px; max-height: 320px; overflow: auto; font-size: 12px; line-height: 1.45; }
+        .report-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+        .report-row { font-size: 12px; display: flex; justify-content: space-between; gap: 12px; }
+        .report-path { color: #0f172a; font-family: "Consolas", "SFMono-Regular", monospace; font-size: 11px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>데이터 품질 관리자</h1>
+        <div class="muted">CSV 적재 + Stage1/Stage2/Stage3 점검·적용을 버튼으로 실행하고 현재 DB 품질 지표를 확인합니다.</div>
+
+        <div class="top-links">
+            <a class="btn-link" href="/admin/curations">큐레이션 관리자</a>
+            <a class="btn-link" href="/admin/data-quality/review">중복 리뷰 큐</a>
+            <a class="btn-link" href="/search" target="_blank" rel="noopener noreferrer">검색 화면</a>
+        </div>
+
+        <div class="notice">
+            <strong>운영 규칙</strong><br>
+            1) CSV 적재(증분/전체) → 2) <code>dry-run</code> 확인 → 3) 백업 → 4) <code>apply</code> 실행 순서를 권장합니다.<br>
+            백업 예시: <code>docker exec -e PGPASSWORD=localpass soulib-postgres pg_dump -U root -d soulib_test -Fc -f /tmp/soulib_test_stage2_preapply.dump</code>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn-primary" id="btnRefresh">상태 새로고침</button>
+            <div class="muted" id="refreshInfo"></div>
+        </div>
+
+        <div class="grid" id="metricGrid"></div>
+
+        <div class="card">
+            <div class="card-title">실행 작업</div>
+            <div class="input-row">
+                <label for="csvOnlyInput" class="small">증분 적재 도서관 코드(CSV_ONLY)</label>
+                <input id="csvOnlyInput" type="text" placeholder="예: seoul,gangnam,sen_owned">
+                <div class="small">`CSV 적재 (증분)` 실행 시 필수입니다. 쉼표로 여러 개 입력하세요.</div>
+            </div>
+            <div class="ops-grid" id="opsGrid"></div>
+        </div>
+
+        <div class="card job-box">
+            <div class="card-title">최근 실행 상태</div>
+            <div class="job-meta" id="jobMeta"></div>
+            <pre id="jobOut">아직 실행 이력이 없습니다.</pre>
+        </div>
+
+        <div class="card">
+            <div class="card-title">최근 리포트</div>
+            <ul class="report-list" id="reportList"></ul>
+        </div>
+    </div>
+
+    <script>
+        const initial = {{ initial|tojson|safe }};
+        let state = initial || {};
+
+        function num(value) {
+            if (value === null || value === undefined) return "-";
+            const n = Number(value);
+            if (Number.isNaN(n)) return String(value);
+            return n.toLocaleString();
+        }
+
+        function metricCards(metrics) {
+            if (!metrics || metrics.error) {
+                return [
+                    { title: "지표 수집", value: "실패", hint: metrics?.error || "DB 연결 오류" }
+                ];
+            }
+            return [
+                { title: "books 총계", value: num(metrics.books_total), hint: "books 테이블 행 수" },
+                { title: "holdings 총계", value: num(metrics.holdings_total), hint: "holdings 테이블 행 수" },
+                { title: "orphan books", value: num(metrics.orphan_books), hint: "holdings가 없는 books" },
+                { title: "exact 중복 그룹", value: num(metrics.books_exact_dup_groups), hint: "title_norm+author_norm+publisher_norm" },
+                { title: "holdings 중복 그룹", value: num(metrics.holdings_book_library_dup_groups), hint: "(book_id, library_code) 중복" },
+                { title: "canonical 누락", value: num(metrics.holdings_no_canonical), hint: "holdings.canonical_id 공백" },
+                { title: "식별자 있는데 canonical 없음", value: num(metrics.identifier_without_canonical), hint: "brcd/goods/content 보유 행" },
+                { title: "canonical 다중 book", value: num(metrics.canonical_multi_book_groups), hint: "canonical_id가 여러 book_id에 연결" },
+                { title: "리뷰 큐(new)", value: num(metrics.review_new), hint: "관리자 판단 대기" },
+                { title: "리뷰 큐(approved)", value: num(metrics.review_approved), hint: "Stage3 적용 가능 건" },
+            ];
+        }
+
+        function renderMetrics(metrics) {
+            const grid = document.getElementById("metricGrid");
+            grid.innerHTML = "";
+            for (const card of metricCards(metrics)) {
+                const el = document.createElement("div");
+                el.className = "card";
+                el.innerHTML = `
+                    <div class="card-title">${card.title}</div>
+                    <div class="card-value">${card.value}</div>
+                    <div class="small">${card.hint || ""}</div>
+                `;
+                grid.appendChild(el);
+            }
+        }
+
+        function renderOps(operations, isRunning) {
+            const wrap = document.getElementById("opsGrid");
+            wrap.innerHTML = "";
+            for (const op of operations || []) {
+                const row = document.createElement("div");
+                row.className = "op-card";
+                const btnClass = op.destructive ? "btn-danger-soft" : "btn-secondary";
+                const extraNote = op.requires_csv_only
+                    ? `<div class="small">옵션: CSV_ONLY 필요</div>`
+                    : (op.force_drop ? `<div class="small">옵션: MIGRATE_DROP=1</div>` : ``);
+                row.innerHTML = `
+                    <div class="op-title">${op.label}</div>
+                    <div class="op-desc">${op.description || ""}</div>
+                    ${extraNote}
+                    <div class="op-cmd">${op.command || ""}</div>
+                    <div class="row-actions">
+                        <button class="${btnClass}" data-op="${op.key}" ${isRunning ? "disabled" : ""}>실행</button>
+                    </div>
+                `;
+                wrap.appendChild(row);
+            }
+        }
+
+        function renderJob(job) {
+            const meta = document.getElementById("jobMeta");
+            const out = document.getElementById("jobOut");
+            if (!job) {
+                meta.innerHTML = "";
+                out.textContent = "아직 실행 이력이 없습니다.";
+                return;
+            }
+
+            const status = job.running ? "실행 중" : (job.success === true ? "성공" : (job.success === false ? "실패" : "-"));
+            meta.innerHTML = `
+                <div><strong>상태:</strong> ${status}</div>
+                <div><strong>작업:</strong> ${job.operation || "-"}</div>
+                <div><strong>시작:</strong> ${job.started_at || "-"}</div>
+                <div><strong>종료:</strong> ${job.ended_at || "-"}</div>
+                <div><strong>코드:</strong> ${job.exit_code ?? "-"}</div>
+            `;
+            if (job.options && Object.keys(job.options).length) {
+                const extra = document.createElement("div");
+                extra.innerHTML = `<strong>옵션:</strong> ${JSON.stringify(job.options)}`;
+                meta.appendChild(extra);
+            }
+
+            let text = "";
+            if (job.result_json) {
+                text += "[result_json]\n" + JSON.stringify(job.result_json, null, 2) + "\n\n";
+            }
+            if (job.stdout_tail) {
+                text += "[stdout]\n" + job.stdout_tail + "\n\n";
+            }
+            if (job.stderr_tail) {
+                text += "[stderr]\n" + job.stderr_tail + "\n";
+            }
+            out.textContent = text || "출력 없음";
+        }
+
+        function renderReports(reports) {
+            const list = document.getElementById("reportList");
+            list.innerHTML = "";
+            for (const item of reports || []) {
+                const li = document.createElement("li");
+                li.className = "report-row";
+                li.innerHTML = `
+                    <span class="report-path">${item.path}</span>
+                    <span class="small">${item.mtime || "-"}</span>
+                `;
+                list.appendChild(li);
+            }
+            if (!list.children.length) {
+                const li = document.createElement("li");
+                li.className = "small";
+                li.textContent = "리포트가 없습니다.";
+                list.appendChild(li);
+            }
+        }
+
+        function renderAll(payload) {
+            state = payload || {};
+            renderMetrics(state.metrics);
+            renderOps(state.operations, Boolean(state.job && state.job.running));
+            renderJob(state.job);
+            renderReports(state.reports);
+            const measured = state.metrics && state.metrics.measured_at ? state.metrics.measured_at : new Date().toLocaleString();
+            document.getElementById("refreshInfo").textContent = `마지막 갱신: ${measured}`;
+        }
+
+        async function fetchStatus() {
+            const res = await fetch("/admin/data-quality/status");
+            const payload = await res.json();
+            renderAll(payload);
+        }
+
+        async function runOperation(op) {
+            const body = { operation: op.key, confirm: true };
+
+            if (op.requires_csv_only) {
+                const csvOnly = (document.getElementById("csvOnlyInput").value || "").trim();
+                if (!csvOnly) {
+                    alert("증분 적재는 CSV_ONLY 입력이 필요합니다. 예: seoul,gangnam");
+                    return;
+                }
+                body.csv_only = csvOnly;
+            }
+
+            if (op.destructive) {
+                const message = op.force_drop
+                    ? "전체 재구축 작업입니다(MIGRATE_DROP=1). books/holdings를 재생성합니다. 계속할까요?"
+                    : "apply 작업입니다. 백업 후 실행하시겠습니까?";
+                const ok = window.confirm(message);
+                if (!ok) return;
+            }
+            const res = await fetch("/admin/data-quality/run", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const payload = await res.json().catch(() => ({}));
+                const msgMap = {
+                    csv_only_required: "CSV_ONLY 입력이 필요합니다.",
+                    job_already_running: "다른 작업이 실행 중입니다.",
+                    confirm_required: "확인값(confirm)이 필요합니다.",
+                };
+                alert(msgMap[payload.error] || payload.error || "실행 요청 실패");
+                return;
+            }
+            await fetchStatus();
+        }
+
+        document.getElementById("btnRefresh").addEventListener("click", fetchStatus);
+
+        document.getElementById("opsGrid").addEventListener("click", async (event) => {
+            const btn = event.target.closest("button[data-op]");
+            if (!btn) return;
+            const key = btn.getAttribute("data-op");
+            const op = (state.operations || []).find((item) => item.key === key);
+            if (!op) return;
+            btn.disabled = true;
+            try {
+                await runOperation(op);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        renderAll(initial);
+        setInterval(fetchStatus, 3000);
+    </script>
+</body>
+</html>
+
+

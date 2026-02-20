@@ -8,7 +8,7 @@
   "seoul": {
     "name": "서울도서관",
     "status": "done",
-    "last_run": "2026-01-26 15:56:56",
+    "last_run": "2026-02-11 10:04:37",
     "msg": "done"
   },
   "sen_owned": {
@@ -20,7 +20,7 @@
   "sen_subs": {
     "name": "서울교육청 (구독)",
     "status": "done",
-    "last_run": "2026-01-25 22:32:05",
+    "last_run": "2026-02-09 16:05:11",
     "msg": "done"
   },
   "seongbuk": {
@@ -116,7 +116,7 @@
   "gwangjin_subs": {
     "name": "광진구 (구독)",
     "status": "done",
-    "last_run": "2026-01-25 01:36:26",
+    "last_run": "2026-02-09 18:49:00",
     "msg": "done"
   },
   "seongdong": {
@@ -134,7 +134,7 @@
   "gangdong_subs": {
     "name": "강동구 (구독)",
     "status": "done",
-    "last_run": "2026-01-25 01:33:25",
+    "last_run": "2026-02-09 18:45:48",
     "msg": "done"
   },
   "dobong": {
@@ -146,7 +146,7 @@
   "seodaemun_subs": {
     "name": "서대문구 (구독)",
     "status": "done",
-    "last_run": "2026-01-25 01:36:43",
+    "last_run": "2026-02-09 18:50:04",
     "msg": "done"
   },
   "seodaemun_owned": {
@@ -188,7 +188,7 @@
   "songpa_subs": {
     "name": "송파구 (구독)",
     "status": "done",
-    "last_run": "2026-01-25 01:34:10",
+    "last_run": "2026-02-09 18:47:26",
     "msg": "done"
   },
   "songpa_owned": {
@@ -200,7 +200,7 @@
   "yangcheon_subs": {
     "name": "양천구 (구독)",
     "status": "done",
-    "last_run": "2026-01-25 01:29:44",
+    "last_run": "2026-02-09 18:42:36",
     "msg": "done"
   },
   "yangcheon_owned": {

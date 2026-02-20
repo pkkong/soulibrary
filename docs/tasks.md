@@ -6,7 +6,8 @@
 - Cloudtype 환경변수: DB_HOST=postgresql / DB_PORT=5432 / DB_NAME=postgres / DB_USER=root / DB_PASSWORD=시크릿.
 - 검색 로직: 서버에서 도서관 수 기준 정렬 + 페이지네이션.
 - 최근 UI 변경: 검색결과 문구 따옴표/크기 조정, 결과 내 재검색(Enter/적용), 필터 텍스트 크기 맞춤.
-- run_search.bat에 로컬 PostgreSQL 기본 환경변수 설정.
+- `run_search.bat`는 검색/상세 테스트 전용(큐레이션 관리자 비활성).
+- 큐레이션 갱신은 `run_curation_admin.bat`로 로컬에서만 수행.
 - 남은 작업: commit/push → Cloudtype 재배포, SSL 인증서 발급 확인, `soulib.kr` 루트 → `www` 포워딩 확인.
 
 ## 사용 가이드 (Codex)
@@ -40,6 +41,53 @@
 ### C. 운영 반영 원칙
 - 코드 변경은 GitHub로, 데이터 변경은 PostgreSQL 적재로 반영한다.
 - SQLite는 중간 검증용이었으나 현재는 PostgreSQL 중심으로 운영한다.
+
+## 큐레이션 기능 정리 (기획/개발)
+### 현재(운영 상태)
+- 홈(`/`) 큐레이션은 `data/curations.json` 기반 동적 렌더링.
+- 큐레이션 전용 목록/상세 페이지 운영:
+  - `/curations`
+  - `/curation/<slug>`
+- 하단 메뉴 5개 운영(홈/가이드/검색/오늘의책/오류신고).
+- 큐레이션 상세는 본문 템플릿(`web/templates/curations/<slug>.html`) + 관련 도서 카드 조합으로 노출.
+
+### 한 일
+- 큐레이션 관리자 페이지 구축:
+  - `/admin/curations`
+  - 저장/삭제 라우트 분리
+- 홈 카드 스타일 확장:
+  - 기존: `hero`, `ranked`, `basic`
+  - 추가: `tilt`, `editorial`, `compact`, `news(좌우버튼 배너)`
+- 스타일 옵션/검증 기준을 `web/curations.py` 단일 소스로 통합.
+- 큐레이션 저장 시 `books(제목/저자)` 입력을 `book_ids`로 자동 확정(매칭 실패는 제외).
+- 관리자 접근 제어 단순화:
+  - `ENABLE_CURATION_ADMIN=1` + localhost 요청만 허용
+  - `CURATION_ADMIN_TOKEN` 미사용
+
+### 문제/한계
+- 본문/책 목록 품질은 입력 원본(LLM output) 품질에 크게 의존.
+- 자동 매칭에서 일부 책은 미매칭 또는 오매칭 가능성 존재(발행 전 점검 필요).
+- 제목 원문 태그(`[구독형전자책]`)와 검색 인덱스(`title_norm`) 정책 차이로 사용자 혼선 가능.
+
+### 계획(기획 관점)
+- 반자동 제작 파이프라인 고정:
+  1) LLM으로 큐레이션 JSON 생성
+  2) 관리자 페이지에 JSON 붙여넣기
+  3) 저장 시 `book_ids` 자동 확정
+  4) 미매칭 도서 수동 보정 후 발행
+- 발행 기준을 `book_ids 우선`으로 강제해 속도/정확도 안정화.
+- 큐레이션 타입(오늘의책/오늘의작가 등) 확장 시 kicker 기반으로 통일 운영.
+
+### 해야 할 일(개발)
+- 자동확정 결과(미매칭 목록)를 관리자 화면에 상세 표시.
+- 발행 모드에서 미매칭 1권 이상이면 저장 경고/차단 옵션 추가.
+- 큐레이션 본문 템플릿 에디터 UX 개선(미리보기/검증).
+- 검색 인덱스 정책과 원문 제목 태그 정책(예: `[구독형전자책]`) 정리.
+
+### 확장(회원 기능 이후)
+- 최근 댓글 달린 책/좋아요 많은 책 기반 큐레이션.
+- 사용자 리스트(“XXX님이 만든 리스트”) 노출.
+- 개인화 추천 큐레이션(내 서재/관심 작가 기반).
 
 ## DB 작업 모음
 - 서울도서관/서울시교육청 크롤러 데이터 정리(풀네임 표기 이상 원인 추적 및 수정)
@@ -91,6 +139,47 @@
 - 다음 계획:
 
 
+### 2026-02-11
+- 변경 요약: 중복 정리 1단계 범위를 문서로 고정(`docs/Guide.md` 6-1.G).
+- 변경 요약: 정규화 규칙 동결(v1) 단일 소스 추가(`scripts/norm_rules.py`).
+- 기능 개선: 1단계 자동 처리 대상을 "완전 동일 3키(title_norm/author_norm/publisher_norm)"로 제한.
+- 기능 개선: 1단계 제외 대상을 명시(식별자 동일·norm 상이 케이스는 2단계 canonical 백필로 이관).
+- 기능 개선: `load_csv_to_postgres.py`/`recompute_norms.py`가 동일 norm 버전을 공통 사용하도록 정리.
+- 기능 개선: 1-2 베이스라인 수치 리포트 추가(`docs/reports/stage1_baseline_2026-02-11.md`).
+- 기능 개선: 1-4 dry-run 후보 추출 자동화 스크립트 추가(`scripts/stage1_dryrun_report.py`).
+- 기능 개선: dry-run 결과 기록(`safe_groups=6,700`, `review_groups=5,615`).
+- 운영/배포: 롤백용 백업 생성 완료(`/tmp/soulib_test_stage1_20260211.dump`, 약 62MB, 보고서: `docs/reports/stage1_backup_2026-02-11.md`).
+- 운영/배포: Stage1 본 실행 완료(`scripts/stage1_apply_exact_dedupe.py --apply --scope all --dedupe-holdings --add-unique`).
+- 기능 개선: exact 중복 그룹 제거 완료(`books`: 12,315→0, `holdings(book_id,library_code)`: 162,695→0).
+- 기능 개선: 데이터 정리 반영(`holdings` 재매핑 16,700건, `books` 13,038행 삭제, `holdings` 중복 200,330행 삭제).
+- 기능 개선: `books` 복합 UNIQUE 잠금 생성(`uq_books_norm`).
+- 운영/배포: 적용 결과 리포트 추가(`docs/reports/stage1_apply_2026-02-11.md`).
+- 운영/배포: 파괴적 변경 전 백업/dry-run/승인 게이트를 필수 조건으로 명문화.
+- 변경 요약: Stage2 식별자 기반 canonical 병합 스크립트 추가(`scripts/stage2_apply_identifier_merge.py`).
+- 운영/배포: Stage2 적용 전 백업 생성 완료(`/tmp/soulib_test_stage2_20260211_preapply.dump`, 약 59MB, 보고서: `docs/reports/stage2_backup_2026-02-11.md`).
+- 기능 개선: Stage2 dry-run 결과 기록(`fillable_rows=1,221,608`, `book_map_rows=8,151`).
+- 기능 개선: Stage2 본 실행 완료(`--apply --dedupe-holdings`).
+- 기능 개선: Stage2 적용 결과(`holdings_canonical_filled=1,221,608`, `holdings_reassigned_by_canonical=10,386`, `orphan_books_deleted=28,240`).
+- 기능 개선: 식별자 보유 holdings의 canonical 누락 제거(`brcd/goods/content 누락 0`), canonical 다중-book 그룹 0.
+- 운영/배포: Stage2 결과 리포트 추가(`docs/reports/stage2_dryrun_preapply_2026-02-11.md`, `docs/reports/stage2_apply_2026-02-11.md`).
+- 기능 개선: 데이터 품질 관리자 대시보드 추가(`/admin/data-quality`, `web/data_quality_admin.py`).
+- 기능 개선: Stage1/Stage2 dry-run/apply를 관리자 화면 버튼으로 실행하는 반자동 운영 플로우 추가.
+- 기능 개선: CSV 적재 버튼 추가(증분 `CSV_ONLY`, 전체 재구축 `MIGRATE_DROP=1`)로 데이터 적재도 data-admin에서 실행 가능.
+- 기능 개선: Stage3 보수형 파이프라인 추가(후보 생성 스크립트 `scripts/stage3_build_review_queue.py`, 승인건 적용 스크립트 `scripts/stage3_apply_approved.py`).
+- 기능 개선: 관리자 승인 필수 리뷰 큐 화면 추가(`/admin/data-quality/review`, 승인/거절/보류/초기화).
+- 기능 개선: 리뷰 큐 DB 스키마/로그(`merge_review_queue`, `merge_review_log`)와 상태 지표 카드 연동.
+- 운영/배포: Stage3 후보 생성 동작 검증(`--limit 200` 실행, `pairs_fetched=200`, `queue_total=225`, `status=new`).
+- 기능 개선: 운영 배치 스크립트 추가(`run_data_admin.bat`), 큐레이션 관리자에서 데이터 품질 화면 이동 링크 추가.
+- 다음 계획: 3단계 텍스트 병합(저자/출판사 alias + 번역/개정/시리즈 예외 규칙) 설계 및 적용.
+
+### 2026-02-10
+- 변경 요약: 큐레이션 로컬 운영 기준 정리(`run_search.bat`는 검색 전용, 큐레이션 수정은 `run_curation_admin.bat` 전용).
+- 기능 개선: 홈 카드 스타일 추가/확장(`tilt`, `editorial`, `compact`, `news`), 스타일 가이드를 관리자 화면에 반영.
+- 기능 개선: 큐레이션 저장 시 `books` 입력만으로 `book_ids` 자동확정(저장 결과에 확정/미매칭 수 표시).
+- 기능 개선: 큐레이션 렌더를 `book_ids` 우선으로 고정해 속도/정확도 안정화.
+- 운영/배포: 로컬에서 큐레이션 생성/수정 후 결과물(`data/curations.json`, `web/templates/curations/<slug>.html`)만 Git 반영.
+- 다음 계획: 관리자에서 미매칭 도서 상세 목록/경고 정책 추가.
+
 ### 2026-01-28
 - 변경 요약: app_search.py 역할 분리(상태/정규화/HTTP 유틸 분리) 진행.
 - 변경 요약: 검색/상세 그룹핑 기준에 publisher_norm 포함(검색/상세 동일 기준 적용).
@@ -99,15 +188,15 @@
 - 다음 계획: app_search.py 라우팅 중심으로 축소, 검색/상태/상세/파서/HTTP 유틸 모듈 분리.
 
 ### 2026-01-29
-- ?? ??: ???? ???? ?? ??? ??? ??(??) ? status_parsers/normalize/providers ??.
-- ??: ??/??/?? ?? ??(nothing to repeat) ??, ??? ??/??? ???.
-- ?? ??: web/adapters/status_parsers.py, web/utils/normalize.py, web/utils/providers.py.
-- UI ??: ??? ?? 2?(????/??) + ?? ??/??? ???, 4?/6? ??? ??.
-- UI ??: ??? ??? ?? ? ???/YES24/?? ???? ??? ?? ???? ??.
-- UX ??: ?? ?? ? ??? ??, ?? ?? ? ??(?? ??? ?? ???).
-- ?? ??: ??? ??? ??? ??(???? ?? ??), ???? ?????(??)? ??.
-- ?? ??: YES24/Bookcube/Gangnam detail-first ?? ??, Bookcube/Gangnam ??? ?? ?? ??.
-- ???: ?? ??? holdings ?? ?? ??(?? row ?? ?? ??).
+- 변경 요약: status_parsers/normalize/providers 한글 정규식 깨짐 복구 및 파서 안정화.
+- 버그 수정: 교보/YES24/북큐브 정규식 예외(`nothing to repeat`) 이슈 해결.
+- 변경 파일: `web/adapters/status_parsers.py`, `web/utils/normalize.py`, `web/utils/providers.py`.
+- UI 개선: 도서관 배지 2줄(도서관/상태), 4열/6열 그리드, 색상/강조 정리.
+- UI 개선: 플랫폼 아이콘 제거 후 `교보/YES24/기타 도서관` 텍스트 그룹 타이틀 적용.
+- UX 개선: 상태 로딩 중 스피너 표시 후 정렬 완료 상태로 노출(중간 리플로우 완화).
+- 표시 규칙: 예약이 있으면 예약 우선 표기, 구독형은 `대출가능(구독)` 표기.
+- 조회 방식: YES24/Bookcube/Gangnam `detail-first` 우선 조회, 일부 탐색 상한 축소로 속도 보정.
+- 이슈 메모: merge 그룹 내 holdings 중복으로 상세 중복 노출 사례 확인.
 
 ### 2026-01-25
 - 변경 요약: 서울시교육청 소장 content_id=contentsKey, 구독 content_id=ucm_code 수집 추가.

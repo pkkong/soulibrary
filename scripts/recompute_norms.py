@@ -1,52 +1,22 @@
 import os
-import re
 import sys
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+from scripts.norm_rules import (
+    NORM_RULE_VERSION,
+    normalize_author,
+    normalize_publisher,
+    normalize_title,
+)
 from web import db
-
-
-def normalize_text(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value).lower()
-    text = re.sub(r"[\u200b\ufeff]", "", text)
-    text = re.sub(r"[\s\[\]\(\){}<>.,/|\\\-_:\;\"'`~!?]", "", text)
-    return text
-
-
-def normalize_title(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value)
-    text = re.sub(r"\[.*?\]|\(.*?\)", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return normalize_text(text)
-
-
-def normalize_author(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value)
-    text = re.sub(r"(지은이|저자|저|역|옮긴이|편|엮음|그림|삽화|해설)", " ", text)
-    text = re.sub(r"[:：]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return normalize_text(text)
-
-
-def normalize_publisher(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value)
-    text = re.sub(r"(주식회사|\(주\)|㈜|출판사)$", "", text).strip()
-    return normalize_text(text)
 
 
 def main():
     dry_run = "--dry-run" in sys.argv
+    print(f"[norm] {NORM_RULE_VERSION}")
     conn = db.get_db()
     try:
         cur = conn.execute("SELECT id, title, author, publisher FROM books")

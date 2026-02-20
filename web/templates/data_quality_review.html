@@ -1,0 +1,260 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>중복 리뷰 큐</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png', v='20260219c') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png', v='20260219c') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png', v='20260219c') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico', v='20260219c') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .top-links { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+        .btn-link {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: #0f172a;
+            border-radius: 8px;
+            padding: 8px 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .btn-link:hover { background: #f8fafc; text-decoration: none; }
+        .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .toolbar select, .toolbar input {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            font-family: 'Pretendard', 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: #fff;
+        }
+        .queue-list { display: grid; gap: 12px; margin-top: 14px; }
+        .queue-card { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 12px; }
+        .queue-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+        .queue-id { font-weight: 700; font-size: 13px; }
+        .queue-meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+        .queue-cols { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+        .book-box { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #f8fafc; }
+        .book-title { font-size: 14px; font-weight: 700; line-height: 1.35; }
+        .book-sub { font-size: 12px; color: #334155; margin-top: 4px; }
+        .risk-flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .risk-chip { font-size: 11px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 999px; padding: 2px 7px; }
+        .decision-row { margin-top: 10px; display: grid; gap: 8px; }
+        .decision-row input {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+        .decision-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-approve { background: #dcfce7; color: #166534; }
+        .btn-reject { background: #fee2e2; color: #991b1b; }
+        .btn-hold { background: #e0f2fe; color: #075985; }
+        .pager { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+        .empty { padding: 16px; border: 1px dashed var(--border); border-radius: 10px; background: #fff; color: var(--muted); text-align: center; }
+        @media (max-width: 900px) { .queue-cols { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>중복 리뷰 큐</h1>
+        <div class="muted">프로그램이 만든 후보를 관리자가 승인/거절/보류합니다. 자동 병합은 하지 않습니다.</div>
+
+        <div class="top-links">
+            <a class="btn-link" href="/admin/data-quality">데이터 품질 관리자</a>
+            <a class="btn-link" href="/search" target="_blank" rel="noopener noreferrer">검색 화면</a>
+        </div>
+
+        <div class="grid" id="summaryGrid"></div>
+
+        <div class="card">
+            <div class="toolbar">
+                <label for="statusFilter">상태</label>
+                <select id="statusFilter">
+                    <option value="new">new</option>
+                    <option value="hold">hold</option>
+                    <option value="approved">approved</option>
+                    <option value="rejected">rejected</option>
+                    <option value="applied">applied</option>
+                    <option value="all">all</option>
+                </select>
+                <label for="limitInput">개수</label>
+                <input id="limitInput" type="number" value="50" min="1" max="200">
+                <button class="btn-primary" id="btnLoad">불러오기</button>
+            </div>
+            <div class="queue-list" id="queueList"></div>
+            <div class="pager">
+                <button class="btn-secondary" id="btnPrev">이전</button>
+                <button class="btn-secondary" id="btnNext">다음</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const initial = {{ initial|tojson|safe }};
+        let state = initial || {};
+        let offset = Number(initial?.offset || 0);
+
+        function num(v) {
+            if (v === null || v === undefined) return "-";
+            const n = Number(v);
+            return Number.isNaN(n) ? String(v) : n.toLocaleString();
+        }
+
+        function renderSummary(summary) {
+            const grid = document.getElementById("summaryGrid");
+            const cards = [
+                { title: "전체", value: num(summary.total) },
+                { title: "new", value: num(summary.new) },
+                { title: "hold", value: num(summary.hold) },
+                { title: "approved", value: num(summary.approved) },
+                { title: "rejected", value: num(summary.rejected) },
+                { title: "applied", value: num(summary.applied) },
+            ];
+            grid.innerHTML = "";
+            for (const c of cards) {
+                const el = document.createElement("div");
+                el.className = "card";
+                el.innerHTML = `<div class="card-title">${c.title}</div><div class="card-value">${c.value}</div>`;
+                grid.appendChild(el);
+            }
+        }
+
+        function statusChip(status) {
+            const map = {
+                new: "status-idle",
+                hold: "status-stale",
+                approved: "status-done",
+                rejected: "status-failed",
+                applied: "status-running",
+            };
+            const cls = map[status] || "status-idle";
+            return `<span class="status-chip ${cls}">${status}</span>`;
+        }
+
+        function renderItems(items) {
+            const wrap = document.getElementById("queueList");
+            wrap.innerHTML = "";
+            if (!items || !items.length) {
+                wrap.innerHTML = `<div class="empty">표시할 후보가 없습니다.</div>`;
+                return;
+            }
+
+            for (const item of items) {
+                const risks = item.risk_flags || [];
+                const riskHtml = risks.length
+                    ? `<div class="risk-flags">${risks.map((r) => `<span class="risk-chip">${r}</span>`).join("")}</div>`
+                    : `<div class="small">risk flag 없음</div>`;
+
+                const row = document.createElement("div");
+                row.className = "queue-card";
+                row.innerHTML = `
+                    <div class="queue-head">
+                        <div>
+                            <div class="queue-id">#${item.id} ${statusChip(item.status)}</div>
+                            <div class="queue-meta">
+                                <span>source=${item.source}</span>
+                                <span>score=${item.scores.total}</span>
+                                <span>reason=${item.reason || "-"}</span>
+                            </div>
+                        </div>
+                        <div class="small">updated: ${item.timestamps.updated_at || "-"}</div>
+                    </div>
+                    <div class="queue-cols">
+                        <div class="book-box">
+                            <div class="book-title">${item.left.title || "(삭제됨)"}</div>
+                            <div class="book-sub">book_id=${item.left.book_id} / 보유=${num(item.left.holdings_count)}</div>
+                            <div class="book-sub">${item.left.author || "-"} / ${item.left.publisher || "-"}</div>
+                        </div>
+                        <div class="book-box">
+                            <div class="book-title">${item.right.title || "(삭제됨)"}</div>
+                            <div class="book-sub">book_id=${item.right.book_id} / 보유=${num(item.right.holdings_count)}</div>
+                            <div class="book-sub">${item.right.author || "-"} / ${item.right.publisher || "-"}</div>
+                        </div>
+                    </div>
+                    ${riskHtml}
+                    <div class="decision-row">
+                        <input type="text" data-note-for="${item.id}" placeholder="판단 메모 (선택)">
+                        <div class="decision-actions">
+                            <button class="btn-approve" data-action="approve" data-id="${item.id}">승인</button>
+                            <button class="btn-reject" data-action="reject" data-id="${item.id}">거절</button>
+                            <button class="btn-hold" data-action="hold" data-id="${item.id}">보류</button>
+                            <button class="btn-secondary" data-action="reset" data-id="${item.id}">초기화</button>
+                        </div>
+                    </div>
+                `;
+                wrap.appendChild(row);
+            }
+        }
+
+        async function fetchItems() {
+            const status = (document.getElementById("statusFilter").value || "new").trim();
+            const limit = Number(document.getElementById("limitInput").value || 50);
+            const res = await fetch(`/admin/data-quality/review/items?status=${encodeURIComponent(status)}&limit=${limit}&offset=${offset}`);
+            const payload = await res.json();
+            state = payload || {};
+            renderSummary(state.summary || {});
+            renderItems(state.items || []);
+        }
+
+        async function decide(id, action) {
+            const noteInput = document.querySelector(`input[data-note-for="${id}"]`);
+            const note = (noteInput?.value || "").trim();
+            const res = await fetch("/admin/data-quality/review/decision", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, action, note }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok || !payload.success) {
+                alert(payload.error || "처리 실패");
+                return;
+            }
+            await fetchItems();
+        }
+
+        document.getElementById("btnLoad").addEventListener("click", async () => {
+            offset = 0;
+            await fetchItems();
+        });
+
+        document.getElementById("btnPrev").addEventListener("click", async () => {
+            const limit = Number(document.getElementById("limitInput").value || 50);
+            offset = Math.max(0, offset - limit);
+            await fetchItems();
+        });
+
+        document.getElementById("btnNext").addEventListener("click", async () => {
+            const limit = Number(document.getElementById("limitInput").value || 50);
+            offset += limit;
+            await fetchItems();
+        });
+
+        document.getElementById("queueList").addEventListener("click", async (event) => {
+            const btn = event.target.closest("button[data-action][data-id]");
+            if (!btn) return;
+            const id = Number(btn.getAttribute("data-id"));
+            const action = btn.getAttribute("data-action");
+            btn.disabled = true;
+            try {
+                await decide(id, action);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById("statusFilter").value = initial?.status_filter || "new";
+        document.getElementById("limitInput").value = initial?.limit || 50;
+        renderSummary(initial?.summary || {});
+        renderItems(initial?.items || []);
+    </script>
+</body>
+</html>
+
+

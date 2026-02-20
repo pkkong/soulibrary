@@ -5,69 +5,38 @@
 {% block body_class %}page-home{% endblock %}
 
 {% block content %}
-<div class="container-compact">
-    <div class="home-search">
-        <button class="home-search-bar" type="button" onclick="if (window.__openGlobalSearch) window.__openGlobalSearch();">
-            <span class="home-search-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="7"></circle>
-                    <path d="M21 21l-4.3-4.3"></path>
-                </svg>
-            </span>
-            <span class="home-search-placeholder">검색어를 입력하세요</span>
-        </button>
-    </div>
-</div>
-
-<section class="curation-section" data-curation="higashino" aria-label="커버강조 큐레이션">
-    <div class="curation-inner">
-        <div class="curation-head">
-            <div class="curation-title">디지털 e북 카페 추천 도서</div>
-            <a class="curation-more" href="https://cafe.naver.com/ebook" target="_blank" rel="noopener noreferrer">카페로 이동 &gt;</a>
+<section class="home-search-section" aria-label="홈 검색">
+    <div class="container-compact">
+        <div class="home-search">
+            <button class="home-search-bar" type="button" onclick="if (window.__openGlobalSearch) window.__openGlobalSearch();">
+                <span class="home-search-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <path d="M21 21l-4.3-4.3"></path>
+                    </svg>
+                </span>
+                <span class="home-search-placeholder">검색어를 입력하세요</span>
+            </button>
         </div>
-        <div class="curation-track curation-track-hero" id="curation-higashino"></div>
     </div>
 </section>
 
-<section class="curation-section" data-curation="bitcoin" aria-label="랭킹 큐레이션">
+{% for curation in home_curations %}
+<section class="curation-section" data-curation="{{ curation.slug }}" aria-label="홈 큐레이션">
     <div class="curation-inner">
         <div class="curation-head">
-            <div class="curation-title">비트코인 함께 공부하기 위해 필요한 책들</div>
-            <a class="curation-more" href="https://brunch.co.kr/@30f0e6d330d44fb/6" target="_blank" rel="noopener noreferrer">관련 글 보기 &gt;</a>
+            <div class="curation-title">{{ curation.title }}</div>
+            <a class="curation-more" href="/curation/{{ curation.slug }}">더보기 &gt;</a>
         </div>
-        <div class="curation-track curation-track-ranked" id="curation-bitcoin"></div>
+        <div class="curation-track curation-track-{{ curation.home_style }}" id="{{ curation.section_id }}"></div>
     </div>
 </section>
-
-<section class="curation-section" data-curation="chanho" aria-label="기본 큐레이션">
-    <div class="curation-inner">
-        <div class="curation-head">
-            <div class="curation-title">'찬호께이' 추천 도서</div>
-            <a class="curation-more" href="/search?q={{ '찬호께이' | urlencode }}&field=author">더보기 &gt;</a>
-        </div>
-        <div class="curation-track curation-track-basic" id="curation-chanho"></div>
-    </div>
-</section>
-<section class="curation-section" data-curation="jeongyujeong" aria-label="기본 큐레이션">
-    <div class="curation-inner">
-        <div class="curation-head">
-            <div class="curation-title">'정유정' 추천 도서</div>
-            <a class="curation-more" href="/search?q={{ '정유정' | urlencode }}&field=author">더보기 &gt;</a>
-        </div>
-        <div class="curation-track curation-track-basic" id="curation-jeongyujeong"></div>
-    </div>
-</section>
-<section class="curation-section" data-curation="jeonghaeyeon" aria-label="기본 큐레이션">
-    <div class="curation-inner">
-        <div class="curation-head">
-            <div class="curation-title">'정해연' 추천 도서</div>
-            <a class="curation-more" href="/search?q={{ '정해연' | urlencode }}&field=author">더보기 &gt;</a>
-        </div>
-        <div class="curation-track curation-track-basic" id="curation-jeonghaeyeon"></div>
-    </div>
-</section>
+{% endfor %}
 {% endblock %}
 
 {% block scripts %}
+<script>
+    window.__HOME_CURATIONS__ = {{ home_curations | tojson }};
+</script>
 <script src="{{ url_for('static', filename='js/home.js') }}"></script>
 {% endblock %}

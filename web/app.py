@@ -7,7 +7,7 @@ from db import get_db, using_postgres
 import threading
 import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from config import LIBRARIES, STATUS_FILE, PLATFORM_LABELS, LIBRARY_SHORT
 
 try:
@@ -285,6 +285,11 @@ def admin_page():
     lib_total, book_total = get_counts()
     rows = build_admin_rows()
     return render_template('admin.html', status=CRAWLER_STATUS, library_count=lib_total, book_count=book_total, rows=rows)
+
+
+@app.route("/favicon.ico")
+def favicon_ico():
+    return send_from_directory(os.path.join(app.root_path, "static", "img"), "favicon.ico")
 
 
 @app.route('/admin/run/<lib_code>', methods=['POST'])

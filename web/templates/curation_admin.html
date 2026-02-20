@@ -1,0 +1,268 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>큐레이션 관리자</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png', v='20260219c') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png', v='20260219c') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png', v='20260219c') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico', v='20260219c') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .admin-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(380px, 2fr); gap: 16px; }
+        @media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr; } }
+        .form-grid { display: grid; gap: 12px; }
+        .form-row { display: grid; gap: 6px; }
+        label { font-size: 13px; font-weight: 700; }
+        input[type="text"], textarea, select {
+            width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+            font-size: 13px; font-family: 'Pretendard', 'Segoe UI', 'Noto Sans KR', sans-serif; background: #fff;
+        }
+        textarea { min-height: 120px; resize: vertical; }
+        .form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-danger { background: #fee2e2; color: #991b1b; }
+        .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; font-size: 12px; }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-error { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #e0f2fe; color: #075985; }
+        .table-compact td { font-size: 12px; }
+        .row-selected { background: #eef6ff; }
+        .muted small { font-size: 12px; }
+        .inline-help { font-size: 12px; color: var(--muted); }
+        .style-guide {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 10px;
+        }
+        .style-guide-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #111827;
+            margin: 0 0 8px;
+        }
+        .style-guide-list {
+            display: grid;
+            gap: 6px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .style-guide-item {
+            font-size: 12px;
+            color: #334155;
+            line-height: 1.45;
+        }
+        .style-guide-item code {
+            display: inline-block;
+            min-width: 70px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #0f172a;
+            background: #e2e8f0;
+            border-radius: 6px;
+            padding: 2px 6px;
+            margin-right: 6px;
+        }
+        .top-links { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+        .btn-link {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: #0f172a;
+            border-radius: 8px;
+            padding: 8px 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .btn-link:hover { background: #f8fafc; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>큐레이션 관리자</h1>
+        <div class="muted">큐레이션 목록과 본문(HTML)을 한 번에 관리합니다. 저장하면 즉시 서비스에 반영됩니다.</div>
+        <div class="top-links">
+            <a class="btn-link" href="/admin/data-quality">데이터 품질 관리자</a>
+            <a class="btn-link" href="/search" target="_blank" rel="noopener noreferrer">검색 화면</a>
+        </div>
+
+        {% if status %}
+        <div class="notice">
+            {% if status == 'saved' %}
+                <span class="badge badge-success">저장 완료</span>
+            {% elif status == 'deleted' %}
+                <span class="badge badge-info">삭제 완료</span>
+            {% else %}
+                <span class="badge badge-error">오류</span>
+            {% endif %}
+            {% if message %}<span class="inline-help">{{ message }}</span>{% endif %}
+        </div>
+        {% endif %}
+
+        <div class="admin-grid">
+            <div class="card">
+                <div class="card-title">큐레이션 목록</div>
+                <table class="table-compact">
+                    <thead>
+                        <tr>
+                            <th>제목</th>
+                            <th>슬러그</th>
+                            <th>권수</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in curations %}
+                        <tr class="{% if selected and selected.slug == item.slug %}row-selected{% endif %}">
+                            <td>
+                                <strong>{{ item.title }}</strong>
+                                <div class="muted small">{{ item.summary }}</div>
+                            </td>
+                            <td>{{ item.slug }}</td>
+                            <td class="nowrap">{{ item.book_count }}</td>
+                            <td>
+                                <a href="/admin/curations?slug={{ item.slug }}">편집</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-title">큐레이션 편집</div>
+                <form class="form-grid" method="post" action="/admin/curations/save">
+                    <input type="hidden" name="original_slug" value="{{ selected.slug if selected }}">
+
+                    <div class="form-row">
+                        <label for="title">제목</label>
+                        <input type="text" id="title" name="title" value="{{ selected.title if selected }}" placeholder="큐레이션 제목">
+                    </div>
+
+                    <div class="form-row">
+                        <label for="summary">요약</label>
+                        <input type="text" id="summary" name="summary" value="{{ selected.summary if selected }}" placeholder="짧은 소개 문구">
+                    </div>
+
+                    <div class="form-row">
+                        <label for="kicker">상단 라벨 (kicker)</label>
+                        <input type="text" id="kicker" name="kicker" value="{{ selected.kicker if selected else '오늘의책' }}" placeholder="예: 오늘의책">
+                        <div class="inline-help">상세/목록 상단에 보이는 짧은 분류 라벨입니다.</div>
+                    </div>
+
+                    <div class="form-row">
+                        <label>
+                            <input type="checkbox" name="home_enabled" value="1" {% if selected is none or selected.home_enabled is not sameas(false) %}checked{% endif %}>
+                            홈 화면에 노출
+                        </label>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="home_style">홈 카드 스타일</label>
+                        {% set selected_home_style = (selected.home_style if selected and selected.home_style else '') %}
+                        <select id="home_style" name="home_style">
+                            <option value="" {% if not selected_home_style %}selected{% endif %}>자동 (기본)</option>
+                            {% for style in home_style_options %}
+                            <option value="{{ style.value }}" {% if selected_home_style == style.value %}selected{% endif %}>{{ style.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="style-guide" aria-label="홈 카드 스타일 가이드">
+                            <div class="style-guide-title">스타일 가이드 (유지보수용)</div>
+                            <ul class="style-guide-list">
+                                {% for style in home_style_options %}
+                                <li class="style-guide-item"><code>{{ style.value }}</code>{{ style.description }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="home_order">홈 노출 순서</label>
+                        <input type="text" id="home_order" name="home_order" value="{{ selected.home_order if selected and selected.home_order is not none else '' }}" placeholder="숫자 (작을수록 먼저 노출)">
+                    </div>
+
+                    <div class="form-row">
+                        <label for="slug">슬러그 (URL)</label>
+                        <input type="text" id="slug" name="slug" value="{{ selected.slug if selected }}" placeholder="예: faker-top10">
+                        <div class="inline-help">슬러그가 비어 있으면 제목에서 영문/숫자를 자동 생성합니다.</div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="feature_image">대표 이미지 URL</label>
+                        <input type="text" id="feature_image" name="feature_image" value="{{ selected.feature_image if selected }}" placeholder="https://...">
+                    </div>
+
+                    <div class="form-row">
+                        <label for="json_payload">JSON 입력 (권장)</label>
+                        <textarea id="json_payload" name="json_payload" placeholder="ChatGPT 출력 JSON을 그대로 붙여넣으세요.">{{ json_payload }}</textarea>
+                        <div class="inline-help">JSON이 있으면 원문 텍스트보다 우선 처리합니다.</div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="raw_text">원문 텍스트 (NotebookLM 결과)</label>
+                        <textarea id="raw_text" name="raw_text" placeholder="원문을 붙여넣으면 본문 HTML/제목/요약/책목록을 자동 생성합니다.">{{ raw_text }}</textarea>
+                        <div class="inline-help">원문을 넣고 자동 생성 체크 후 저장하면 자동으로 반영됩니다.</div>
+                    </div>
+
+                    <div class="form-row">
+                        <label>
+                            <input type="checkbox" name="auto_mode" value="1" checked> 원문으로 자동 생성
+                        </label>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="book_ids">book_id 목록 (쉼표 또는 줄바꿈)</label>
+                        <textarea id="book_ids" name="book_ids" placeholder="1163, 1653, 3900">{{ book_ids_str }}</textarea>
+                        <div class="inline-help">book_id가 있으면 우선 사용합니다.</div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="books_text">책 목록 (제목 | 저자)</label>
+                        <textarea id="books_text" name="books_text" placeholder="우리는 왜 잠을 자야 할까? | 매슈 워커">{{ books_text }}</textarea>
+                        <div class="inline-help">book_id가 없을 때 제목/저자로 검색합니다.</div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="content_html">본문 HTML</label>
+                        <textarea id="content_html" name="content_html" placeholder="&lt;section&gt;...&lt;/section&gt;">{{ content_html | e }}</textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <label>
+                            <input type="checkbox" name="clear_content" value="1"> 본문/템플릿 삭제
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">저장</button>
+                        {% if selected %}
+                        <button type="submit" class="btn-danger" formaction="/admin/curations/delete" formmethod="post">삭제</button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const title = document.getElementById("title");
+            const slug = document.getElementById("slug");
+            if (!title || !slug) return;
+            title.addEventListener("blur", () => {
+                if (slug.value.trim()) return;
+                const value = title.value.trim().toLowerCase();
+                const cleaned = value.replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+                if (cleaned) slug.value = cleaned;
+            });
+        })();
+    </script>
+</body>
+</html>
+
+

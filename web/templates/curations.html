@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}오늘의책{% endblock %}
+
+{% block body_class %}page-curations{% endblock %}
+
+{% block content %}
+<div class="container-compact">
+    <section class="curations-hero">
+        <div class="curations-kicker">Soulib</div>
+        <h1 class="curations-title">오늘의책</h1>
+        <p class="curations-sub">주제·작가·추천 기준으로 묶은 큐레이션을 모았습니다.</p>
+    </section>
+
+    <section class="curations-list" aria-label="큐레이션 목록">
+        {% for curation in curations %}
+        <a class="curation-list-item" href="/curation/{{ curation.slug }}">
+            <div class="curation-list-head">
+                <div class="curation-list-kicker">{{ curation.kicker or '오늘의책' }} · {{ curation.book_count }}권</div>
+            </div>
+            <div class="curation-list-title">{{ curation.title }}</div>
+            <div class="curation-list-summary">{{ curation.summary }}</div>
+            <span class="curation-list-chevron" aria-hidden="true">›</span>
+        </a>
+        {% endfor %}
+    </section>
+</div>
+{% endblock %}

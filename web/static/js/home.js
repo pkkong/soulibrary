@@ -71,6 +71,79 @@ function renderRankedCard(book, index) {
     `;
 }
 
+function renderTiltCard(book) {
+    const id = book.book_id || book.id;
+    const title = escHtml(book.title);
+    const author = escHtml(book.author);
+    const img = book.image_url
+        ? `<img src="${escHtml(book.image_url)}" loading="lazy" alt="" draggable="false">`
+        : `<div class="curation-noimg">이미지 없음</div>`;
+    return `
+        <a class="curation-card curation-card-tilt" href="${bookHref(id)}">
+            <div class="curation-tilt-stage">
+                <div class="curation-tilt-cover">${img}</div>
+            </div>
+            <div class="curation-cover-title">${title}</div>
+            <div class="curation-book-sub">${author}</div>
+        </a>
+    `;
+}
+
+function renderEditorialCard(book) {
+    const id = book.book_id || book.id;
+    const title = escHtml(book.title);
+    const author = escHtml(book.author);
+    const img = book.image_url
+        ? `<img src="${escHtml(book.image_url)}" loading="lazy" alt="" draggable="false">`
+        : `<div class="curation-noimg">이미지 없음</div>`;
+    return `
+        <a class="curation-card curation-card-editorial" href="${bookHref(id)}">
+            <div class="curation-editorial-cover">${img}</div>
+            <div class="curation-editorial-title">${title}</div>
+            <div class="curation-editorial-sub">${author}</div>
+        </a>
+    `;
+}
+
+function renderCompactCard(book) {
+    const id = book.book_id || book.id;
+    const title = escHtml(book.title);
+    const author = escHtml(book.author);
+    const img = book.image_url
+        ? `<img src="${escHtml(book.image_url)}" loading="lazy" alt="" draggable="false">`
+        : `<div class="curation-noimg">이미지 없음</div>`;
+    return `
+        <a class="curation-card curation-card-compact" href="${bookHref(id)}">
+            <div class="curation-compact-cover">${img}</div>
+            <div class="curation-compact-meta">
+                <div class="curation-book-title">${title}</div>
+                <div class="curation-book-sub">${author}</div>
+            </div>
+        </a>
+    `;
+}
+
+function renderNewsCard(book, index) {
+    const id = book.book_id || book.id;
+    const title = escHtml(book.title);
+    const author = escHtml(book.author);
+    const img = book.image_url
+        ? `<img src="${escHtml(book.image_url)}" loading="lazy" alt="" draggable="false">`
+        : `<div class="curation-noimg">이미지 없음</div>`;
+    const palette = ["#f2dede", "#e9e5d8", "#dfe8f4", "#e4efe2", "#ede2ef"];
+    const bg = palette[index % palette.length];
+    return `
+        <a class="curation-card curation-card-news" href="${bookHref(id)}" style="--news-bg:${bg}">
+            <div class="curation-news-copy">
+                <div class="curation-news-kicker">오늘의 선택</div>
+                <div class="curation-news-title">${title}</div>
+                <div class="curation-news-sub">${author || "지금 읽어보기"}</div>
+            </div>
+            <div class="curation-news-cover">${img}</div>
+        </a>
+    `;
+}
+
 async function fetchTopByAuthor(authorName, limit = 5) {
     const params = new URLSearchParams();
     params.set("query", authorName);
@@ -86,6 +159,7 @@ async function fetchTopByAuthor(authorName, limit = 5) {
 }
 
 async function fetchBooksByIds(ids) {
+    if (!Array.isArray(ids) || !ids.length) return [];
     const params = new URLSearchParams();
     params.set("ids", ids.join(","));
     const res = await fetch(`/api/books?${params.toString()}`);
@@ -93,6 +167,88 @@ async function fetchBooksByIds(ids) {
     if (!Array.isArray(data)) return [];
     const byId = new Map(data.map(b => [String(b.book_id || b.id), b]));
     return ids.map(id => byId.get(String(id))).filter(Boolean);
+}
+
+function normalizeText(value) {
+    return String(value || "").toLowerCase().replace(/\s+/g, "");
+}
+
+function normalizeStrictText(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[^0-9a-z\uac00-\ud7a3]/g, "");
+}
+
+function scoreBookMatch(entry, item) {
+    const targetTitle = normalizeStrictText(entry.title);
+    const itemTitle = normalizeStrictText(item.title);
+    const targetTitleLoose = normalizeText(entry.title);
+    const itemTitleLoose = normalizeText(item.title);
+    const targetAuthor = normalizeStrictText(entry.author);
+    const itemAuthor = normalizeStrictText(item.author);
+
+    let titleScore = 0;
+    if (targetTitle && itemTitle) {
+        if (itemTitle === targetTitle) {
+            titleScore = 100;
+        } else if (itemTitle.startsWith(targetTitle) || targetTitle.startsWith(itemTitle)) {
+            titleScore = 70;
+        } else if (
+            itemTitleLoose.includes(targetTitleLoose) ||
+            targetTitleLoose.includes(itemTitleLoose)
+        ) {
+            titleScore = 40;
+        }
+    }
+
+    let authorScore = 0;
+    if (targetAuthor && itemAuthor) {
+        if (itemAuthor === targetAuthor) {
+            authorScore = 40;
+        } else if (itemAuthor.includes(targetAuthor) || targetAuthor.includes(itemAuthor)) {
+            authorScore = 20;
+        }
+    }
+
+    return {
+        titleScore,
+        authorScore,
+        total: titleScore + authorScore,
+    };
+}
+
+async function fetchBookByTitle(entry) {
+    const title = String(entry.title || "").trim();
+    if (!title) return null;
+
+    const params = new URLSearchParams();
+    params.set("query", title);
+    params.set("field", "title");
+    params.set("limit", "20");
+    params.set("offset", "0");
+
+    const res = await fetch(`/api/search?${params.toString()}`);
+    const data = await res.json();
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) return null;
+
+    const scored = items
+        .map((item) => ({ item, score: scoreBookMatch(entry, item) }))
+        .sort((a, b) => b.score.total - a.score.total);
+    const best = scored[0];
+    if (!best) return null;
+
+    const hasAuthor = normalizeStrictText(entry.author).length > 0;
+    if (best.score.titleScore < 70) return null;
+    if (hasAuthor && best.score.authorScore < 20) return null;
+    return best.item;
+}
+
+async function fetchBooksByEntries(entries) {
+    if (!Array.isArray(entries) || !entries.length) return [];
+    const tasks = entries.map((entry) => fetchBookByTitle(entry));
+    const result = await Promise.all(tasks);
+    return result.filter(Boolean);
 }
 
 function renderInto(containerId, books, renderer) {
@@ -300,29 +456,125 @@ function setupInfiniteCenteredCarousel(trackEl) {
     }
 }
 
+function setupNewsCarousel(trackEl) {
+    if (!trackEl) return;
+    const cards = Array.from(trackEl.querySelectorAll(".curation-card-news"));
+    if (!cards.length) return;
+
+    const wrap = trackEl.parentElement;
+    if (!wrap) return;
+    const existing = wrap.querySelector(".curation-news-controls");
+    if (existing) existing.remove();
+
+    if (cards.length <= 1) return;
+
+    const controls = document.createElement("div");
+    controls.className = "curation-news-controls";
+    controls.innerHTML = `
+        <button type="button" class="curation-news-btn prev" aria-label="이전">‹</button>
+        <button type="button" class="curation-news-btn next" aria-label="다음">›</button>
+    `;
+    wrap.insertBefore(controls, trackEl.nextSibling);
+
+    const prev = controls.querySelector(".prev");
+    const next = controls.querySelector(".next");
+    let current = 0;
+    let ticking = false;
+
+    function scrollToCurrent(smooth = true) {
+        const card = cards[current];
+        if (!card) return;
+        trackEl.scrollTo({
+            left: card.offsetLeft - 12,
+            behavior: smooth ? "smooth" : "auto",
+        });
+    }
+
+    function updateButtons() {
+        prev.disabled = current <= 0;
+        next.disabled = current >= cards.length - 1;
+    }
+
+    function syncCurrentFromScroll() {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+            ticking = false;
+            const center = trackEl.scrollLeft + trackEl.clientWidth / 2;
+            let nearest = 0;
+            let nearestDist = Infinity;
+            cards.forEach((card, idx) => {
+                const cardCenter = card.offsetLeft + card.clientWidth / 2;
+                const dist = Math.abs(center - cardCenter);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = idx;
+                }
+            });
+            current = nearest;
+            updateButtons();
+        });
+    }
+
+    prev.addEventListener("click", () => {
+        current = Math.max(0, current - 1);
+        updateButtons();
+        scrollToCurrent(true);
+    });
+
+    next.addEventListener("click", () => {
+        current = Math.min(cards.length - 1, current + 1);
+        updateButtons();
+        scrollToCurrent(true);
+    });
+
+    trackEl.addEventListener("scroll", syncCurrentFromScroll, { passive: true });
+    window.addEventListener("resize", () => {
+        scrollToCurrent(false);
+        updateButtons();
+    });
+
+    scrollToCurrent(false);
+    updateButtons();
+}
+
 async function initCurations() {
     try {
-        const chanhoIds = [261, 7939, 31037, 439973, 275025];
-        const chanho = await fetchBooksByIds(chanhoIds);
-        const bitcoinIds = [29621, 293944, 231444, 234760, 303558, 182651];
-        const bitcoin = await fetchBooksByIds(bitcoinIds);
+        const sections = Array.isArray(window.__HOME_CURATIONS__) ? window.__HOME_CURATIONS__ : [];
+        if (!sections.length) return;
 
-        const cafeIds = [1163, 1653, 3900, 2361, 62991, 165705, 269836, 239293];
-        const cafeBooks = await fetchBooksByIds(cafeIds);
+        for (const section of sections) {
+            const trackId = section.section_id;
+            if (!trackId) continue;
 
-        const jeongyujeongIds = [311288, 458653, 456403, 459032, 460178];
-        const jeongyujeong = await fetchBooksByIds(jeongyujeongIds);
+            let books = [];
+            const bookIds = Array.isArray(section.book_ids) ? section.book_ids : [];
+            const entries = Array.isArray(section.books) ? section.books : [];
+            if (bookIds.length) {
+                books = await fetchBooksByIds(bookIds);
+            } else if (entries.length) {
+                books = await fetchBooksByEntries(entries);
+            }
 
-        const jeonghaeyeonIds = [1749, 2666, 2792, 4727, 9221];
-        const jeonghaeyeon = await fetchBooksByIds(jeonghaeyeonIds);
-
-        renderInto("curation-higashino", cafeBooks, renderHeroCoverCard);
-        const heroTrack = document.getElementById("curation-higashino");
-        setupInfiniteCenteredCarousel(heroTrack);
-        renderInto("curation-bitcoin", bitcoin, renderRankedCard);
-        renderInto("curation-chanho", chanho, renderCoverCard);
-        renderInto("curation-jeongyujeong", jeongyujeong, renderCoverCard);
-        renderInto("curation-jeonghaeyeon", jeonghaeyeon, renderCoverCard);
+            const style = section.home_style;
+            if (style === "hero") {
+                renderInto(trackId, books, renderHeroCoverCard);
+                setupInfiniteCenteredCarousel(document.getElementById(trackId));
+            } else if (style === "ranked") {
+                renderInto(trackId, books, renderRankedCard);
+            } else if (style === "tilt") {
+                renderInto(trackId, books, renderTiltCard);
+            } else if (style === "editorial") {
+                renderInto(trackId, books, renderEditorialCard);
+            } else if (style === "compact") {
+                renderInto(trackId, books, renderCompactCard);
+            } else if (style === "news") {
+                renderInto(trackId, books, renderNewsCard);
+                setupNewsCarousel(document.getElementById(trackId));
+            } else {
+                renderInto(trackId, books, renderCoverCard);
+            }
+        }
 
         document.querySelectorAll(".curation-track").forEach(enableDragScroll);
     } catch (e) {

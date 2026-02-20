@@ -3,7 +3,9 @@ Crawler manager: run spiders, track status, and check remote total counts.
 """
 
 import datetime
+import csv
 import json
+import math
 import os
 import re
 import ssl
@@ -22,7 +24,6 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from config import LIBRARIES, CRAWLER_DIR, STATUS_FILE
-from crawler.odcloud_downloader import get_odcloud_total_count
 
 # Optional API helpers (서울도서관/교육청)
 try:
@@ -37,6 +38,8 @@ status_lock = threading.Lock()
 auto_crawl_active = False
 # 오래된 상태 자동 초기화 기준(초)
 RUN_STALE_SECONDS = 60 * 60  # 1시간
+SEN_SUBS_REMOTE_COUNT_CACHE = {"time": 0.0, "value": -1}
+SEN_SUBS_REMOTE_COUNT_TTL_SEC = int(os.getenv("SEN_SUBS_REMOTE_COUNT_TTL_SEC", "21600"))
 
 
 class TLSAdapter(requests.adapters.HTTPAdapter):
@@ -290,6 +293,11 @@ def fetch_total_count_from_api(lib_code, config):
             if get_seoul_total_count:
                 return get_seoul_total_count() or -1
 
+        if lib_code == "sen_subs":
+            total = fetch_sen_subs_non_audio_total()
+            if total > 0:
+                return total
+
         # 서울교육청 소장/구독: 간단히 totalCount 유사 필드를 시도
         if lib_code in {"sen_owned", "sen_subs"}:
             if lib_code == "sen_owned":
@@ -371,6 +379,115 @@ def fetch_total_count_from_api(lib_code, config):
     return -1
 
 
+def _count_csv_rows(csv_path: str) -> int:
+    """
+    CSV 실제 데이터 행 수(헤더 제외)를 구한다.
+    """
+    try:
+        with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.reader(f)
+            next(reader, None)  # header
+            return sum(1 for _ in reader)
+    except Exception:
+        return 0
+
+
+def _to_positive_int(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        try:
+            n = float(s)
+        except Exception:
+            return None
+    elif isinstance(value, (int, float)):
+        n = float(value)
+    else:
+        return None
+    return int(n) if n > 0 else None
+
+
+def fetch_sen_subs_non_audio_total() -> int:
+    """
+    서울시교육청 구독형(TY02) 총권수를 오디오북 제외 기준으로 계산한다.
+    """
+    now = time.time()
+    cached = SEN_SUBS_REMOTE_COUNT_CACHE.get("value", -1)
+    cached_at = SEN_SUBS_REMOTE_COUNT_CACHE.get("time", 0.0)
+    if cached > 0 and (now - cached_at) < SEN_SUBS_REMOTE_COUNT_TTL_SEC:
+        return cached
+
+    url = "https://e-lib.sen.go.kr/api/contents/catesearch"
+    base_params = {
+        "contentType": "TY02",
+        "majorCategory": "",
+        "subCategory": "",
+        "tinyCategory": "",
+        "ownerCategory": "",
+        "innerSearchYN": "N",
+        "innerKeyword": "",
+        "orderOption": "1",
+        "typeOption": "1",
+        "loanable": "N",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://e-lib.sen.go.kr/",
+        "Accept": "application/json, text/plain, */*",
+    }
+    page_size = 1000
+
+    def _fetch_page(session: requests.Session, page: int):
+        params = dict(base_params)
+        params.update({
+            "currentCount": page,
+            "pageCount": page_size,
+            "_": int(time.time() * 1000),
+        })
+        res = session.get(url, params=params, headers=headers, timeout=30)
+        res.raise_for_status()
+        data = res.json()
+        cat = data.get("CategoryDataList") or {}
+        return cat, cat.get("responses") or []
+
+    def _count_non_audio(items):
+        return sum(1 for item in items if (item.get("ucm_file_type") or "").upper() != "AUDIO")
+
+    try:
+        session = requests.Session()
+        session.trust_env = False
+
+        first_cat, first_items = _fetch_page(session, 1)
+        book_total = _to_positive_int(first_cat.get("bookTotalCount"))
+        page_total = _to_positive_int(first_cat.get("pageTotalCount"))
+
+        if book_total:
+            total_pages = int(math.ceil(book_total / float(page_size)))
+        elif page_total:
+            total_pages = page_total
+        else:
+            total_pages = 1
+
+        non_audio_total = _count_non_audio(first_items)
+        for page in range(2, total_pages + 1):
+            _, items = _fetch_page(session, page)
+            if not items:
+                break
+            non_audio_total += _count_non_audio(items)
+
+        if non_audio_total > 0:
+            SEN_SUBS_REMOTE_COUNT_CACHE["value"] = non_audio_total
+            SEN_SUBS_REMOTE_COUNT_CACHE["time"] = now
+            return non_audio_total
+    except Exception as e:
+        print(f"[total_count api] sen_subs 오디오 제외 계산 실패: {e}")
+
+    return -1
+
+
 def check_library_update(lib_code):
     """
     로컬/원격 권수 비교: 로컬 vs 원격 총 권수
@@ -380,16 +497,18 @@ def check_library_update(lib_code):
     local_count = 0
     if os.path.exists(config["db_file"]):
         try:
-            with open(config["db_file"], "rb") as f:
-                local_count = sum(1 for _ in f) - 1
+            if lib_code == "sen_subs":
+                # sen_subs는 본문 개행 데이터가 있어 단순 라인 수로는 과대 계수될 수 있음
+                local_count = _count_csv_rows(config["db_file"])
+            else:
+                with open(config["db_file"], "rb") as f:
+                    local_count = sum(1 for _ in f) - 1
         except Exception:
             local_count = 0
 
     remote_count = -1
 
-    if config["type"] == "odcloud":
-        remote_count = get_odcloud_total_count(config)
-    elif config["type"] == "custom" and lib_code in {"seoul", "sen_owned", "sen_subs"}:
+    if config["type"] == "custom" and lib_code in {"seoul", "sen_owned", "sen_subs"}:
         remote_count = fetch_total_count_from_api(lib_code, config)
     elif lib_code in {"seongdong", "geumcheon", "eunpyeong"} and config.get("total_count_url"):
         remote_count = fetch_total_count_bookcube(config["total_count_url"], config.get("name", lib_code))
@@ -405,7 +524,10 @@ def smart_update_loop():
         if auto_crawl_active:
             print("[auto] Checking libraries for updates...")
             for lib_code, config in LIBRARIES.items():
-                supported = (config.get("type") == "odcloud") or (lib_code == "mapo") or config.get("total_count_url")
+                supported = (
+                    (config.get("type") == "custom" and lib_code in {"seoul", "sen_owned", "sen_subs"})
+                    or bool(config.get("total_count_url"))
+                )
                 if not supported:
                     continue
                 if "running" in CRAWLER_STATUS.get(lib_code, {}).get("status", ""):

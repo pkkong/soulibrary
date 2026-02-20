@@ -10,7 +10,7 @@ Env:
 
 import csv
 import os
-import re
+import sys
 from pathlib import Path
 
 import psycopg2
@@ -18,6 +18,16 @@ from psycopg2.extras import execute_values
 
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.norm_rules import (  # noqa: E402
+    NORM_RULE_VERSION,
+    normalize_author,
+    normalize_publisher,
+    normalize_title,
+)
+
 CSV_DIR = Path(os.environ.get("CSV_DIR", ROOT / "data"))
 SKIP_CODES = {"songpa", "yangcheon"}
 CSV_ONLY = os.environ.get("CSV_ONLY", "")
@@ -46,45 +56,6 @@ def _normalize_csv_only(value: str):
 
 
 CSV_ONLY_SET = _normalize_csv_only(CSV_ONLY)
-
-
-def normalize_text(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value).lower()
-    text = re.sub(r"[\u200b\ufeff]", "", text)
-    text = re.sub(r"[\s\[\]\(\){}<>.,/|\\\-_:\;\"'`~!?]", "", text)
-    return text
-
-
-def normalize_author(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value)
-    # Remove role labels (translator, editor, etc.).
-    text = re.sub(r"(지은이|저자|저|역|옮긴이|편|엮음|그림|삽화|해설)", " ", text)
-    text = re.sub(r"[:：]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return normalize_text(text)
-
-
-def normalize_title(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value)
-    # Remove bracketed tags like [구독형 전자책], (개정판), etc.
-    text = re.sub(r"\[.*?\]|\(.*?\)", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return normalize_text(text)
-
-
-def normalize_publisher(value: str) -> str:
-    if not value:
-        return ""
-    text = str(value)
-    # Remove common publisher suffixes.
-    text = re.sub(r"(주식회사|\(주\)|㈜|출판사)$", "", text).strip()
-    return normalize_text(text)
 
 
 def normalize_provider(value: str) -> str:
@@ -235,6 +206,7 @@ def purge_holdings(cur, library_codes):
 
 
 def main():
+    print(f"[norm] {NORM_RULE_VERSION}")
     conn = connect_pg()
     conn.autocommit = True
     cur = conn.cursor()

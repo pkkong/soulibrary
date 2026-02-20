@@ -4,4 +4,4 @@ __pycache__/
 
 # Local data outputs
 data/library.db
-
+data/*.tmp

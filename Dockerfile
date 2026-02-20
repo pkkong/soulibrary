@@ -1,5 +1,5 @@
-# 1. 파이썬 3.9 버전을 기반으로 한다
-FROM python:3.9-slim
+# 1. 파이썬 3.11 버전을 기반으로 한다
+FROM python:3.11-slim
 
 # 2. 서버 내 작업 폴더를 설정한다
 WORKDIR /app

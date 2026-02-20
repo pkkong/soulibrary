@@ -6,6 +6,9 @@ echo [Search] Starting search-only app on port %LIBRARY_SEARCH_PORT: =5001%...
 if "%LIBRARY_SEARCH_PORT%"=="" set LIBRARY_SEARCH_PORT=5001
 start "" http://127.0.0.1:%LIBRARY_SEARCH_PORT%/
 
+:: Search-only mode: curation admin is disabled here.
+set ENABLE_CURATION_ADMIN=0
+
 :: 1-1) Default PostgreSQL connection for local testing (override if needed)
 if "%DB_HOST%"=="" set DB_HOST=localhost
 if "%DB_PORT%"=="" set DB_PORT=5432

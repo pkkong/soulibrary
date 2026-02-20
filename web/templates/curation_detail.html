@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}{{ curation.title }}{% endblock %}
+
+{% block body_class %}page-curation-detail{% endblock %}
+
+{% block content %}
+<div class="container-compact curation-article-shell">
+    <section class="curation-detail-hero">
+        <div class="curation-detail-kicker">{{ curation.kicker or '오늘의책' }}</div>
+        <h1 class="curation-detail-title">{{ curation.title }}</h1>
+        <p class="curation-detail-summary">{{ curation.summary }}</p>
+        <div class="curation-detail-meta">
+            <span>총 {{ book_count }}권</span>
+        </div>
+    </section>
+
+    {% if curation.feature_image %}
+    <section class="curation-feature" aria-label="대표 이미지">
+        <img class="curation-feature-image" src="{{ curation.feature_image }}" alt="">
+    </section>
+    {% endif %}
+
+    {% if curation.content_template %}
+    <section class="curation-detail-body" aria-label="큐레이션 본문">
+        <div class="curation-article-content" id="curation-article-content">
+            {% include curation.content_template ignore missing %}
+        </div>
+    </section>
+    {% elif curation.content_html %}
+    <section class="curation-detail-body" aria-label="큐레이션 본문">
+        <div class="curation-article-content" id="curation-article-content">
+            {{ curation.content_html | safe }}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="curation-detail-list">
+        <h2 class="curation-books-title">관련 도서</h2>
+        <div id="curation-books" class="curation-grid"></div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.__CURATION__ = {{ curation | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/curations.js') }}"></script>
+{% endblock %}
