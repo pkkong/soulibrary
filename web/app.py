@@ -3,6 +3,8 @@
 import os
 import json
 import re
+import subprocess
+import sys
 from db import get_db, using_postgres
 import threading
 import datetime
@@ -27,6 +29,9 @@ DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT
 IS_SPLIT_DB = True  # 기본은 split DB 사용
 db_lock = threading.Lock()
 DATA_DIR = Path(ROOT_DIR) / "data"
+GUIDE_STATS_FILE = DATA_DIR / "guide_stats_cache.json"
+GUIDE_STATS_SCRIPT = Path(ROOT_DIR) / "scripts" / "update_guide_stats.py"
+guide_stats_refresh_lock = threading.Lock()
 
 
 def get_db_conn():
@@ -229,6 +234,37 @@ def reload_database_safely(lib_code=None, success=True):
     # 크롤 종료 후 count만 갱신 (SQLite 재구축은 별도 스크립트)
     global LIB_COUNTS
     LIB_COUNTS = load_counts()
+    if success:
+        refresh_guide_stats_cache()
+
+
+def refresh_guide_stats_cache():
+    if not GUIDE_STATS_SCRIPT.exists():
+        print(f"[GUIDE] stats script not found: {GUIDE_STATS_SCRIPT}")
+        return False
+
+    with guide_stats_refresh_lock:
+        try:
+            result = subprocess.run(
+                [sys.executable, str(GUIDE_STATS_SCRIPT), "--output", str(GUIDE_STATS_FILE)],
+                cwd=ROOT_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception as e:
+            print(f"[GUIDE] stats update failed: {e}")
+            return False
+
+    if result.returncode != 0:
+        print(f"[GUIDE] stats update failed (exit={result.returncode})")
+        if result.stderr:
+            print(result.stderr.strip())
+        return False
+
+    if result.stdout:
+        print(result.stdout.strip())
+    return True
 
 
 def get_counts():

@@ -40,6 +40,7 @@ SITEMAP_TTL_SEC = int(os.environ.get("SITEMAP_TTL", "21600"))
 SITEMAP_CACHE = {"ts": 0, "count": 0, "pages": 0}
 SITEMAP_PAGE_CACHE = {}
 HOLDINGS_COLUMNS = None
+GUIDE_STATS_FILE = os.path.join(ROOT_DIR, "data", "guide_stats_cache.json")
 SUBSCRIPTION_TAG_PATTERN = re.compile(r"\s*\[구독형전자책\]\s*")
 
 
@@ -133,43 +134,96 @@ def get_counts():
     return lib_total, book_total
 
 
-def get_holdings_total():
-    total = None
+def _read_guide_stats_cache():
+    if not os.path.exists(GUIDE_STATS_FILE):
+        return None
+    try:
+        with open(GUIDE_STATS_FILE, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(cached, dict):
+        return None
+    if not isinstance(cached.get("library_counts"), list):
+        return None
+    return cached
+
+
+def _build_guide_stats_from_db():
+    lib_total, book_total = get_counts()
+    holdings_total = 0
+    rows = []
+
     if using_postgres() or os.path.exists(DB_PATH):
         conn = get_db_conn()
         try:
-            cur = conn.execute("SELECT COUNT(*) AS count FROM holdings;")
-            row = cur.fetchone()
+            total_row = conn.execute("SELECT COUNT(*) AS count FROM holdings;").fetchone()
             if using_postgres():
-                total = row["count"] if row else 0
-            else:
-                total = row[0] if row else 0
-        finally:
-            conn.close()
-    return total
-
-
-def get_library_holdings_counts():
-    results = []
-    if using_postgres() or os.path.exists(DB_PATH):
-        conn = get_db_conn()
-        try:
-            cur = conn.execute(
-                "SELECT library, COUNT(*) AS count FROM holdings "
-                "WHERE library IS NOT NULL AND library != '' "
-                "GROUP BY library;"
-            )
-            rows = cur.fetchall()
-            if using_postgres():
-                results = [
-                    {"library": r.get("library") or "", "count": r.get("count") or 0}
-                    for r in rows
+                holdings_total = int((total_row or {}).get("count") or 0)
+                lib_rows = conn.execute(
+                    "SELECT library, COUNT(*) AS count FROM holdings "
+                    "WHERE library IS NOT NULL AND library != '' "
+                    "GROUP BY library;"
+                ).fetchall()
+                rows = [
+                    {"library": str(r.get("library") or ""), "count": int(r.get("count") or 0)}
+                    for r in lib_rows
                 ]
             else:
-                results = [{"library": r[0] or "", "count": r[1] or 0} for r in rows]
+                holdings_total = int(total_row[0] if total_row else 0)
+                lib_rows = conn.execute(
+                    "SELECT library, COUNT(*) AS count FROM holdings "
+                    "WHERE library IS NOT NULL AND library != '' "
+                    "GROUP BY library;"
+                ).fetchall()
+                rows = [{"library": str(r[0] or ""), "count": int(r[1] or 0)} for r in lib_rows]
         finally:
             conn.close()
-    return results
+
+    rows = sorted(rows, key=lambda item: (item.get("library") or ""))
+    return {
+        "library_count": int(lib_total or len(LIBRARIES)),
+        "book_count": int(book_total or 0),
+        "holdings_total": int(holdings_total or 0),
+        "library_counts": rows,
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def _write_guide_stats_cache(stats):
+    try:
+        os.makedirs(os.path.dirname(GUIDE_STATS_FILE), exist_ok=True)
+        with open(GUIDE_STATS_FILE, "w", encoding="utf-8") as f:
+            json.dump(stats, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def get_guide_stats():
+    cached = _read_guide_stats_cache()
+    # Cache file missing or empty should not break guide in production.
+    if cached is None or not (cached.get("library_counts") or []):
+        fresh = _build_guide_stats_from_db()
+        _write_guide_stats_cache(fresh)
+        return fresh
+
+    rows = []
+    for item in cached.get("library_counts") or []:
+        if not isinstance(item, dict):
+            continue
+        rows.append({
+            "library": str(item.get("library") or ""),
+            "count": int(item.get("count") or 0),
+        })
+    rows = sorted(rows, key=lambda item: (item.get("library") or ""))
+
+    return {
+        "library_count": int(cached.get("library_count") or len(LIBRARIES)),
+        "book_count": int(cached.get("book_count") or 0),
+        "holdings_total": int(cached.get("holdings_total") or 0),
+        "library_counts": rows,
+        "generated_at": cached.get("generated_at"),
+    }
 
 
 def get_book_detail(book_id: int):
@@ -514,10 +568,11 @@ def search_page():
 
 @app.route('/guide')
 def guide_page():
-    lib_total, book_total = get_counts()
-    holdings_total = get_holdings_total()
-    library_counts = get_library_holdings_counts()
-    library_counts = sorted(library_counts, key=lambda item: (item.get("library") or ""))
+    guide_stats = get_guide_stats()
+    lib_total = int(guide_stats.get("library_count") or 0)
+    book_total = int(guide_stats.get("book_count") or 0)
+    holdings_total = int(guide_stats.get("holdings_total") or 0)
+    library_counts = guide_stats.get("library_counts") or []
     library_url_map = {info.get("library_name"): info.get("homepage_url") for info in LIBRARIES.values()}
     return render_template(
         "guide.html",
@@ -525,6 +580,7 @@ def guide_page():
         book_count=book_total,
         holdings_total=holdings_total,
         library_counts=library_counts,
+        guide_generated_at=guide_stats.get("generated_at"),
         library_url_map=library_url_map,
         show_topbar=True,
         topbar_desc=f"{lib_total}개 도서관" if lib_total else "",
