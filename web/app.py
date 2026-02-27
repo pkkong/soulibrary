@@ -29,7 +29,7 @@ DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT
 IS_SPLIT_DB = True  # 기본은 split DB 사용
 db_lock = threading.Lock()
 DATA_DIR = Path(ROOT_DIR) / "data"
-GUIDE_STATS_FILE = DATA_DIR / "guide_stats_cache.json"
+GUIDE_STATS_FILE = Path(ROOT_DIR) / "web" / "static" / "data" / "guide_stats.json"
 GUIDE_STATS_SCRIPT = Path(ROOT_DIR) / "scripts" / "update_guide_stats.py"
 guide_stats_refresh_lock = threading.Lock()
 

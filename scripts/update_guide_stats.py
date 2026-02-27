@@ -3,7 +3,7 @@ Build guide statistics cache for the /guide page.
 
 Usage:
     python scripts/update_guide_stats.py
-    python scripts/update_guide_stats.py --output data/guide_stats_cache.json
+    python scripts/update_guide_stats.py --output web/static/data/guide_stats.json
 """
 
 import argparse
@@ -88,7 +88,7 @@ def main():
     parser = argparse.ArgumentParser(description="Update guide statistics cache JSON")
     parser.add_argument(
         "--output",
-        default=str(ROOT / "data" / "guide_stats_cache.json"),
+        default=str(ROOT / "web" / "static" / "data" / "guide_stats.json"),
         help="Output JSON path",
     )
     args = parser.parse_args()
