@@ -10,6 +10,7 @@ Env:
 
 import csv
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -39,6 +40,8 @@ DB_USER = os.environ.get("DB_USER", "root")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 DROP_EXISTING = os.environ.get("MIGRATE_DROP", "").lower() in {"1", "true", "yes"}
 HOLDINGS_BATCH = int(os.environ.get("HOLDINGS_BATCH", "5000"))
+GUIDE_STATS_SCRIPT = ROOT / "scripts" / "update_guide_stats.py"
+GUIDE_STATS_OUTPUT = ROOT / "web" / "static" / "data" / "guide_stats.json"
 
 
 def _normalize_csv_only(value: str):
@@ -205,6 +208,32 @@ def purge_holdings(cur, library_codes):
     )
 
 
+def refresh_guide_stats_cache():
+    if not GUIDE_STATS_SCRIPT.exists():
+        print(f"[guide-stats] skipped: script not found: {GUIDE_STATS_SCRIPT}")
+        return
+    try:
+        result = subprocess.run(
+            [sys.executable, str(GUIDE_STATS_SCRIPT), "--output", str(GUIDE_STATS_OUTPUT)],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception as e:
+        print(f"[guide-stats] skipped: launch failed: {e}")
+        return
+
+    if result.returncode != 0:
+        print(f"[guide-stats] skipped: exit={result.returncode}")
+        if result.stderr:
+            print(result.stderr.strip())
+        return
+
+    if result.stdout:
+        print(result.stdout.strip())
+
+
 def main():
     print(f"[norm] {NORM_RULE_VERSION}")
     conn = connect_pg()
@@ -330,6 +359,7 @@ def main():
     holdings_total = cur.fetchone()[0]
     print(f"[done] rows={total_rows:,} books={books_total:,} holdings={holdings_total:,}")
     conn.close()
+    refresh_guide_stats_cache()
 
 
 if __name__ == "__main__":

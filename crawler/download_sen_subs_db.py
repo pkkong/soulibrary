@@ -1,15 +1,29 @@
 ﻿# -*- coding: utf-8 -*-
-import requests
-import pandas as pd
+import os
 import time
+from pathlib import Path
 
-OUTPUT_FILE = "../data/sen_subs_db.csv"
+import pandas as pd
+import requests
+
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+OUTPUT_FILE = DATA_DIR / "sen_subs_db.csv"
 
 URL_SUBS = "https://e-lib.sen.go.kr/api/contents/catesearch"
 CONTENT_TYPE_SUBS = "TY02"
 LABEL = "Subscription"
 LIBRARY_NAME = "서울시교육청 (구독)"
 PLATFORM_NAME = "서울시교육청"
+
+
+def _resolve_output_file() -> Path:
+    override = os.getenv("CRAWLER_OUTPUT_FILE", "").strip()
+    if override:
+        path = Path(override)
+        if not path.is_absolute():
+            path = (Path(__file__).resolve().parent / path).resolve()
+        return path
+    return OUTPUT_FILE
 
 
 def _extract_isbn(book_json):
@@ -122,8 +136,15 @@ def save_to_csv(books):
         "platform",
     ]]
 
-    final_df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8-sig")
-    print(f"Saved: {OUTPUT_FILE}")
+    output_file = _resolve_output_file()
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    tmp_file = output_file.with_name(
+        f"_tmp_{output_file.stem}_{int(time.time())}{output_file.suffix}"
+    )
+
+    final_df.to_csv(tmp_file, index=False, encoding="utf-8-sig")
+    os.replace(tmp_file, output_file)
+    print(f"Saved: {output_file} [atomic]")
 
 
 if __name__ == "__main__":

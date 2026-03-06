@@ -1,7 +1,9 @@
 ﻿# -*- coding: utf-8 -*-
 import csv
+import os
 import time
 from pathlib import Path
+
 import requests
 
 BASE_URL = "https://elib.seoul.go.kr/api"
@@ -15,6 +17,16 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Referer": "https://elib.seoul.go.kr/",
 }
+
+
+def _resolve_output_file() -> Path:
+    override = os.getenv("CRAWLER_OUTPUT_FILE", "").strip()
+    if override:
+        path = Path(override)
+        if not path.is_absolute():
+            path = (Path(__file__).resolve().parent / path).resolve()
+        return path
+    return OUTPUT_FILE
 
 
 def _get_content_list(data):
@@ -123,8 +135,13 @@ def save_ebooks_to_csv(final_ebook_list):
 
     print(f"\nSaving {len(final_ebook_list)} rows to CSV...")
 
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w", encoding="utf-8-sig", newline="") as f:
+    output_file = _resolve_output_file()
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    tmp_file = output_file.with_name(
+        f"_tmp_{output_file.stem}_{int(time.time())}{output_file.suffix}"
+    )
+
+    with open(tmp_file, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=[
@@ -142,7 +159,8 @@ def save_ebooks_to_csv(final_ebook_list):
         writer.writeheader()
         writer.writerows(final_ebook_list)
 
-    print(f"Saved: '{OUTPUT_FILE}' ({len(final_ebook_list)} rows)")
+    os.replace(tmp_file, output_file)
+    print(f"Saved: '{output_file}' ({len(final_ebook_list)} rows) [atomic]")
 
 
 if __name__ == "__main__":

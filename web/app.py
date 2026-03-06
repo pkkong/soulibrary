@@ -3,6 +3,7 @@
 import os
 import json
 import re
+import csv
 import subprocess
 import sys
 from db import get_db, using_postgres
@@ -42,13 +43,12 @@ def _count_csv_rows(path):
     if not path or not os.path.exists(path):
         return 0
     try:
-        with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
-            total = sum(1 for _ in f)
+        with open(path, "r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.reader(f)
+            next(reader, None)  # skip header
+            return sum(1 for _ in reader)
     except Exception:
         return 0
-    if total <= 1:
-        return 0
-    return total - 1
 
 
 def load_counts():
@@ -231,11 +231,10 @@ def provider_from_platforms(platforms):
 
 
 def reload_database_safely(lib_code=None, success=True):
-    # 크롤 종료 후 count만 갱신 (SQLite 재구축은 별도 스크립트)
+    # 크롤 종료 후 로컬 CSV count만 갱신.
+    # guide_stats는 DB 적재 완료 후 별도 스크립트에서 갱신한다.
     global LIB_COUNTS
     LIB_COUNTS = load_counts()
-    if success:
-        refresh_guide_stats_cache()
 
 
 def refresh_guide_stats_cache():

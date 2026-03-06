@@ -1,0 +1,322 @@
+{
+  "generated_at": "2026-03-05 15:21:19",
+  "mode": "cache",
+  "threshold": 10,
+  "candidate_count": 6,
+  "candidates": [
+    {
+      "code": "gangdong_subs",
+      "name": "강동구 (구독)",
+      "local_count": 51574,
+      "remote_count": 183202,
+      "diff": 131628,
+      "recommend_update": true
+    },
+    {
+      "code": "seodaemun_subs",
+      "name": "서대문구 (구독)",
+      "local_count": 187843,
+      "remote_count": 192182,
+      "diff": 4339,
+      "recommend_update": true
+    },
+    {
+      "code": "gwangjin_subs",
+      "name": "광진구 (구독)",
+      "local_count": 184113,
+      "remote_count": 188365,
+      "diff": 4252,
+      "recommend_update": true
+    },
+    {
+      "code": "songpa_subs",
+      "name": "송파구 (구독)",
+      "local_count": 181209,
+      "remote_count": 185434,
+      "diff": 4225,
+      "recommend_update": true
+    },
+    {
+      "code": "yangcheon_subs",
+      "name": "양천구 (구독)",
+      "local_count": 178864,
+      "remote_count": 183015,
+      "diff": 4151,
+      "recommend_update": true
+    },
+    {
+      "code": "sen_subs",
+      "name": "서울교육청 (구독)",
+      "local_count": 159772,
+      "remote_count": 159866,
+      "diff": 94,
+      "recommend_update": true
+    }
+  ],
+  "all": [
+    {
+      "code": "dobong",
+      "name": "도봉구 (교보)",
+      "local_count": 20378,
+      "remote_count": 20378,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "dongdaemun",
+      "name": "동대문구 (교보 신버전)",
+      "local_count": 14838,
+      "remote_count": 14838,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "dongjak",
+      "name": "동작구 (교보 신버전)",
+      "local_count": 13648,
+      "remote_count": 13648,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "eunpyeong",
+      "name": "은평구 (기타)",
+      "local_count": 10382,
+      "remote_count": 10382,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "gangbuk",
+      "name": "강북구 (교보)",
+      "local_count": 5871,
+      "remote_count": 5871,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "gangdong_owned",
+      "name": "강동구 (YES24)",
+      "local_count": 7093,
+      "remote_count": 7093,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "gangdong_subs",
+      "name": "강동구 (구독)",
+      "local_count": 51574,
+      "remote_count": 183202,
+      "diff": 131628,
+      "recommend_update": true
+    },
+    {
+      "code": "gangnam",
+      "name": "강남구 전자도서관",
+      "local_count": 24734,
+      "remote_count": 24734,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "gangseo",
+      "name": "강서구 (YES24)",
+      "local_count": 19656,
+      "remote_count": 19657,
+      "diff": 1,
+      "recommend_update": false
+    },
+    {
+      "code": "geumcheon",
+      "name": "금천구(북큐브)",
+      "local_count": 11142,
+      "remote_count": 11142,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "guro",
+      "name": "구로구 (교보)",
+      "local_count": 10506,
+      "remote_count": 10506,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "gwanak",
+      "name": "관악구 (YES24)",
+      "local_count": 8068,
+      "remote_count": 8068,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "gwangjin",
+      "name": "광진구 (소장)",
+      "local_count": 13152,
+      "remote_count": 13152,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "gwangjin_subs",
+      "name": "광진구 (구독)",
+      "local_count": 184113,
+      "remote_count": 188365,
+      "diff": 4252,
+      "recommend_update": true
+    },
+    {
+      "code": "jongno",
+      "name": "종로구 (YES24)",
+      "local_count": 20005,
+      "remote_count": 20006,
+      "diff": 1,
+      "recommend_update": false
+    },
+    {
+      "code": "junggu",
+      "name": "중구 (교보)",
+      "local_count": 8631,
+      "remote_count": 8631,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "jungnang",
+      "name": "중랑구 (교보)",
+      "local_count": 16017,
+      "remote_count": 16017,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "mapo",
+      "name": "마포구 (교보)",
+      "local_count": 5657,
+      "remote_count": 5657,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "nowon",
+      "name": "노원구 (교보)",
+      "local_count": 5605,
+      "remote_count": 5605,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "sen_owned",
+      "name": "서울교육청 (소장)",
+      "local_count": 17474,
+      "remote_count": 17473,
+      "diff": 1,
+      "recommend_update": false
+    },
+    {
+      "code": "sen_subs",
+      "name": "서울교육청 (구독)",
+      "local_count": 159772,
+      "remote_count": 159866,
+      "diff": 94,
+      "recommend_update": true
+    },
+    {
+      "code": "seocho",
+      "name": "서초구 (교보 신버전)",
+      "local_count": 42354,
+      "remote_count": 42354,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "seodaemun_owned",
+      "name": "서대문구 (소장)",
+      "local_count": 10545,
+      "remote_count": 10545,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "seodaemun_subs",
+      "name": "서대문구 (구독)",
+      "local_count": 187843,
+      "remote_count": 192182,
+      "diff": 4339,
+      "recommend_update": true
+    },
+    {
+      "code": "seongbuk",
+      "name": "성북구 (교보 신버전)",
+      "local_count": 9811,
+      "remote_count": 9811,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "seongdong",
+      "name": "성동구 (북큐브)",
+      "local_count": 71152,
+      "remote_count": 71152,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "seoul",
+      "name": "서울도서관",
+      "local_count": 28613,
+      "remote_count": 28613,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "songpa_owned",
+      "name": "송파구 (소장)",
+      "local_count": 11439,
+      "remote_count": 11439,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "songpa_subs",
+      "name": "송파구 (구독)",
+      "local_count": 181209,
+      "remote_count": 185434,
+      "diff": 4225,
+      "recommend_update": true
+    },
+    {
+      "code": "yangcheon_owned",
+      "name": "양천구 (소장)",
+      "local_count": 5949,
+      "remote_count": 5949,
+      "diff": 0,
+      "recommend_update": false
+    },
+    {
+      "code": "yangcheon_subs",
+      "name": "양천구 (구독)",
+      "local_count": 178864,
+      "remote_count": 183015,
+      "diff": 4151,
+      "recommend_update": true
+    },
+    {
+      "code": "yeongdeungpo",
+      "name": "영등포구 (YES24)",
+      "local_count": 13931,
+      "remote_count": 13932,
+      "diff": 1,
+      "recommend_update": false
+    },
+    {
+      "code": "yongsan",
+      "name": "용산구 (교보)",
+      "local_count": 6937,
+      "remote_count": 6937,
+      "diff": 0,
+      "recommend_update": false
+    }
+  ]
+}

@@ -1,140 +1,176 @@
 {
   "library_count": 33,
-  "book_count": 522925,
-  "holdings_total": 1468370,
+  "book_count": 577197,
+  "holdings_total": 1531278,
   "library_counts": [
     {
       "library": "강남구 전자도서관",
-      "count": 24699
+      "count": 25971
     },
     {
       "library": "강동구립도서관",
-      "count": 7083
+      "count": 7093
     },
     {
       "library": "강동구립도서관 (구독)",
-      "count": 173926
+      "count": 185837
     },
     {
       "library": "강북문화정보도서관",
-      "count": 5854
+      "count": 5871
     },
     {
       "library": "강서구 전자도서관",
-      "count": 19430
+      "count": 19656
     },
     {
       "library": "관악구통합도서관",
-      "count": 8053
+      "count": 8068
     },
     {
       "library": "광진구립도서관 (구독)",
-      "count": 178906
+      "count": 190231
     },
     {
       "library": "광진구립도서관 (소장)",
-      "count": 13108
+      "count": 13152
     },
     {
       "library": "구로구립도서관",
-      "count": 10389
+      "count": 10506
     },
     {
       "library": "금천구립도서관",
-      "count": 11085
+      "count": 10507
     },
     {
       "library": "노원구립도서관",
-      "count": 5595
+      "count": 5605
     },
     {
       "library": "도봉구립도서관",
-      "count": 20308
+      "count": 20378
     },
     {
       "library": "동대문구 도서관",
-      "count": 14587
+      "count": 14838
     },
     {
       "library": "동작구 구립도서관",
-      "count": 13400
+      "count": 13648
     },
     {
       "library": "마포구 전자도서관",
-      "count": 5632
+      "count": 5657
     },
     {
       "library": "서대문구립도서관 (구독)",
-      "count": 182805
+      "count": 194617
     },
     {
       "library": "서대문구립도서관 (소장)",
-      "count": 10516
+      "count": 10545
     },
     {
-      "library": "서울도서관",
-      "count": 28435
+      "library": "서울도서관 (API)",
+      "count": 29440
     },
     {
-      "library": "서울시교육청 (구독)",
-      "count": 155492
+      "library": "서울시교육청 (구독형)",
+      "count": 156563
     },
     {
-      "library": "서울시교육청 (소장)",
-      "count": 17139
+      "library": "서울시교육청 (소장 / ECO)",
+      "count": 1074
+    },
+    {
+      "library": "서울시교육청 (소장 / Y2Books)",
+      "count": 854
+    },
+    {
+      "library": "서울시교육청 (소장 / YES24)",
+      "count": 2889
+    },
+    {
+      "library": "서울시교육청 (소장 / 교보문고)",
+      "count": 4094
+    },
+    {
+      "library": "서울시교육청 (소장 / 남산도서관)",
+      "count": 2004
+    },
+    {
+      "library": "서울시교육청 (소장 / 다산지엔지)",
+      "count": 1975
+    },
+    {
+      "library": "서울시교육청 (소장 / 서울시 교육청)",
+      "count": 133
+    },
+    {
+      "library": "서울시교육청 (소장 / 알라딘)",
+      "count": 965
+    },
+    {
+      "library": "서울시교육청 (소장 / 웅진OPMS)",
+      "count": 2004
+    },
+    {
+      "library": "서울시교육청 (소장 / 인터파크)",
+      "count": 1401
     },
     {
       "library": "서초구 전자도서관",
-      "count": 42027
+      "count": 42354
     },
     {
       "library": "성동구립도서관",
-      "count": 67839
+      "count": 77437
     },
     {
       "library": "성북구 도서관",
-      "count": 9760
+      "count": 9811
     },
     {
       "library": "송파구 도서관 (소장)",
-      "count": 11266
+      "count": 11439
     },
     {
       "library": "송파구립도서관 (구독)",
-      "count": 175954
+      "count": 177424
     },
     {
       "library": "양천구립도서관 (구독)",
-      "count": 173853
+      "count": 185385
     },
     {
       "library": "양천구립도서관 (소장)",
-      "count": 5927
+      "count": 5949
     },
     {
       "library": "영등포구 도서관",
-      "count": 13630
+      "count": 13931
     },
     {
       "library": "용산구 전자도서관",
-      "count": 6927
+      "count": 6937
     },
     {
       "library": "은평구립도서관",
-      "count": 10305
+      "count": 10382
     },
     {
       "library": "종로구 전자도서관",
-      "count": 19908
+      "count": 20005
     },
     {
       "library": "중구통합전자도서관",
-      "count": 8583
+      "count": 8631
     },
     {
       "library": "중랑구립정보도서관",
-      "count": 15949
+      "count": 16017
     }
   ],
-  "generated_at": "2026-02-27 12:51:01"
+  "generated_at": "2026-02-27 15:58:35"
 }

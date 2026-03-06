@@ -2,142 +2,142 @@
   "yongsan": {
     "remote_count": 6937,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "mapo": {
     "remote_count": 5657,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gangbuk": {
     "remote_count": 5871,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gwangjin": {
     "remote_count": 13152,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gwangjin_subs": {
-    "remote_count": 184327,
+    "remote_count": 188365,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "seongdong": {
     "remote_count": 71152,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gangdong_owned": {
     "remote_count": 7093,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gangdong_subs": {
-    "remote_count": 179237,
+    "remote_count": 183202,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "dobong": {
     "remote_count": 20378,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "seodaemun_subs": {
-    "remote_count": 188057,
+    "remote_count": 192182,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "seodaemun_owned": {
     "remote_count": 10545,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "junggu": {
     "remote_count": 8631,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "jungnang": {
     "remote_count": 16017,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gwanak": {
     "remote_count": 8068,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "nowon": {
     "remote_count": 5605,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "guro": {
     "remote_count": 10506,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "seoul": {
-    "remote_count": 28593,
-    "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "remote_count": 28613,
+    "recommend_update": false,
+    "checked_at": "2026-03-05 14:13:17"
   },
   "sen_owned": {
-    "remote_count": 17393,
+    "remote_count": 17473,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "sen_subs": {
-    "remote_count": 161043,
+    "remote_count": 159866,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "seongbuk": {
     "remote_count": 9811,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gangnam": {
     "remote_count": 24734,
-    "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "recommend_update": false,
+    "checked_at": "2026-03-05 14:13:17"
   },
   "yeongdeungpo": {
     "remote_count": 13932,
-    "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "recommend_update": true,
+    "checked_at": "2026-03-05 14:13:17"
   },
   "dongdaemun": {
     "remote_count": 14838,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "dongjak": {
     "remote_count": 13648,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "gangseo": {
     "remote_count": 19657,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "seocho": {
     "remote_count": 42354,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "eunpyeong": {
     "remote_count": 10382,
-    "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "recommend_update": false,
+    "checked_at": "2026-03-05 14:13:17"
   },
   "jongno": {
     "remote_count": 20006,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "songpa": {
     "remote_count": 3895,
@@ -147,7 +147,7 @@
   "geumcheon": {
     "remote_count": 11142,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "yangcheon": {
     "remote_count": 6517,
@@ -155,23 +155,23 @@
     "checked_at": "2025-12-31 13:44:51"
   },
   "songpa_subs": {
-    "remote_count": 181423,
+    "remote_count": 185434,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "songpa_owned": {
     "remote_count": 11439,
-    "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "recommend_update": false,
+    "checked_at": "2026-03-05 14:13:17"
   },
   "yangcheon_subs": {
-    "remote_count": 179076,
+    "remote_count": 183015,
     "recommend_update": true,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   },
   "yangcheon_owned": {
     "remote_count": 5949,
     "recommend_update": false,
-    "checked_at": "2026-02-10 17:02:53"
+    "checked_at": "2026-03-05 14:13:17"
   }
 }

@@ -497,12 +497,7 @@ def check_library_update(lib_code):
     local_count = 0
     if os.path.exists(config["db_file"]):
         try:
-            if lib_code == "sen_subs":
-                # sen_subs는 본문 개행 데이터가 있어 단순 라인 수로는 과대 계수될 수 있음
-                local_count = _count_csv_rows(config["db_file"])
-            else:
-                with open(config["db_file"], "rb") as f:
-                    local_count = sum(1 for _ in f) - 1
+            local_count = _count_csv_rows(config["db_file"])
         except Exception:
             local_count = 0
 
@@ -553,10 +548,60 @@ scheduler_thread = threading.Thread(target=smart_update_loop, daemon=True)
 scheduler_thread.start()
 
 
+def _prepare_atomic_output_command(cmd, lib_code):
+    """
+    If cmd has -O/-o output option, redirect output to a temporary CSV path.
+    Returns: (cmd_to_run, swap_info)
+      - cmd_to_run: command list to execute
+      - swap_info: dict with tmp/final paths, or None when atomic swap is not applicable
+    """
+    if not isinstance(cmd, list):
+        return cmd, None
+
+    out_idx = -1
+    for i, token in enumerate(cmd):
+        if token in {"-O", "-o"} and i + 1 < len(cmd):
+            out_idx = i
+            break
+    if out_idx < 0:
+        return cmd, None
+
+    final_token = cmd[out_idx + 1]
+    final_path = Path(final_token)
+    if not final_path.is_absolute():
+        final_path = (Path(CRAWLER_DIR) / final_path).resolve()
+
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    suffix = final_path.suffix or ".csv"
+    tmp_name = f"_tmp_{final_path.stem}_{lib_code}_{ts}{suffix}"
+    tmp_path = final_path.with_name(tmp_name)
+    tmp_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd_to_run = list(cmd)
+    cmd_to_run[out_idx + 1] = str(tmp_path)
+    swap_info = {
+        "tmp_path": tmp_path,
+        "final_path": final_path,
+    }
+    return cmd_to_run, swap_info
+
+
+def _validate_temp_csv(tmp_path: Path, min_rows: int = 1):
+    if not tmp_path.exists():
+        return False, "temp output not found", 0
+    if tmp_path.stat().st_size <= 0:
+        return False, "temp output is empty", 0
+    rows = _count_csv_rows(str(tmp_path))
+    if rows < min_rows:
+        return False, f"row count too small ({rows} < {min_rows})", rows
+    return True, "ok", rows
+
+
 def run_spider_background(lib_code, on_complete_callback=None):
     global CRAWLER_STATUS
     lib_config = LIBRARIES[lib_code]
     cmd = lib_config["cmd"]
+    run_cmd, swap_info = _prepare_atomic_output_command(cmd, lib_code)
 
     with status_lock:
         CRAWLER_STATUS[lib_code]["status"] = "running"
@@ -565,21 +610,39 @@ def run_spider_background(lib_code, on_complete_callback=None):
     save_status()
 
     print(f"[START] {lib_config['name']} crawl")
+    if swap_info:
+        print(
+            f"[ATOMIC] temp -> final: {swap_info['tmp_path']} -> {swap_info['final_path']}"
+        )
 
     try:
-        subprocess.run(cmd, cwd=CRAWLER_DIR, check=True)
+        subprocess.run(run_cmd, cwd=CRAWLER_DIR, check=True)
+
+        done_msg = "done"
+        if swap_info:
+            ok, reason, rows = _validate_temp_csv(swap_info["tmp_path"], min_rows=1)
+            if not ok:
+                raise RuntimeError(
+                    f"atomic swap validation failed: {reason} (tmp={swap_info['tmp_path']})"
+                )
+            os.replace(str(swap_info["tmp_path"]), str(swap_info["final_path"]))
+            done_msg = f"done (atomic swap, rows={rows})"
+
         with status_lock:
             CRAWLER_STATUS[lib_code]["status"] = "done"
             CRAWLER_STATUS[lib_code]["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            CRAWLER_STATUS[lib_code]["msg"] = "done"
+            CRAWLER_STATUS[lib_code]["msg"] = done_msg
         save_status()
         if on_complete_callback:
             on_complete_callback(lib_code, success=True)
 
     except Exception as e:
+        msg = str(e)
+        if swap_info and swap_info["tmp_path"].exists():
+            msg = f"{msg} (temp kept: {swap_info['tmp_path']})"
         with status_lock:
             CRAWLER_STATUS[lib_code]["status"] = "failed"
-            CRAWLER_STATUS[lib_code]["msg"] = str(e)
+            CRAWLER_STATUS[lib_code]["msg"] = msg
             CRAWLER_STATUS[lib_code]["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         save_status()
         if on_complete_callback:
