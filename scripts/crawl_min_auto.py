@@ -455,6 +455,7 @@ def cmd_run_queue(args) -> int:
         lib_code = item.get("lib_code")
         item["status"] = "running"
         item["updated_at"] = _dt_str(_now())
+        _save_queue(queue_path, queue)
 
         error = _execute_crawl(libraries, paths, lib_code=lib_code, dry_run=args.dry_run)
         executed += 1
@@ -478,6 +479,7 @@ def cmd_run_queue(args) -> int:
                 item["last_error"] = error
                 print(f"[run-queue] failed: {lib_code} err={error}")
         item["updated_at"] = _dt_str(_now())
+        _save_queue(queue_path, queue)
 
     _save_queue(queue_path, queue)
     print(f"[run-queue] file={queue_path} processed={executed}")
@@ -543,4 +545,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

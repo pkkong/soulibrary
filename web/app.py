@@ -12,13 +12,14 @@ import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from config import LIBRARIES, STATUS_FILE, PLATFORM_LABELS, LIBRARY_SHORT
+from incremental_config import supports_incremental
 
 try:
     from crawler_manager import CRAWLER_STATUS, start_crawling, check_library_update
 except ImportError:
     CRAWLER_STATUS = {}
 
-    def start_crawling(code, cb=None): return False
+    def start_crawling(code, cb=None, mode="full"): return False
     def check_library_update(code): return (0, -1)
 
 app = Flask(__name__)
@@ -295,7 +296,8 @@ def build_admin_rows():
             "status": status.get("status", "-"),
             "msg": status.get("msg", ""),
             "last_run": status.get("last_run", "-"),
-            "homepage": info.get("homepage_url", "#")
+            "homepage": info.get("homepage_url", "#"),
+            "incremental_supported": supports_incremental(code),
         })
     def sort_key(r):
         cfg = LIBRARIES[r["code"]]
@@ -329,8 +331,13 @@ def favicon_ico():
 
 @app.route('/admin/run/<lib_code>', methods=['POST'])
 def run_crawler(lib_code):
-    if start_crawling(lib_code, on_complete_callback=reload_database_safely):
-        return jsonify({"success": True, "msg": f"{LIBRARIES[lib_code]['name']} 수행"})
+    payload = request.get_json(silent=True) or {}
+    mode = str(payload.get("mode") or request.args.get("mode") or "full").strip().lower()
+    if mode not in {"full", "incremental"}:
+        return jsonify({"success": False, "msg": f"지원하지 않는 모드: {mode}"}), 400
+    if start_crawling(lib_code, on_complete_callback=reload_database_safely, mode=mode):
+        mode_label = "증분수집" if mode == "incremental" else "전체수집"
+        return jsonify({"success": True, "msg": f"{LIBRARIES[lib_code]['name']} {mode_label} 시작"})
     else:
         return jsonify({"success": False, "msg": "이미 실행 중이거나 실패"})
 

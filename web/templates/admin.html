@@ -118,7 +118,14 @@
                 }
 
                 const btnDisabled = cls === "status-running" ? "disabled" : "";
-                const btnLabel = cls === "status-running" ? "실행 중" : "지금 실행";
+                const actionHtml = row.incremental_supported
+                    ? `
+                        <div class="action-buttons">
+                            <button class="btn-mini" data-code="${row.code}" data-mode="full" data-label="전체" ${btnDisabled}>전체</button>
+                            <button class="btn-mini btn-mini-secondary" data-code="${row.code}" data-mode="incremental" data-label="증분" ${btnDisabled}>증분</button>
+                        </div>
+                    `
+                    : `<button class="btn-mini" data-code="${row.code}" data-mode="full" data-label="전체" ${btnDisabled}>전체</button>`;
 
                 const homepage = row.homepage || "#";
 
@@ -137,9 +144,7 @@
                     <td class="small">${info.msg || "-"}</td>
                     <td class="small">${formatTime(info.last_run || "-")}</td>
                     <td class="small">${row.remote_checked_at || "-"}</td>
-                    <td class="nowrap">
-                        <button class="btn-mini" data-code="${row.code}" ${btnDisabled}>${btnLabel}</button>
-                    </td>
+                    <td class="nowrap">${actionHtml}</td>
                 `;
                 tbody.appendChild(tr);
             }
@@ -189,16 +194,41 @@
             const btn = event.target.closest("button[data-code]");
             if (!btn) return;
             const code = btn.getAttribute("data-code");
-            btn.disabled = true;
+            const mode = btn.getAttribute("data-mode") || "full";
+            const originalLabel = btn.getAttribute("data-label") || btn.textContent;
+            const actionGroup = btn.closest(".action-buttons");
+            if (actionGroup) {
+                actionGroup.querySelectorAll("button[data-code]").forEach(item => {
+                    item.disabled = true;
+                });
+            } else {
+                btn.disabled = true;
+            }
             btn.textContent = "실행 중";
             try {
-                await fetch(`/admin/run/${code}`, { method: "POST" });
+                const res = await fetch(`/admin/run/${code}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ mode }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    alert(data.msg || "실행 요청 실패");
+                }
                 await refreshStatus();
             } catch (err) {
                 console.error(err);
+                alert("실행 요청 실패");
             } finally {
-                btn.disabled = false;
-                btn.textContent = "지금 실행";
+                if (actionGroup) {
+                    actionGroup.querySelectorAll("button[data-code]").forEach(item => {
+                        item.disabled = false;
+                        item.textContent = item.getAttribute("data-label") || item.textContent;
+                    });
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = originalLabel;
+                }
             }
         });
 

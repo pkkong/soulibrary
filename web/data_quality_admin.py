@@ -8,29 +8,40 @@ from pathlib import Path
 
 from flask import Blueprint, abort, jsonify, render_template, request
 
-from db import get_db
+try:
+    from config import LIBRARIES, LIBRARY_SHORT
+except ImportError:
+    from web.config import LIBRARIES, LIBRARY_SHORT
+
+try:
+    from db import get_db
+except ImportError:
+    from web.db import get_db
 
 data_quality_bp = Blueprint("data_quality", __name__)
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT_DIR / "docs" / "reports"
+DB_APPLY_STATE_FILE = ROOT_DIR / "data" / "db_apply_state.json"
+PENDING_CSV_FALLBACK_HOURS = 24
+DB_LOAD_SKIP_CODES = {"songpa", "yangcheon"}
 
 ADMIN_ENABLED_VALUES = {"1", "true", "yes", "on"}
 LOCAL_ADDRS = {"127.0.0.1", "::1"}
 
 OPERATIONS = {
     "load_csv_incremental": {
-        "label": "CSV 적재 (증분)",
-        "command": ["scripts/load_csv_to_postgres.py"],
+        "label": "CSV 적재 + 정제 (자동)",
+        "command": ["scripts/run_ingest_quality_pipeline.py"],
         "destructive": False,
-        "description": "선택한 도서관 코드(CSV_ONLY)의 holdings를 교체 후 재적재합니다.",
+        "description": "선택한 도서관을 부분 반영한 뒤 Stage1, Stage2, Stage3 후보 생성까지 자동으로 이어서 실행합니다.",
         "requires_csv_only": True,
     },
     "load_csv_full_rebuild": {
-        "label": "CSV 적재 (전체 재구축)",
-        "command": ["scripts/load_csv_to_postgres.py"],
+        "label": "로컬 DB 재구축 (전체)",
+        "command": ["scripts/rebuild_search_db_local.py", "--yes-rebuild"],
         "destructive": True,
-        "description": "books/holdings를 drop 후 전체 CSV를 재적재합니다.",
+        "description": "로컬 DB에서만 books/holdings를 drop 후 전체 CSV를 재적재합니다.",
         "force_drop": True,
     },
     "stage1_dryrun": {
@@ -103,6 +114,9 @@ JOB_STATE = {
     "options": {},
     "error": None,
 }
+METRICS_CACHE = None
+METRICS_CACHE_TS = None
+METRICS_CACHE_TTL_SECONDS = 30
 
 
 def _to_int(row, key="count"):
@@ -385,6 +399,114 @@ def _list_recent_reports(limit=10):
     return output
 
 
+def _current_db_target():
+    host = (os.environ.get("DB_HOST") or "localhost").strip() or "localhost"
+    port = (os.environ.get("DB_PORT") or "5432").strip() or "5432"
+    name = (os.environ.get("DB_NAME") or "postgres").strip() or "postgres"
+    return f"{host}:{port}/{name}"
+
+
+def _load_apply_state():
+    if not DB_APPLY_STATE_FILE.exists():
+        return {"targets": {}}
+    try:
+        with DB_APPLY_STATE_FILE.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            data.setdefault("targets", {})
+            return data
+    except Exception:
+        pass
+    return {"targets": {}}
+
+
+def _library_csv_catalog():
+    catalog = []
+    seen = set()
+    for lib_code, cfg in LIBRARIES.items():
+        if lib_code in DB_LOAD_SKIP_CODES or lib_code in seen:
+            continue
+        db_file = cfg.get("db_file")
+        if not db_file:
+            continue
+        path = Path(db_file)
+        if path.name.startswith("_tmp_") or not path.name.endswith("_db.csv"):
+            continue
+        try:
+            stat = path.stat()
+        except Exception:
+            continue
+        if stat.st_size <= 0:
+            continue
+        seen.add(lib_code)
+        label = LIBRARY_SHORT.get(lib_code) or cfg.get("name") or lib_code
+        catalog.append(
+            {
+                "code": lib_code,
+                "label": label,
+                "path": str(path.relative_to(ROOT_DIR)).replace("\\", "/"),
+                "mtime_ts": stat.st_mtime,
+                "mtime_ns": int(stat.st_mtime_ns),
+                "mtime": datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                "size": int(stat.st_size),
+            }
+        )
+    catalog.sort(key=lambda item: item["mtime_ts"], reverse=True)
+    return catalog
+
+
+def _pending_csv_updates():
+    state = _load_apply_state()
+    target = _current_db_target()
+    target_state = (state.get("targets") or {}).get(target) or {}
+    applied_by_lib = target_state.get("libraries") or {}
+    catalog = _library_csv_catalog()
+    pending = []
+
+    for item in catalog:
+        applied = applied_by_lib.get(item["code"])
+        if applied:
+            changed = (
+                int(applied.get("csv_mtime_ns") or -1) != item["mtime_ns"]
+                or int(applied.get("csv_size") or -1) != item["size"]
+            )
+            if not changed:
+                continue
+            reason = "csv_changed_since_last_apply"
+            basis = "snapshot"
+        else:
+            age_hours = (datetime.datetime.now().timestamp() - item["mtime_ts"]) / 3600.0
+            if age_hours > PENDING_CSV_FALLBACK_HOURS:
+                continue
+            if applied_by_lib:
+                reason = "untracked_recent_csv"
+                basis = "recent_mtime_fallback"
+            else:
+                reason = "recent_csv_fallback"
+                basis = "recent_mtime_fallback"
+
+        pending.append(
+            {
+                "code": item["code"],
+                "label": item["label"],
+                "path": item["path"],
+                "mtime": item["mtime"],
+                "reason": reason,
+                "basis": basis,
+                "last_applied_at": (applied or {}).get("applied_at"),
+            }
+        )
+
+    return {
+        "target": target,
+        "last_applied_at": target_state.get("last_applied_at"),
+        "has_snapshot": bool(applied_by_lib),
+        "suggested_csv_only": ",".join(item["code"] for item in pending),
+        "items": pending,
+        "count": len(pending),
+    }
+
+
 def _build_runtime(operation_key, payload):
     op = OPERATIONS[operation_key]
     command = [sys.executable] + list(op["command"])
@@ -395,12 +517,8 @@ def _build_runtime(operation_key, payload):
         csv_only = str(payload.get("csv_only") or "").strip()
         if not csv_only:
             raise ValueError("csv_only_required")
-        extra_env["CSV_ONLY"] = csv_only
+        command.extend(["--csv-only", csv_only])
         options["csv_only"] = csv_only
-
-    if op.get("force_drop"):
-        extra_env["MIGRATE_DROP"] = "1"
-        options["migrate_drop"] = "1"
 
     return command, extra_env, options
 
@@ -466,7 +584,8 @@ def _run_operation_async(operation_key, command, extra_env, options):
             )
 
 
-def _status_payload():
+def _status_payload(force_metrics=False):
+    global METRICS_CACHE, METRICS_CACHE_TS
     with JOB_LOCK:
         job = dict(JOB_STATE)
     payload = {
@@ -484,9 +603,33 @@ def _status_payload():
             for key, cfg in OPERATIONS.items()
         ],
         "reports": _list_recent_reports(),
+        "pending_updates": _pending_csv_updates(),
     }
+    if job.get("running"):
+        cached = dict(METRICS_CACHE or {})
+        cached["deferred"] = True
+        cached["measured_at"] = cached.get("measured_at") or _now_str()
+        payload["metrics"] = cached or {
+            "deferred": True,
+            "measured_at": _now_str(),
+        }
+        return payload
+    if not force_metrics:
+        cached = dict(METRICS_CACHE or {})
+        if cached:
+            cached["cached"] = True
+            payload["metrics"] = cached
+        else:
+            payload["metrics"] = {
+                "deferred": True,
+                "measured_at": _now_str(),
+            }
+        return payload
     try:
-        payload["metrics"] = _collect_metrics()
+        metrics = _collect_metrics()
+        METRICS_CACHE = dict(metrics)
+        METRICS_CACHE_TS = datetime.datetime.now()
+        payload["metrics"] = metrics
     except Exception as exc:
         payload["metrics"] = {"error": str(exc), "measured_at": _now_str()}
     return payload
@@ -661,13 +804,14 @@ def _review_items_payload(status, limit, offset):
 @data_quality_bp.route("/admin/data-quality")
 def data_quality_admin_page():
     _require_admin()
-    return render_template("data_quality_admin.html", initial=_status_payload())
+    return render_template("data_quality_admin.html", initial=_status_payload(force_metrics=False))
 
 
 @data_quality_bp.route("/admin/data-quality/status")
 def data_quality_admin_status():
     _require_admin()
-    return jsonify(_status_payload())
+    force_metrics = str(request.args.get("force_metrics") or "").strip().lower() in {"1", "true", "yes"}
+    return jsonify(_status_payload(force_metrics=force_metrics))
 
 
 @data_quality_bp.route("/admin/data-quality/run", methods=["POST"])

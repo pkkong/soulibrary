@@ -24,6 +24,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from config import LIBRARIES, CRAWLER_DIR, STATUS_FILE
+from incremental_config import supports_incremental
 
 # Optional API helpers (서울도서관/교육청)
 try:
@@ -52,6 +53,16 @@ class TLSAdapter(requests.adapters.HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
         pool_kwargs["ssl_context"] = self.ssl_context
         return super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
+
+
+def _request_with_ssl_fallback(client, url, request_name="", **kwargs):
+    try:
+        return client.get(url, **kwargs)
+    except requests.exceptions.SSLError:
+        retry_kwargs = dict(kwargs)
+        retry_kwargs["verify"] = False
+        print(f"[ssl fallback] {request_name or url} 인증서 검증 실패, verify=False 재시도")
+        return client.get(url, **retry_kwargs)
 
 
 def _parse_dt(text):
@@ -203,8 +214,10 @@ def fetch_total_count_from_page(url, name=""):
                 allow_redirects=True,
             )
         else:
-            res = requests.get(
+            res = _request_with_ssl_fallback(
+                requests,
                 url,
+                request_name=name or url,
                 timeout=8,
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -226,8 +239,10 @@ def fetch_total_count_bookcube(url, name=""):
     Bookcube/FxLibrary 계열: JSON 응답이면 TotalCount 사용, 아니면 HTML에서 '총 11,140종' 패턴 파싱.
     """
     try:
-        res = requests.get(
+        res = _request_with_ssl_fallback(
+            requests,
             url,
+            request_name=name or url,
             timeout=10,
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -274,7 +289,14 @@ def fetch_total_count_from_api(lib_code, config):
                     "Referer": "https://elib.seoul.go.kr/",
                     "Accept": "application/json, text/plain, */*",
                 }
-                res = session.get(url, params=params, headers=headers, timeout=15)
+                res = _request_with_ssl_fallback(
+                    session,
+                    url,
+                    request_name=f"{lib_code} total count",
+                    params=params,
+                    headers=headers,
+                    timeout=15,
+                )
                 res.raise_for_status()
                 data = res.json()
                 categories = data.get("ContentDataList") or []
@@ -339,7 +361,14 @@ def fetch_total_count_from_api(lib_code, config):
                 "Referer": "https://e-lib.sen.go.kr/",
                 "Accept": "application/json, text/plain, */*",
             }
-            res = requests.get(url, params=params, headers=headers, timeout=15)
+            res = _request_with_ssl_fallback(
+                requests,
+                url,
+                request_name=f"{lib_code} total count",
+                params=params,
+                headers=headers,
+                timeout=15,
+            )
             res.raise_for_status()
             try:
                 data = res.json()
@@ -447,7 +476,14 @@ def fetch_sen_subs_non_audio_total() -> int:
             "pageCount": page_size,
             "_": int(time.time() * 1000),
         })
-        res = session.get(url, params=params, headers=headers, timeout=30)
+        res = _request_with_ssl_fallback(
+            session,
+            url,
+            request_name="sen_subs total count",
+            params=params,
+            headers=headers,
+            timeout=30,
+        )
         res.raise_for_status()
         data = res.json()
         cat = data.get("CategoryDataList") or {}
@@ -597,28 +633,40 @@ def _validate_temp_csv(tmp_path: Path, min_rows: int = 1):
     return True, "ok", rows
 
 
-def run_spider_background(lib_code, on_complete_callback=None):
+def _resolve_crawl_command(lib_code: str, mode: str):
+    lib_config = LIBRARIES[lib_code]
+    if mode == "incremental":
+        if not supports_incremental(lib_code):
+            raise ValueError(f"incremental not supported: {lib_code}")
+        script_path = Path(ROOT_DIR) / "scripts" / "run_incremental_crawl.py"
+        return [sys.executable, str(script_path), "--lib", lib_code], None
+
+    cmd = lib_config["cmd"]
+    return _prepare_atomic_output_command(cmd, lib_code)
+
+
+def run_spider_background(lib_code, on_complete_callback=None, mode="full"):
     global CRAWLER_STATUS
     lib_config = LIBRARIES[lib_code]
-    cmd = lib_config["cmd"]
-    run_cmd, swap_info = _prepare_atomic_output_command(cmd, lib_code)
+    mode_label = "incremental" if mode == "incremental" else "full"
+    swap_info = None
 
     with status_lock:
         CRAWLER_STATUS[lib_code]["status"] = "running"
-        CRAWLER_STATUS[lib_code]["msg"] = "running"
+        CRAWLER_STATUS[lib_code]["msg"] = f"running [{mode_label}]"
         CRAWLER_STATUS[lib_code]["last_run"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_status()
 
-    print(f"[START] {lib_config['name']} crawl")
-    if swap_info:
-        print(
-            f"[ATOMIC] temp -> final: {swap_info['tmp_path']} -> {swap_info['final_path']}"
-        )
-
     try:
+        run_cmd, swap_info = _resolve_crawl_command(lib_code, mode)
+        print(f"[START] {lib_config['name']} crawl mode={mode_label}")
+        if swap_info:
+            print(
+                f"[ATOMIC] temp -> final: {swap_info['tmp_path']} -> {swap_info['final_path']}"
+            )
         subprocess.run(run_cmd, cwd=CRAWLER_DIR, check=True)
 
-        done_msg = "done"
+        done_msg = f"done [{mode_label}]"
         if swap_info:
             ok, reason, rows = _validate_temp_csv(swap_info["tmp_path"], min_rows=1)
             if not ok:
@@ -626,7 +674,7 @@ def run_spider_background(lib_code, on_complete_callback=None):
                     f"atomic swap validation failed: {reason} (tmp={swap_info['tmp_path']})"
                 )
             os.replace(str(swap_info["tmp_path"]), str(swap_info["final_path"]))
-            done_msg = f"done (atomic swap, rows={rows})"
+            done_msg = f"done [{mode_label}] (atomic swap, rows={rows})"
 
         with status_lock:
             CRAWLER_STATUS[lib_code]["status"] = "done"
@@ -649,7 +697,9 @@ def run_spider_background(lib_code, on_complete_callback=None):
             on_complete_callback(lib_code, success=False)
 
 
-def start_crawling(lib_code, on_complete_callback=None):
+def start_crawling(lib_code, on_complete_callback=None, mode="full"):
+    if mode == "incremental" and not supports_incremental(lib_code):
+        return False
     with status_lock:
         info = CRAWLER_STATUS.get(lib_code, {})
         if _is_stale_running(info):
@@ -658,7 +708,7 @@ def start_crawling(lib_code, on_complete_callback=None):
             CRAWLER_STATUS[lib_code]["msg"] = "오래된 실행을 초기화"
         elif "running" in (info.get("status") or ""):
             return False
-    t = threading.Thread(target=run_spider_background, args=(lib_code, on_complete_callback))
+    t = threading.Thread(target=run_spider_background, args=(lib_code, on_complete_callback, mode))
     t.start()
     return True
 

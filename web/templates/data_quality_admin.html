@@ -37,12 +37,16 @@
         .report-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
         .report-row { font-size: 12px; display: flex; justify-content: space-between; gap: 12px; }
         .report-path { color: #0f172a; font-family: "Consolas", "SFMono-Regular", monospace; font-size: 11px; }
+        .pending-list { display: grid; gap: 8px; margin-top: 10px; }
+        .pending-item { border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; padding: 10px 12px; }
+        .pending-code { font-size: 12px; font-weight: 700; color: #0f172a; }
+        .pending-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>데이터 품질 관리자</h1>
-        <div class="muted">CSV 적재 + Stage1/Stage2/Stage3 점검·적용을 버튼으로 실행하고 현재 DB 품질 지표를 확인합니다.</div>
+        <div class="muted">CSV 부분 반영/로컬 재구축 + Stage1/Stage2/Stage3 점검·적용을 버튼으로 실행하고 현재 DB 품질 지표를 확인합니다.</div>
 
         <div class="top-links">
             <a class="btn-link" href="/admin/curations">큐레이션 관리자</a>
@@ -52,12 +56,15 @@
 
         <div class="notice">
             <strong>운영 규칙</strong><br>
-            1) CSV 적재(증분/전체) → 2) <code>dry-run</code> 확인 → 3) 백업 → 4) <code>apply</code> 실행 순서를 권장합니다.<br>
+            1) 운영 DB는 `CSV 적재 + 정제 (자동)`만 사용하고, 전체 재구축은 로컬에서만 실행하세요.<br>
+            2) `CSV 적재 + 정제 (자동)`은 CSV 자동 검사 -> 부분 반영 -> Stage1 -> Stage2 -> Stage3 후보 생성 순서로 이어집니다.<br>
+            3) 부분 반영/재구축 후 <code>dry-run</code> 확인 → 백업 → <code>apply</code> 실행 순서를 권장합니다.<br>
             백업 예시: <code>docker exec -e PGPASSWORD=localpass soulib-postgres pg_dump -U root -d soulib_test -Fc -f /tmp/soulib_test_stage2_preapply.dump</code>
         </div>
 
         <div class="toolbar">
             <button class="btn-primary" id="btnRefresh">상태 새로고침</button>
+            <button class="btn-secondary" id="btnRefreshMetrics">지표 갱신</button>
             <div class="muted" id="refreshInfo"></div>
         </div>
 
@@ -66,11 +73,21 @@
         <div class="card">
             <div class="card-title">실행 작업</div>
             <div class="input-row">
-                <label for="csvOnlyInput" class="small">증분 적재 도서관 코드(CSV_ONLY)</label>
+                <label for="csvOnlyInput" class="small">부분 반영 도서관 코드(CSV_ONLY)</label>
                 <input id="csvOnlyInput" type="text" placeholder="예: seoul,gangnam,sen_owned">
-                <div class="small">`CSV 적재 (증분)` 실행 시 필수입니다. 쉼표로 여러 개 입력하세요.</div>
+                <div class="small">`CSV 적재 + 정제 (자동)` 실행 시 필수입니다. 쉼표로 여러 개 입력하세요.</div>
             </div>
             <div class="ops-grid" id="opsGrid"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">자동 감지된 반영 후보</div>
+            <div class="small" id="pendingSummary">아직 계산 전입니다.</div>
+            <div class="pending-list" id="pendingList"></div>
+            <div class="row-actions">
+                <button class="btn-secondary" id="btnUsePending">추천값 입력</button>
+                <button class="btn-primary" id="btnRunPending">감지된 후보 바로 반영</button>
+            </div>
         </div>
 
         <div class="card job-box">
@@ -210,18 +227,63 @@
             }
         }
 
+        function renderPending(pending) {
+            const summary = document.getElementById("pendingSummary");
+            const list = document.getElementById("pendingList");
+            list.innerHTML = "";
+
+            const items = pending?.items || [];
+            const target = pending?.target || "-";
+            if (!items.length) {
+                const basisText = pending?.has_snapshot
+                    ? "현재 기준 새로 반영할 CSV가 없습니다."
+                    : "아직 반영 이력이 없어서 최근 변경 CSV만 추정합니다.";
+                summary.textContent = `대상 DB: ${target} / ${basisText}`;
+                const empty = document.createElement("div");
+                empty.className = "small";
+                empty.textContent = "자동 감지된 후보가 없습니다.";
+                list.appendChild(empty);
+                return;
+            }
+
+            const modeText = pending?.has_snapshot
+                ? "마지막 DB 반영 기록과 현재 CSV를 비교했습니다."
+                : "아직 반영 이력이 없어 최근 수정된 CSV를 임시 후보로 보여줍니다.";
+            summary.textContent = `대상 DB: ${target} / 후보 ${items.length}개 / ${modeText}`;
+
+            for (const item of items) {
+                const row = document.createElement("div");
+                row.className = "pending-item";
+                row.innerHTML = `
+                    <div class="pending-code">${item.label} <span class="small">(${item.code})</span></div>
+                    <div class="pending-meta">CSV 수정: ${item.mtime || "-"} / 마지막 반영: ${item.last_applied_at || "없음"}</div>
+                    <div class="pending-meta">${item.path || ""}</div>
+                `;
+                list.appendChild(row);
+            }
+        }
+
         function renderAll(payload) {
             state = payload || {};
             renderMetrics(state.metrics);
             renderOps(state.operations, Boolean(state.job && state.job.running));
+            renderPending(state.pending_updates);
             renderJob(state.job);
             renderReports(state.reports);
+            const csvInput = document.getElementById("csvOnlyInput");
+            if (csvInput && !(csvInput.value || "").trim()) {
+                const suggested = (state.pending_updates && state.pending_updates.suggested_csv_only) || "";
+                if (suggested) {
+                    csvInput.value = suggested;
+                }
+            }
             const measured = state.metrics && state.metrics.measured_at ? state.metrics.measured_at : new Date().toLocaleString();
             document.getElementById("refreshInfo").textContent = `마지막 갱신: ${measured}`;
         }
 
-        async function fetchStatus() {
-            const res = await fetch("/admin/data-quality/status");
+        async function fetchStatus(forceMetrics = false) {
+            const suffix = forceMetrics ? "?force_metrics=1" : "";
+            const res = await fetch(`/admin/data-quality/status${suffix}`);
             const payload = await res.json();
             renderAll(payload);
         }
@@ -232,7 +294,7 @@
             if (op.requires_csv_only) {
                 const csvOnly = (document.getElementById("csvOnlyInput").value || "").trim();
                 if (!csvOnly) {
-                    alert("증분 적재는 CSV_ONLY 입력이 필요합니다. 예: seoul,gangnam");
+                    alert("부분 반영은 CSV_ONLY 입력이 필요합니다. 예: seoul,gangnam");
                     return;
                 }
                 body.csv_only = csvOnly;
@@ -260,10 +322,33 @@
                 alert(msgMap[payload.error] || payload.error || "실행 요청 실패");
                 return;
             }
-            await fetchStatus();
+            await fetchStatus(false);
         }
 
-        document.getElementById("btnRefresh").addEventListener("click", fetchStatus);
+        document.getElementById("btnRefresh").addEventListener("click", () => fetchStatus(false));
+        document.getElementById("btnRefreshMetrics").addEventListener("click", () => fetchStatus(true));
+        document.getElementById("btnUsePending").addEventListener("click", () => {
+            const suggested = (state.pending_updates && state.pending_updates.suggested_csv_only) || "";
+            if (!suggested) {
+                alert("자동 감지된 반영 후보가 없습니다.");
+                return;
+            }
+            document.getElementById("csvOnlyInput").value = suggested;
+        });
+        document.getElementById("btnRunPending").addEventListener("click", async () => {
+            const suggested = (state.pending_updates && state.pending_updates.suggested_csv_only) || "";
+            if (!suggested) {
+                alert("자동 감지된 반영 후보가 없습니다.");
+                return;
+            }
+            document.getElementById("csvOnlyInput").value = suggested;
+            const op = (state.operations || []).find((item) => item.key === "load_csv_incremental");
+            if (!op) {
+                alert("부분 반영 작업을 찾지 못했습니다.");
+                return;
+            }
+            await runOperation(op);
+        });
 
         document.getElementById("opsGrid").addEventListener("click", async (event) => {
             const btn = event.target.closest("button[data-op]");
@@ -280,7 +365,7 @@
         });
 
         renderAll(initial);
-        setInterval(fetchStatus, 3000);
+        setInterval(() => fetchStatus(false), 10000);
     </script>
 </body>
 </html>
