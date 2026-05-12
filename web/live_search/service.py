@@ -1,6 +1,9 @@
 import os
+import hashlib
+import json
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from urllib.parse import urlencode
 
 from config import LIBRARIES, LIBRARY_SHORT
 from live_search.cache import TTLMemoryCache
@@ -14,11 +17,14 @@ from live_search.normalizer import merge_live_results, normalize_text
 
 LIVE_SEARCH_TTL_SEC = int(os.environ.get("LIVE_SEARCH_TTL_SEC", "600"))
 LIVE_SEARCH_CACHE_SIZE = int(os.environ.get("LIVE_SEARCH_CACHE_SIZE", "256"))
-LIVE_SEARCH_LIBRARY_TIMEOUT = float(os.environ.get("LIVE_SEARCH_LIBRARY_TIMEOUT", "8"))
-LIVE_SEARCH_MAX_WORKERS = int(os.environ.get("LIVE_SEARCH_MAX_WORKERS", "12"))
-LIVE_SEARCH_PER_LIBRARY_LIMIT = int(os.environ.get("LIVE_SEARCH_PER_LIBRARY_LIMIT", "20"))
+LIVE_SEARCH_LIBRARY_TIMEOUT = float(os.environ.get("LIVE_SEARCH_LIBRARY_TIMEOUT", "4.5"))
+LIVE_SEARCH_TOTAL_TIMEOUT = float(os.environ.get("LIVE_SEARCH_TOTAL_TIMEOUT", "5.8"))
+LIVE_SEARCH_MAX_WORKERS = int(os.environ.get("LIVE_SEARCH_MAX_WORKERS", "40"))
+LIVE_SEARCH_PER_LIBRARY_LIMIT = int(os.environ.get("LIVE_SEARCH_PER_LIBRARY_LIMIT", "10"))
+LIVE_DETAIL_CACHE_SIZE = int(os.environ.get("LIVE_DETAIL_CACHE_SIZE", "1024"))
 
 _CACHE = TTLMemoryCache(ttl_seconds=LIVE_SEARCH_TTL_SEC, max_items=LIVE_SEARCH_CACHE_SIZE)
+_DETAIL_CACHE = TTLMemoryCache(ttl_seconds=LIVE_SEARCH_TTL_SEC, max_items=LIVE_DETAIL_CACHE_SIZE)
 
 CONNECTOR_FACTORIES = {
     "Kyobo_New": KyoboNewConnector,
@@ -133,6 +139,58 @@ def _item_matches_refine(item: dict, refine: str) -> bool:
     return all(token in haystack for token in tokens)
 
 
+def _detail_cache_key(item: dict) -> str:
+    libraries = []
+    for lib in item.get("libraries") or []:
+        identifiers = {
+            key: value
+            for key, value in lib.items()
+            if key in {
+                "code",
+                "platform_code",
+                "detail_url",
+                "brcd",
+                "goods_id",
+                "content_id",
+                "ctts_dvsn_code",
+                "ctgr_id",
+                "sntn_auth_code",
+            }
+            and value
+        }
+        libraries.append(identifiers)
+    signature = {
+        "title": item.get("title") or "",
+        "author": item.get("author") or "",
+        "publisher": item.get("publisher") or "",
+        "libraries": sorted(libraries, key=lambda lib: json.dumps(lib, ensure_ascii=False, sort_keys=True)),
+    }
+    raw = json.dumps(signature, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]
+
+
+def _attach_live_detail_urls(items: list[dict]) -> None:
+    for item in items:
+        if not isinstance(item, dict) or not (item.get("title") or "").strip():
+            continue
+        key = _detail_cache_key(item)
+        params = {"key": key, "title": item.get("title") or ""}
+        if item.get("author"):
+            params["author"] = item.get("author") or ""
+        if item.get("publisher"):
+            params["publisher"] = item.get("publisher") or ""
+        item["live_detail_key"] = key
+        item["live_detail_url"] = f"/live_book?{urlencode(params)}"
+        _DETAIL_CACHE.set(key, item)
+
+
+def get_cached_live_detail(key: str):
+    key = (key or "").strip()
+    if not key:
+        return None
+    return _DETAIL_CACHE.get(key)
+
+
 def _filters_from_items(items: list[dict]) -> dict:
     providers_filter = sorted(
         {
@@ -156,6 +214,7 @@ def _filters_from_items(items: list[dict]) -> dict:
 def _slice_response(payload: dict, refine: str, limit: int, offset: int, cache_hit: bool) -> dict:
     base_items = payload.get("items") or []
     items = [item for item in base_items if _item_matches_refine(item, refine)]
+    _attach_live_detail_urls(items)
     return {
         **payload,
         "total": len(items),
@@ -190,11 +249,12 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
             continue
         tasks.append((code, cfg, connector))
 
-    max_workers = max(1, min(LIVE_SEARCH_MAX_WORKERS, len(library_codes)))
+    max_workers = max(1, min(LIVE_SEARCH_MAX_WORKERS, len(tasks)))
     started = time.time()
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {}
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    futures = {}
+    try:
         for code, cfg, connector in tasks:
             future = executor.submit(
                 connector.search_library,
@@ -207,7 +267,7 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
             )
             futures[future] = (code, cfg.get("platform") or getattr(connector, "platform", ""))
 
-        for future in as_completed(futures):
+        for future in as_completed(futures, timeout=LIVE_SEARCH_TOTAL_TIMEOUT):
             code, platform = futures[future]
             try:
                 for result in future.result():
@@ -215,6 +275,13 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
                         results.append(result)
             except Exception as exc:
                 errors.append({"library_code": code, "platform": platform, "error": str(exc)})
+    except TimeoutError:
+        for future, (code, platform) in futures.items():
+            if not future.done():
+                future.cancel()
+                errors.append({"library_code": code, "platform": platform, "error": "search_timeout"})
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     elapsed_ms = int((time.time() - started) * 1000)
     if errors:

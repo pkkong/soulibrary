@@ -81,7 +81,8 @@ class KyoboNewConnector:
         url = f"{base_url}{_search_path(base_path)}"
         results = []
         seen = set()
-        for sch_clst in FIELD_TO_SCH_CLSTS.get(field, FIELD_TO_SCH_CLSTS["title_author"]):
+        search_fields = FIELD_TO_SCH_CLSTS.get(field, FIELD_TO_SCH_CLSTS["title_author"])
+        for sch_clst in search_fields:
             params = {
                 "schTxt": query,
                 "schClst": sch_clst,
@@ -109,6 +110,8 @@ class KyoboNewConnector:
                     continue
                 seen.add(key)
                 results.append(result)
+            if field == "title_author" and results:
+                return results[:limit]
         return results
 
     def _parse_results(self, html: str, base_url: str, lib_code: str, config: dict):

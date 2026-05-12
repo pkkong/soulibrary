@@ -1,4 +1,5 @@
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -15,25 +16,30 @@ def _json_headers(referer: str) -> dict:
 class SeoulLibraryConnector:
     platform = "SeoulLibrary"
     _categories = None
+    _categories_lock = threading.Lock()
 
     def _fetch_categories(self, session, timeout: float):
-        if self._categories is not None:
-            return self._categories
-        response = session.get(
-            "https://elib.seoul.go.kr/api/category/main",
-            params={"contentType": "EB"},
-            headers=_json_headers("https://elib.seoul.go.kr/"),
-            timeout=timeout,
-            verify=False,
-        )
-        response.raise_for_status()
-        data = response.json()
-        self._categories = [
-            item.get("categoryNo")
-            for item in data.get("ContentDataList", [])
-            if item.get("categoryNo")
-        ]
-        return self._categories
+        cls = type(self)
+        if cls._categories is not None:
+            return cls._categories
+        with cls._categories_lock:
+            if cls._categories is not None:
+                return cls._categories
+            response = session.get(
+                "https://elib.seoul.go.kr/api/category/main",
+                params={"contentType": "EB"},
+                headers=_json_headers("https://elib.seoul.go.kr/"),
+                timeout=timeout,
+                verify=False,
+            )
+            response.raise_for_status()
+            data = response.json()
+            cls._categories = [
+                item.get("categoryNo")
+                for item in data.get("ContentDataList", [])
+                if item.get("categoryNo")
+            ]
+            return cls._categories
 
     def search_library(self, lib_code: str, config: dict, query: str, field: str, limit: int, timeout: float):
         session = make_session()

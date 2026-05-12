@@ -3,7 +3,7 @@ import traceback
 from flask import Blueprint, jsonify, render_template, request
 
 from live_search.normalizer import normalize_text
-from live_search.service import live_search
+from live_search.service import get_cached_live_detail, live_search
 
 
 live_search_bp = Blueprint("live_search", __name__)
@@ -125,11 +125,24 @@ def _decorate_live_book(book: dict | None):
 
 @live_search_bp.route("/live_book")
 def live_book_page():
+    cache_key = (request.args.get("key") or "").strip()
     target = {
         "title": (request.args.get("title") or "").strip(),
         "author": (request.args.get("author") or "").strip(),
         "publisher": (request.args.get("publisher") or "").strip(),
     }
+
+    cached_book = get_cached_live_detail(cache_key)
+    if cached_book:
+        return render_template(
+            "live_book.html",
+            book=_decorate_live_book(cached_book),
+            error=None,
+            show_topbar=False,
+            topbar_desc="",
+            active_tab="search",
+        )
+
     if not target["title"]:
         return render_template(
             "live_book.html",

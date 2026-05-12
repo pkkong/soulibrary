@@ -85,7 +85,8 @@ class GangnamConnector:
         session = make_session()
         results = []
         seen = set()
-        for search_type in self.FIELD_TO_SEARCH.get(field, self.FIELD_TO_SEARCH["title_author"]):
+        search_fields = self.FIELD_TO_SEARCH.get(field, self.FIELD_TO_SEARCH["title_author"])
+        for search_type in search_fields:
             query_string = urlencode({"search": search_type, "strSearch": query}, encoding="euc-kr")
             url = f"{base_url}/elibbook/book_info.asp?{query_string}"
             response = session.get(url, headers=request_headers(base_url), timeout=timeout, verify=False)
@@ -100,6 +101,8 @@ class GangnamConnector:
                 results.append(result)
                 if len(results) >= limit:
                     return results
+            if field == "title_author" and results:
+                return results[:limit]
         return results
 
     def _parse_results(self, html: str, base_url: str, lib_code: str, config: dict):

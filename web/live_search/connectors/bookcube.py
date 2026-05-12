@@ -54,7 +54,8 @@ class BookcubeConnector:
         session = make_session()
         results = []
         seen = set()
-        for keyoption2 in FIELD_TO_KEYOPTION2.get(field, FIELD_TO_KEYOPTION2["title_author"]):
+        search_fields = FIELD_TO_KEYOPTION2.get(field, FIELD_TO_KEYOPTION2["title_author"])
+        for keyoption2 in search_fields:
             url = _search_url(list_url, query, keyoption2, limit)
             response = session.get(url, headers=request_headers(base_url), timeout=timeout, verify=False)
             response.raise_for_status()
@@ -67,6 +68,8 @@ class BookcubeConnector:
                 results.append(result)
                 if len(results) >= limit:
                     return results
+            if field == "title_author" and results:
+                return results[:limit]
         return results
 
     def _parse_results(self, html: str, base_url: str, lib_code: str, config: dict):
