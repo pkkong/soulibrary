@@ -381,3 +381,11 @@ docker exec -e PGPASSWORD=mkfleo93fe570fad soulib-postgres pg_restore -h svc.sel
 - 오류 신고는 `/reports`에서 접수하며, 운영 DB의 `error_reports` 테이블에 저장한다.
 - 배포 변경 내역은 `docs/RELEASE_NOTES.md`에 기록한다.
 
+## Cloudtype 자동 배포
+- GitHub Actions workflow: `.github/workflows/cloudtype-deploy.yml`
+- `main` 브랜치에 push되면 Cloudtype GitHub webhook endpoint를 호출한다.
+- GitHub 저장소 secret `CLOUDTYPE_API_KEY`가 필요하다. API 키는 저장소 파일에 직접 쓰지 않는다.
+- Secret 등록 위치: GitHub repository `Settings > Secrets and variables > Actions > New repository secret`.
+- 선택 사항: GitHub repository variables `CLOUDTYPE_PROJECT`, `CLOUDTYPE_APP`, `CLOUDTYPE_STAGE`를 설정하면 Cloudtype direct deploy endpoint(`/webhooks/deploy`)를 사용한다.
+- `CLOUDTYPE_PROJECT`/`CLOUDTYPE_APP`이 없으면 GitHub push payload를 서명해서 `/webhooks/github`로 보낸다.
+

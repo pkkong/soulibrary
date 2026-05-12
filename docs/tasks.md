@@ -146,6 +146,7 @@
 - 기능 개선: 검색 결과에서 상세 진입 시 실시간 검색을 반복하지 않도록 상세 캐시를 추가하고, 통합 검색의 중복 플랫폼 요청을 축소.
 - 기능 개선: iOS 홈 화면 저장용 apple-touch-icon을 불투명 정사각형 아이콘으로 교체하고 manifest를 추가.
 - 운영/배포: 릴리즈 노트 추가(`docs/RELEASE_NOTES.md`), Cloudtype 배포 대상은 `app_cloudtype.py -> app_search.py`.
+- 운영/배포: GitHub Actions에서 Cloudtype webhook을 호출하는 자동 배포 workflow 추가. API 키는 GitHub secret `CLOUDTYPE_API_KEY`로 관리.
 - 다음 계획: Cloudtype 재배포 후 `/`, `/search`, `/reports`, 상세 페이지 동작 확인.
 
 
