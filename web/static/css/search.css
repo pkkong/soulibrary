@@ -18,7 +18,7 @@
     --bottom-nav-h: 62px;
     --home-top-fill: 0px;
     --section-divider-h: 0px;
-    --app-shell-w: 430px;
+    --app-shell-w: 860px;
 }
 
 * { box-sizing: border-box; }
@@ -885,7 +885,7 @@ body.has-topbar .search-top {
     margin: 2px 0 10px;
     font-size: 19px;
     font-weight: 600;
-    letter-spacing: -0.2px;
+    letter-spacing: 0;
     line-height: 1.3;
 }
 .detail-meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
@@ -960,16 +960,135 @@ body.has-topbar .search-top {
 .lib-card.status-reserved { border-color:#e5e7eb; color:#9ca3af; background:#f8fafc; }
 .lib-card.status-unknown { border-color:#e5e7eb; color:#9ca3af; background:#f8fafc; }
 .lib-badge-name { font-weight:700; font-size:13px; line-height:1.2; }
-.lib-status { font-size:10.5px; color:inherit; white-space:nowrap; min-height:14px; }
+.lib-status { font-size:10.5px; color:inherit; white-space:normal; min-height:14px; line-height:1.25; }
 .lib-status.is-loading { color: transparent; }
 .lib-status.is-muted { color:#9ca3af; }
 .lib-status.is-error { color:#b91c1c; }
 .lib-details { display:block; }
 .detail-libs .badge { background: #e5e7eb; border: none; border-radius: 0; padding: 4px 6px; }
 .detail-libs .lib-name { border-radius: 10px; }
+.detail-desktop-summary { display: none; }
 
 @media (min-width: 720px) {
     .lib-grid { grid-template-columns:repeat(6, minmax(0, 1fr)); }
+}
+
+@media (min-width: 860px) {
+    .page-detail .app-main {
+        padding-top: 24px;
+    }
+    .detail-hero {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 34px;
+        align-items: center;
+        height: auto;
+        min-height: 318px;
+        padding: 42px 28px 30px;
+        border-bottom: 1px solid #f2f2f7;
+        background: #ffffff;
+    }
+    .detail-bg {
+        inset: 0;
+        opacity: 0.16;
+        filter: blur(22px) saturate(1.02);
+        transform: none;
+    }
+    .detail-bg::after {
+        background: rgba(255, 255, 255, 0.84);
+    }
+    .detail-topbar {
+        top: 14px;
+        left: 14px;
+        right: 14px;
+        padding: 0;
+    }
+    .detail-icon-btn {
+        width: 38px;
+        height: 38px;
+        background: #f2f2f7;
+        color: #1d1d1f;
+        font-size: 18px;
+        backdrop-filter: none;
+    }
+    .detail-cover-wrap {
+        position: relative;
+        top: auto;
+        left: auto;
+        right: auto;
+        transform: none;
+        justify-content: flex-start;
+        padding: 0;
+    }
+    .detail-cover {
+        width: 170px;
+        height: 238px;
+        box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+    }
+    .detail-desktop-summary {
+        position: relative;
+        z-index: 2;
+        display: block;
+        min-width: 0;
+        padding-right: 8px;
+    }
+    .detail-desktop-summary .detail-title {
+        margin: 0 0 16px;
+        font-size: 26px;
+        line-height: 1.28;
+        letter-spacing: 0;
+    }
+    .detail-desktop-summary .detail-meta {
+        margin: 0;
+        gap: 10px;
+    }
+    .detail-desktop-summary .detail-meta-k {
+        font-size: 14px;
+    }
+    .detail-desktop-summary .detail-meta-v {
+        font-size: 15px;
+    }
+    .detail-sheet {
+        margin: 0 auto;
+    }
+    .detail-info {
+        display: none;
+    }
+    .detail-inner {
+        max-width: var(--app-shell-w);
+        padding: 0 28px;
+    }
+    .detail-panel {
+        padding: 22px 0;
+    }
+    .detail-panel + .detail-panel {
+        border-top: none;
+    }
+    .detail-section-head {
+        margin-bottom: 8px;
+    }
+    .detail-section-title {
+        font-size: 18px;
+    }
+    .detail-section-sub {
+        margin-bottom: 16px;
+    }
+    .lib-groups {
+        gap: 10px;
+    }
+    .lib-group-row {
+        padding: 16px 0 18px;
+        border-top: 1px solid #f2f2f7;
+    }
+    .lib-grid {
+        grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+        gap: 8px;
+    }
+    .lib-card {
+        min-height: 64px;
+        justify-content: center;
+        padding: 8px 8px;
+    }
 }
 
 .filter-summary {
@@ -1019,7 +1138,7 @@ body.has-topbar .search-top {
     margin:0;
     font-size:15px;
     font-weight:600;
-    letter-spacing: -0.1px;
+    letter-spacing: 0;
     line-height:1.4;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }

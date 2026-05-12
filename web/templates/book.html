@@ -38,6 +38,22 @@
                 {% endif %}
             </div>
         </div>
+
+        <div class="detail-desktop-summary" aria-hidden="true">
+            <h1 class="detail-title">{{ book.title }}</h1>
+            <div class="detail-meta">
+                <a class="detail-meta-row detail-meta-link" href="/search?q={{ book.author|urlencode }}&field=author">
+                    <span class="detail-meta-k">저자</span>
+                    <span class="detail-meta-v detail-meta-v-link">
+                        <span class="detail-meta-text">{{ book.author }}</span>
+                        <span class="detail-meta-chevron">›</span>
+                    </span>
+                </a>
+                {% if book.publisher %}
+                    <div class="detail-meta-row"><span class="detail-meta-k">출판</span><span class="detail-meta-v">{{ book.publisher }}</span></div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
     <div class="detail-sheet">
