@@ -1,9 +1,14 @@
 const PAGE_SIZE = 20;
+const SEARCH_PARAMS = new URLSearchParams(window.location.search);
+const SEARCH_API_ENDPOINT = "/api/live_search";
 const PROVIDER_LABELS = {
     "교보": "교보",
     "교보문고": "교보",
     "yes24": "YES24",
     "YES24": "YES24",
+    "Bookcube": "기타",
+    "북큐브": "기타",
+    "FxLibrary": "기타",
     "알라딘": "알라딘",
     "알라딘커뮤니케이션": "알라딘",
     "인터파크": "인터파크",
@@ -11,6 +16,7 @@ const PROVIDER_LABELS = {
     "Y2Books": "Y2Books",
     "ECO": "ECO",
     "기타": "기타",
+    "기타 도서관": "기타",
 };
 
 const PROVIDER_LOGOS = {};
@@ -56,6 +62,26 @@ function providerLabel(raw) {
     return PROVIDER_LABELS[raw] || raw;
 }
 
+function escapeAttr(value) {
+    return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
+
+function liveDetailUrlForBook(book) {
+    if (book.live_detail_url) return book.live_detail_url;
+    if (book.book_id) return "";
+    const title = String(book.title || "").trim();
+    if (!title) return "";
+    const params = new URLSearchParams();
+    params.set("title", title);
+    params.set("author", String(book.author || "").trim());
+    params.set("publisher", String(book.publisher || "").trim());
+    return `/live_book?${params.toString()}`;
+}
+
 function extractLibraries(book) {
     if (Array.isArray(book.libraries)) return book.libraries;
     const libField = book.library;
@@ -76,7 +102,7 @@ function buildFilters(results, filters) {
     const providerSet = new Set();
     const libSet = new Set();
     if (filters && Array.isArray(filters.providers)) {
-        filters.providers.forEach(p => providerSet.add(p));
+        filters.providers.forEach(p => providerSet.add(providerLabel(p)));
     } else {
         results.forEach(r => {
             if (r.provider) providerSet.add(providerLabel(r.provider));
@@ -173,7 +199,7 @@ function fetchSearch(query, refine) {
     if (selectedLibraries.size > 0) {
         params.set("libraries", [...selectedLibraries].join(","));
     }
-    fetch(`/api/search?${params.toString()}`)
+    fetch(`${SEARCH_API_ENDPOINT}?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
             loader.style.display = "none";
@@ -271,24 +297,24 @@ function renderMore() {
 
     slice.forEach(book => {
         const bookId = book.book_id || "";
+        const liveDetailUrl = liveDetailUrlForBook(book);
         const imgHtml = book.image_url
             ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'no-img\'>이미지 없음</div>'">`
-            : `<div class="no-img">이미지 없음</div>`;
+            : `<div class="no-img">이미지 없음</div>`;
     let kyoboCount = 0;
     let yes24Count = 0;
-    let otherCount = 0;
-    if (book.counts) {
-        kyoboCount = Number(book.counts.kyobo) || 0;
-        yes24Count = Number(book.counts.yes24) || 0;
-        otherCount = Number(book.counts.other) || 0;
-    } else {
-        const libs = uniqueLibraries(book);
-        const groups = groupLibraries(libs);
-        kyoboCount = groups.kyobo.length;
-        yes24Count = groups.yes24.length;
-        otherCount = groups.other.length + groups.special.length;
+    let otherCount = 0;
+    if (book.counts) {
+        kyoboCount = Number(book.counts.kyobo) || 0;
+        yes24Count = Number(book.counts.yes24) || 0;
+        otherCount = (Number(book.counts.other) || 0) + (Number(book.counts.bookcube) || 0);
+    } else {
+        const libs = uniqueLibraries(book);
+        const groups = groupLibraries(libs);
+        kyoboCount = groups.kyobo.length;
+        yes24Count = groups.yes24.length;
+        otherCount = groups.other.length + groups.special.length;
     }
-    const totalLibs = kyoboCount + yes24Count + otherCount;
     const kyoboOn = kyoboCount > 0;
     const yes24On = yes24Count > 0;
     const otherOn = otherCount > 0;
@@ -312,7 +338,7 @@ function renderMore() {
     `;
 
     const html = `
-        <div class="card js-book-card" ${bookId ? `data-book-id="${bookId}"` : ""}>
+        <div class="card js-book-card" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""}>
             <div class="thumb">${imgHtml}</div>
             <div class="info">
                 <h3 class="title" title="${book.title}">${book.title}</h3>
@@ -367,7 +393,7 @@ function loadMoreFromServer() {
     if (selectedLibraries.size > 0) {
         params.set("libraries", [...selectedLibraries].join(","));
     }
-    fetch(`/api/search?${params.toString()}`)
+    fetch(`${SEARCH_API_ENDPOINT}?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
             if (data.error) {
@@ -405,6 +431,11 @@ function loadMoreFromServer() {
 document.addEventListener("click", (event) => {
     const card = event.target.closest(".js-book-card");
     if (!card) return;
+    const liveUrl = card.getAttribute("data-live-detail-url");
+    if (liveUrl) {
+        window.location.href = liveUrl;
+        return;
+    }
     const id = card.getAttribute("data-book-id");
     if (!id) return;
     window.location.href = `/book/${id}`;
@@ -436,9 +467,18 @@ function syncRefineUI() {
     if (isRefineMode()) {
         searchTopInput.placeholder = "결과 내 재검색";
         if (searchTopBtn) searchTopBtn.textContent = "재검색";
+        if (currentQueryText && searchTopInput.value.trim() === currentQueryText) {
+            searchTopInput.value = refineQueryText || "";
+        }
+        searchTopInput.focus();
     } else {
         searchTopInput.placeholder = "검색어를 입력하세요";
         if (searchTopBtn) searchTopBtn.textContent = "검색";
+        if (currentQueryText) searchTopInput.value = currentQueryText;
+        if (currentQueryText && refineQueryText) {
+            refineQueryText = "";
+            fetchSearch(currentQueryText, "");
+        }
     }
 }
 
@@ -474,7 +514,7 @@ let currentSheet = null; // field, provider, library
 
 const SHEET_LABELS = {
     field: "검색 대상",
-    provider: "공급사",
+    provider: "플랫폼",
     library: "도서관",
 };
 

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}오류 신고 - 서울시 전자도서 통합검색{% endblock %}
+{% block body_class %}page-reports{% endblock %}
+
+{% block content %}
+<div class="reports-shell">
+    <section class="reports-head" aria-labelledby="reports-title">
+        <h1 id="reports-title">오류 신고</h1>
+        <p>검색 결과, 대출 상태, 화면 오류를 간단히 남겨주세요.</p>
+    </section>
+
+    {% if saved %}
+        <div class="report-alert success" role="status">신고가 접수되었습니다.</div>
+    {% endif %}
+    {% if error %}
+        <div class="report-alert error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form class="report-form" method="post" action="/reports">
+        <label class="report-field">
+            <span>분류</span>
+            <span class="report-select-wrap">
+                <select name="category">
+                    {% for item in ["오류", "검색 결과", "대출 상태", "화면", "기타"] %}
+                        <option value="{{ item }}" {% if form.category == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </span>
+        </label>
+
+        <label class="report-field">
+            <span>내용</span>
+            <textarea name="message" rows="6" maxlength="1200" required placeholder="어떤 문제가 있었나요?">{{ form.message }}</textarea>
+        </label>
+
+        <label class="report-field">
+            <span>문제가 있던 주소</span>
+            <input name="page_url" type="url" value="{{ form.page_url }}" placeholder="https://www.soulib.kr/search?q=..." inputmode="url">
+        </label>
+
+        <label class="report-field">
+            <span>연락처</span>
+            <input name="contact" type="text" value="{{ form.contact }}" maxlength="120" placeholder="선택 입력">
+        </label>
+
+        <label class="report-honeypot">
+            <span>Website</span>
+            <input name="website" type="text" tabindex="-1" autocomplete="off">
+        </label>
+
+        <button class="report-submit" type="submit">보내기</button>
+    </form>
+
+    <section class="reports-list" aria-labelledby="reports-list-title">
+        <div class="reports-list-head">
+            <h2 id="reports-list-title">최근 접수</h2>
+            <span>{{ reports|length }}건</span>
+        </div>
+        {% if reports %}
+            <div class="report-items">
+                {% for report in reports %}
+                    <article class="report-item">
+                        <div class="report-item-meta">
+                            <span>{{ report.category }}</span>
+                            <time>{{ report.created_at.strftime("%Y-%m-%d %H:%M") if report.created_at else "" }}</time>
+                        </div>
+                        <p>{{ report.message }}</p>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="report-empty">아직 접수된 신고가 없습니다.</div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

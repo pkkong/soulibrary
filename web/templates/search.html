@@ -17,7 +17,7 @@
                         </svg>
                     </span>
                     <label class="sr-only" for="query">검색어</label>
-                    <input type="text" id="query" class="search-top-input" placeholder="검색어를 입력하세요" autocomplete="off" />
+                    <input type="search" id="query" class="search-top-input" placeholder="검색어를 입력하세요" autocomplete="off" enterkeyhint="search" />
                 </form>
                 <button type="button" class="filter-summary" id="filter-summary" onclick="openFilterSheet()" aria-label="필터">
                     <span class="filter-icon" aria-hidden="true">
@@ -77,7 +77,7 @@
 <script>
     const LIB_URLS = {{ lib_url_map|tojson|safe }};
 </script>
-<script src="{{ url_for('static', filename='js/search.js') }}"></script>
+<script src="{{ url_for('static', filename='js/search.js', v='live20260511b') }}"></script>
 {% endblock %}
 
 {% block scripts %}

@@ -374,3 +374,10 @@ DB_PASSWORD=mkfleo93fe570fad
 복원 명령:
 docker exec -e PGPASSWORD=mkfleo93fe570fad soulib-postgres pg_restore -h svc.sel3.cloudtype.app -p 31659 -U root -d soulib_test --clean --if-exists /tmp/soulib_test.dump
 
+## UX/UI 디자인 가이드
+- 모바일 중심 Apple style UI 원칙은 `docs/UX_UI_Guide.md`를 기준으로 유지한다.
+- 검색 결과 공급사 분류는 `교보`, `YES24`, `기타` 3개만 사용한다.
+- 랜딩 페이지에는 검색과 직접 관련 없는 플랫폼 뱃지, 예시 결과, 장식 카드를 추가하지 않는다.
+- 오류 신고는 `/reports`에서 접수하며, 운영 DB의 `error_reports` 테이블에 저장한다.
+- 배포 변경 내역은 `docs/RELEASE_NOTES.md`에 기록한다.
+

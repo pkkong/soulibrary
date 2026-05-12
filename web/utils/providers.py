@@ -6,8 +6,6 @@ def provider_from_platforms(platforms):
             return "YES24"
         if code == "Aladin":
             return "알라딘"
-        if code == "Bookcube":
-            return "북큐브"
     return "기타"
 
 
@@ -19,8 +17,6 @@ def platform_to_provider_label(platform_code: str) -> str:
         return "교보"
     if code == "YES24":
         return "YES24"
-    if code == "Bookcube":
-        return "북큐브"
     if code == "Aladin":
         return "알라딘"
     return "기타"

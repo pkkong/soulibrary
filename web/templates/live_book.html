@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% if book %}
+{% set page_title = book.title ~ " - 실시간 상세" %}
+{% else %}
+{% set page_title = "실시간 도서 상세" %}
+{% endif %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block body_class %}page-detail{% endblock %}
+
+{% block content %}
+{% if error %}
+    <div class="container-compact" style="padding-top: 18px;">
+        <a href="/search" class="btn-link">← 검색</a>
+        <div class="card result-message error" style="margin-top: 12px;">{{ error }}</div>
+    </div>
+{% else %}
+    <div class="detail-hero">
+        {% if book.image_url %}
+            <div class="detail-bg" style="background-image: url('{{ book.image_url }}');"></div>
+        {% else %}
+            <div class="detail-bg detail-bg-fallback"></div>
+        {% endif %}
+
+        <div class="detail-topbar">
+            <button class="detail-icon-btn" type="button" onclick="history.length > 1 ? history.back() : (location.href='/search')">✕</button>
+            <span></span>
+        </div>
+
+        <div class="detail-cover-wrap">
+            <div class="detail-cover">
+                {% if book.image_url %}
+                    <img src="{{ book.image_url }}" loading="lazy" alt="커버">
+                {% else %}
+                    <div class="no-img">이미지 없음</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-sheet">
+        <section class="detail-panel detail-info">
+            <div class="detail-inner">
+                <h2 class="detail-title">{{ book.title }}</h2>
+                <div class="detail-meta">
+                    {% if book.author %}
+                    <a class="detail-meta-row detail-meta-link" href="/search?q={{ book.author|urlencode }}&field=author">
+                        <span class="detail-meta-k">저자</span>
+                        <span class="detail-meta-v detail-meta-v-link">
+                            <span class="detail-meta-text">{{ book.author }}</span>
+                            <span class="detail-meta-chevron">›</span>
+                        </span>
+                    </a>
+                    {% endif %}
+                    {% if book.publisher %}
+                        <div class="detail-meta-row"><span class="detail-meta-k">출판</span><span class="detail-meta-v">{{ book.publisher }}</span></div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="detail-panel detail-libs">
+            <div class="detail-inner">
+                <div class="detail-section-head">
+                    <div class="detail-section-title">소장 도서관</div>
+                </div>
+                <div class="detail-section-sub">실시간으로 조회한 결과입니다.</div>
+
+                <div class="lib-groups">
+                    {% for group in book.library_groups %}
+                    <div class="lib-group-row is-pending">
+                        <div class="lib-group-title">{{ group.label }}</div>
+                        <div class="lib-grid" data-lib-group>
+                            {% for lib in group.libraries %}
+                            <a class="lib-card status-unknown"
+                               href="{{ lib.detail_url or '#' }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               data-live-status="1"
+                               data-status-kind="{{ lib.status_kind }}"
+                               data-library-code="{{ lib.code }}"
+                               data-brcd="{{ lib.brcd }}"
+                               data-goods-id="{{ lib.goods_id }}"
+                               data-content-id="{{ lib.content_id }}"
+                               data-ctts="{{ lib.ctts_dvsn_code }}"
+                               data-ctgr="{{ lib.ctgr_id }}"
+                               data-sntn="{{ lib.sntn_auth_code }}">
+                                <span class="lib-badge-name">{{ lib.short or lib.name }}</span>
+                                <span class="lib-status is-loading" data-status-text aria-label="조회 중..."></span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if book %}
+<script>
+    (function () {
+        const TEXT = {
+            available: "대출가능",
+            reservable: "예약",
+            unknown: "상태 정보 없음"
+        };
+
+        function applyKind(card, kind, reserved) {
+            card.classList.remove("status-available", "status-reserved", "status-unknown");
+            card.dataset.statusOrder = kind === "available" ? "0" : kind === "reservable" ? "1" : "2";
+            card.dataset.reserved = String(reserved || 0);
+            card.classList.add(kind === "available" ? "status-available" : kind === "reservable" ? "status-reserved" : "status-unknown");
+        }
+
+        function formatAvailability(status) {
+            const loaned = Number(status.loaned || 0);
+            const total = Number(status.total ?? status.owned ?? 0);
+            const reserved = Number(status.reserved || 0);
+            if (total > loaned && reserved === 0) {
+                return `${TEXT.available} (${Math.max(total - loaned, 0)}/${total})`;
+            }
+            return `${TEXT.reservable} ${reserved}`;
+        }
+
+        function sortGroup(group) {
+            if (!group) return;
+            const cards = Array.from(group.querySelectorAll(".lib-card"));
+            cards.sort((a, b) => {
+                const aOrder = a.dataset.statusOrder || "2";
+                const bOrder = b.dataset.statusOrder || "2";
+                if (aOrder !== bOrder) return aOrder.localeCompare(bOrder);
+                const aReserved = parseInt(a.dataset.reserved || "0", 10);
+                const bReserved = parseInt(b.dataset.reserved || "0", 10);
+                if (aReserved !== bReserved) return aReserved - bReserved;
+                const aName = (a.querySelector(".lib-badge-name")?.textContent || "").trim();
+                const bName = (b.querySelector(".lib-badge-name")?.textContent || "").trim();
+                return aName.localeCompare(bName);
+            });
+            cards.forEach((card) => group.appendChild(card));
+        }
+
+        function statusUrl(card) {
+            const kind = card.dataset.statusKind || "";
+            if (kind === "kyobo") {
+                const params = new URLSearchParams({
+                    library_code: card.dataset.libraryCode || "",
+                    brcd: card.dataset.brcd || "",
+                    ctts_dvsn_code: card.dataset.ctts || "",
+                    ctgr_id: card.dataset.ctgr || "",
+                    sntn_auth_code: card.dataset.sntn || "",
+                });
+                return `/api/kyobo_status?${params.toString()}`;
+            }
+            if (kind === "dobong") {
+                const params = new URLSearchParams({ brcd: card.dataset.brcd || "" });
+                return `/api/dobong_status?${params.toString()}`;
+            }
+            if (kind === "yes24") {
+                const params = new URLSearchParams({
+                    library_code: card.dataset.libraryCode || "",
+                    goods_id: card.dataset.goodsId || "",
+                });
+                return `/api/yes24_status?${params.toString()}`;
+            }
+            if (kind === "bookcube") {
+                const params = new URLSearchParams({
+                    library_code: card.dataset.libraryCode || "",
+                    content_id: card.dataset.contentId || "",
+                });
+                return `/api/bookcube_status?${params.toString()}`;
+            }
+            if (kind === "gangnam") {
+                const params = new URLSearchParams({
+                    library_code: card.dataset.libraryCode || "",
+                    content_id: card.dataset.contentId || "",
+                });
+                return `/api/gangnam_status?${params.toString()}`;
+            }
+            if (kind === "eunpyeong") {
+                const params = new URLSearchParams({ content_id: card.dataset.contentId || "" });
+                return `/api/eunpyeong_status?${params.toString()}`;
+            }
+            if (kind === "seoul") {
+                const params = new URLSearchParams({ content_id: card.dataset.contentId || "" });
+                return `/api/seoul_status?${params.toString()}`;
+            }
+            if (kind === "sen") {
+                const params = new URLSearchParams({
+                    library_code: card.dataset.libraryCode || "",
+                    content_id: card.dataset.contentId || "",
+                });
+                return `/api/sen_status?${params.toString()}`;
+            }
+            return "";
+        }
+
+        async function fetchStatus(card) {
+            const holder = card.querySelector("[data-status-text]");
+            try {
+                const url = statusUrl(card);
+                if (!url) throw new Error("unsupported_status");
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("status_fetch_failed");
+                const data = await res.json();
+                const status = data.status || {};
+                const total = Number(status.total ?? status.owned ?? 0);
+                const loaned = Number(status.loaned || 0);
+                const reserved = Number(status.reserved || 0);
+                if (!total && status.total == null && status.owned == null) {
+                    throw new Error("status_missing");
+                }
+                holder.textContent = formatAvailability(status);
+                holder.classList.remove("is-loading");
+                const kind = reserved > 0 ? "reservable" : (total > loaned ? "available" : "reservable");
+                applyKind(card, kind, reserved);
+            } catch (err) {
+                holder.textContent = TEXT.unknown;
+                holder.classList.remove("is-loading");
+                holder.classList.add("is-error");
+                applyKind(card, "unknown", 0);
+            }
+        }
+
+        function resolveGroup(card) {
+            const group = card.closest("[data-lib-group]");
+            if (!group) return;
+            const left = Math.max(Number(group.dataset.pendingCount || 1) - 1, 0);
+            group.dataset.pendingCount = String(left);
+            if (left > 0) return;
+            sortGroup(group);
+            const groupRow = group.closest(".lib-group-row");
+            if (groupRow) groupRow.classList.remove("is-pending");
+        }
+
+        function init() {
+            const cards = Array.from(document.querySelectorAll("[data-live-status]"));
+            document.querySelectorAll("[data-lib-group]").forEach((group) => {
+                group.dataset.pendingCount = String(group.querySelectorAll("[data-live-status]").length);
+            });
+            cards.forEach((card) => {
+                fetchStatus(card).finally(() => resolveGroup(card));
+            });
+        }
+
+        init();
+    })();
+</script>
+{% endif %}
+{% endblock %}

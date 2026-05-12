@@ -13,9 +13,10 @@ from utils.normalize import (
     normalize_provider,
 )
 from utils.providers import provider_from_platforms, platform_to_provider_label
-from curations import HOME_STYLE_VALUES, get_curations
-from curation_routes import curation_bp
 from data_quality_admin import data_quality_bp
+from live_search_routes import live_search_bp
+from report_routes import report_bp
+from live_search.service import live_search as run_live_search
 from status_api_routes import (
     bookcube_base_url,
     build_kyobo_detail_url,
@@ -24,9 +25,10 @@ from status_api_routes import (
 )
 
 app = Flask(__name__)
-app.register_blueprint(curation_bp)
 app.register_blueprint(data_quality_bp)
 app.register_blueprint(status_api_bp)
+app.register_blueprint(live_search_bp)
+app.register_blueprint(report_bp)
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
@@ -119,16 +121,20 @@ def get_counts():
     lib_total = len(LIBRARIES)
     book_total = None
     if using_postgres() or os.path.exists(DB_PATH):
-        conn = get_db_conn()
+        conn = None
         try:
+            conn = get_db_conn()
             cur = conn.execute("SELECT COUNT(*) FROM books;")
             row = cur.fetchone()
             if using_postgres():
                 book_total = row["count"] if row else 0
             else:
                 book_total = row[0] if row else 0
+        except Exception as e:
+            print(f"[db warning] book count unavailable: {e}")
         finally:
-            conn.close()
+            if conn:
+                conn.close()
     return lib_total, book_total
 
 
@@ -378,7 +384,7 @@ for code, label in PLATFORM_LABELS.items():
     if code in {"Kyobo", "Kyobo_New"}:
         label = "교보"
     if code == "Bookcube":
-        label = "북큐브"
+        label = "기타"
     if code == "Aladin":
         label = "알라딘"
     PROVIDER_LABEL_TO_PLATFORMS.setdefault(label, set()).add(code)
@@ -388,66 +394,10 @@ if "기타" not in PROVIDER_LABEL_TO_PLATFORMS:
 
 @app.route('/')
 def index():
-    lib_total, book_total = get_counts()
-    desc = ""
-    if lib_total:
-        desc = f"{lib_total}개 도서관"
-    curated = []
-    for idx, c in enumerate(get_curations()):
-        slug = (c.get("slug") or "").strip()
-        title = (c.get("title") or "").strip()
-        if not slug or not title:
-            continue
-
-        if c.get("home_enabled") is False:
-            continue
-
-        raw_style = str(c.get("home_style") or "").strip().lower()
-        if raw_style in HOME_STYLE_VALUES:
-            home_style = raw_style
-        else:
-            home_style = "hero" if idx == 0 else ("ranked" if idx == 1 else "basic")
-
-        try:
-            home_order = int(c.get("home_order"))
-        except Exception:
-            home_order = idx
-
-        safe_slug = re.sub(r"[^a-z0-9_-]+", "-", slug.lower()).strip("-")
-        if not safe_slug:
-            safe_slug = f"item-{idx + 1}"
-
-        books = []
-        for b in (c.get("books") or []):
-            if not isinstance(b, dict):
-                continue
-            bt = (b.get("title") or "").strip()
-            ba = (b.get("author") or "").strip()
-            if bt:
-                books.append({"title": bt, "author": ba})
-
-        curated.append(
-            {
-                "slug": slug,
-                "title": title,
-                "book_count": len(c.get("book_ids") or c.get("books") or []),
-                "home_style": home_style,
-                "home_order": home_order,
-                "section_id": f"curation-{safe_slug}",
-                "book_ids": c.get("book_ids") or [],
-                "books": books,
-            }
-        )
-
-    curated.sort(key=lambda x: (x.get("home_order", 0), x.get("title") or ""))
     return render_template(
-        'index.html',
-        library_count=lib_total,
-        book_count=book_total,
-        home_curations=curated,
-        lib_url_map={},
-        show_topbar=True,
-        topbar_desc=desc,
+        "index.html",
+        show_topbar=False,
+        topbar_desc="",
         active_tab="home",
     )
 
@@ -457,33 +407,14 @@ def index():
 
 
 def search_page():
-    lib_total, book_total = get_counts()
-    desc = ""
-    if lib_total:
-        desc = f"{lib_total}개 도서관"
     return render_template(
         "search.html",
-        library_count=lib_total,
-        book_count=book_total,
+        library_count=len(LIBRARIES),
+        book_count=None,
         lib_url_map={},
         show_topbar=False,
         topbar_desc="",
         active_tab="search",
-    )
-
-
-@app.route('/guide')
-def guide_page():
-    lib_total = len(LIBRARIES)
-    library_url_map = {info.get("library_name"): info.get("homepage_url") for info in LIBRARIES.values()}
-    return render_template(
-        "guide.html",
-        library_count=lib_total,
-        guide_stats_url=url_for("static", filename="data/guide_stats.json"),
-        library_url_map=library_url_map,
-        show_topbar=True,
-        topbar_desc=f"{lib_total}개 도서관" if lib_total else "",
-        active_tab="guide",
     )
 
 
@@ -518,11 +449,7 @@ def sitemap_index():
 def sitemap_static():
     base = _sitemap_base_url()
     today = time.strftime("%Y-%m-%d")
-    urls = [f"{base}/", f"{base}/search", f"{base}/curations"]
-    for item in get_curations():
-        slug = item.get("slug")
-        if slug:
-            urls.append(f"{base}/curation/{slug}")
+    urls = [f"{base}/", f"{base}/search", f"{base}/reports"]
     parts = ['<?xml version="1.0" encoding="UTF-8"?>']
     parts.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
     for url in urls:
@@ -615,6 +542,32 @@ def search():
     if not query:
         return jsonify({"total": 0, "items": []})
 
+    try:
+        limit = int(request.args.get('limit', '20'))
+    except ValueError:
+        limit = 20
+    try:
+        offset = int(request.args.get('offset', '0'))
+    except ValueError:
+        offset = 0
+
+    try:
+        return jsonify(
+            run_live_search(
+                query=query,
+                field=(request.args.get("field") or "title_author").strip(),
+                providers_raw=(request.args.get("providers") or "").strip(),
+                libraries_raw=(request.args.get("libraries") or "").strip(),
+                limit=limit,
+                offset=offset,
+                refine=(request.args.get("refine") or "").strip(),
+            )
+        )
+    except Exception as exc:
+        print(f"[live search compatibility error] {exc}")
+        print(traceback.format_exc())
+        return jsonify({"error": "실시간 검색 처리 오류 발생", "total": 0, "items": []}), 502
+
     field = request.args.get('field', 'title_author')
     refine = request.args.get('refine', '').strip()
     query_tokens = normalize_search_tokens(query)
@@ -684,7 +637,11 @@ def search():
             groups.append("(" + " OR ".join(clauses) + ")")
         return "(" + " AND ".join(groups) + ")", params
 
-    conn = get_db_conn()
+    try:
+        conn = get_db_conn()
+    except Exception as e:
+        print(f"[search db warning] {e}")
+        return jsonify({"error": "DB 연결 실패", "total": 0, "items": []}), 503
     try:
         where_sql, params = build_where(query_tokens)
         if refine_tokens:
@@ -917,7 +874,11 @@ def api_books():
     if not ids:
         return jsonify([])
 
-    conn = get_db_conn()
+    try:
+        conn = get_db_conn()
+    except Exception as e:
+        print(f"[books db warning] {e}")
+        return jsonify([])
     try:
         placeholders = ",".join("?" for _ in ids)
         cur = conn.execute(
