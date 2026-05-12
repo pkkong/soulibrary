@@ -316,44 +316,49 @@ body.has-topbar .app-main {
     min-height: 100svh;
     display: flex;
     justify-content: center;
-    padding: calc(20px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+    padding: calc(18px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
 }
 
 .landing-phone {
     width: 100%;
-    max-width: var(--app-shell-w);
-    min-height: calc(100svh - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-width: 680px;
+    min-height: calc(100svh - 42px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
 }
 
-.landing-top {
+.landing-center {
+    flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    gap: 12px;
-    margin-bottom: 76px;
+    justify-content: center;
+    padding: 0 0 11svh;
+    text-align: center;
 }
 
 .landing-brand {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    justify-content: center;
+    gap: 10px;
     color: #1d1d1f;
-    font-size: 15px;
-    font-weight: 720;
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 760;
     text-decoration: none;
+    margin-bottom: 20px;
 }
 
 .landing-brand-img {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     box-shadow: none;
 }
 
 .landing-copy {
-    margin-bottom: 28px;
+    margin-bottom: 26px;
 }
 
 .landing-eyebrow {
@@ -366,18 +371,18 @@ body.has-topbar .app-main {
 .landing-title {
     margin: 0;
     color: #1d1d1f;
-    font-size: 44px;
-    line-height: 1.06;
-    font-weight: 760;
+    font-size: 22px;
+    line-height: 1.3;
+    font-weight: 650;
     letter-spacing: 0;
     word-break: keep-all;
 }
 
 .landing-sub {
-    margin: 16px 0 0;
+    margin: 8px 0 0;
     color: #6e6e73;
-    font-size: 16px;
-    line-height: 1.58;
+    font-size: 15px;
+    line-height: 1.5;
     font-weight: 450;
     word-break: keep-all;
 }
@@ -390,8 +395,8 @@ body.has-topbar .app-main {
     gap: 8px;
     background: #f2f2f7;
     border: 0;
-    border-radius: 17px;
-    padding: 0 8px 0 15px;
+    border-radius: 18px;
+    padding: 0 8px 0 16px;
     box-shadow: none;
 }
 
@@ -439,10 +444,10 @@ body.has-topbar .app-main {
         padding-right: 12px;
     }
     .landing-title {
-        font-size: 38px;
+        font-size: 20px;
     }
     .landing-sub {
-        font-size: 15px;
+        font-size: 14px;
     }
 }
 
@@ -453,7 +458,10 @@ body.has-topbar .app-main {
         padding-bottom: 28px;
     }
     .landing-phone {
-        min-height: min(844px, calc(100svh - 56px));
+        min-height: min(760px, calc(100svh - 56px));
+    }
+    .landing-center {
+        padding-bottom: 8svh;
     }
 }
 
