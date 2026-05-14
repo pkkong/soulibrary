@@ -125,6 +125,7 @@
 {% if book %}
 <script>
     (function () {
+        const BOOK_TITLE = {{ book.title|tojson }};
         const TEXT = {
             available: "대출가능",
             reservable: "예약",
@@ -203,6 +204,7 @@
                 const params = new URLSearchParams({
                     library_code: card.dataset.libraryCode || "",
                     content_id: card.dataset.contentId || "",
+                    title: BOOK_TITLE || "",
                 });
                 return `/api/gangnam_status?${params.toString()}`;
             }
