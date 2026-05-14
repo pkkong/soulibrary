@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 
 from flask import Blueprint, redirect, render_template, request, url_for
@@ -13,15 +14,29 @@ MAX_MESSAGE_LEN = 1200
 MAX_CONTACT_LEN = 120
 MAX_PAGE_URL_LEN = 500
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FALLBACK_REPORTS_FILE = os.environ.get(
-    "ERROR_REPORTS_FILE",
-    os.path.join(ROOT_DIR, "data", "error_reports.jsonl"),
-)
+DEFAULT_REPORTS_FILE = os.path.join(tempfile.gettempdir(), "soulib", "error_reports.jsonl")
+LEGACY_REPORTS_FILE = os.path.join(ROOT_DIR, "data", "error_reports.jsonl")
 
 
 def _clean(value: str, limit: int) -> str:
     text = " ".join(str(value or "").split())
     return text[:limit]
+
+
+def _report_file_candidates():
+    paths = [
+        os.environ.get("ERROR_REPORTS_FILE"),
+        DEFAULT_REPORTS_FILE,
+        LEGACY_REPORTS_FILE,
+    ]
+    result = []
+    seen = set()
+    for path in paths:
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        result.append(path)
+    return result
 
 
 def _ensure_table(conn):
@@ -82,18 +97,22 @@ def _file_report_row(payload: dict, report_id: int | None = None) -> dict:
 
 
 def _recent_file_reports():
-    if not os.path.exists(FALLBACK_REPORTS_FILE):
-        return []
     rows = []
-    with open(FALLBACK_REPORTS_FILE, "r", encoding="utf-8") as f:
-        for idx, line in enumerate(f, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rows.append(_file_report_row(json.loads(line), idx))
-            except json.JSONDecodeError:
-                continue
+    for path in _report_file_candidates():
+        if not os.path.exists(path) or os.path.isdir(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                for idx, line in enumerate(f, start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rows.append(_file_report_row(json.loads(line), idx))
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as exc:
+            print(f"[report warning] file report read failed from {path}: {exc}")
     return list(reversed(rows))[:10]
 
 
@@ -106,9 +125,17 @@ def _safe_recent_file_reports():
 
 
 def _append_file_report(payload: dict):
-    os.makedirs(os.path.dirname(FALLBACK_REPORTS_FILE), exist_ok=True)
-    with open(FALLBACK_REPORTS_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    last_error = None
+    for path in _report_file_candidates():
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            return
+        except Exception as exc:
+            last_error = exc
+            print(f"[report warning] file report write failed to {path}: {exc}")
+    raise RuntimeError(f"all report file fallbacks failed: {last_error}")
 
 
 def _open_report_db():
