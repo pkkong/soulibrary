@@ -39,6 +39,17 @@ def _ensure_table(conn):
         )
         """
     )
+    # Older deployments may already have the table with fewer columns.
+    for sql in (
+        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT '오류'",
+        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS message TEXT",
+        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS contact TEXT",
+        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS page_url TEXT",
+        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS user_agent TEXT",
+        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'new'",
+        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+    ):
+        conn.execute(sql)
     conn.commit()
 
 
@@ -86,6 +97,14 @@ def _recent_file_reports():
     return list(reversed(rows))[:10]
 
 
+def _safe_recent_file_reports():
+    try:
+        return _recent_file_reports()
+    except Exception as exc:
+        print(f"[report warning] file report read failed: {exc}")
+        return []
+
+
 def _append_file_report(payload: dict):
     os.makedirs(os.path.dirname(FALLBACK_REPORTS_FILE), exist_ok=True)
     with open(FALLBACK_REPORTS_FILE, "a", encoding="utf-8") as f:
@@ -93,12 +112,52 @@ def _append_file_report(payload: dict):
 
 
 def _open_report_db():
+    if os.environ.get("ERROR_REPORTS_STORAGE") == "file":
+        return None
     try:
         conn = get_db()
         _ensure_table(conn)
         return conn
-    except Exception:
+    except Exception as exc:
+        print(f"[report warning] database unavailable: {exc}")
         return None
+
+
+def _build_report_payload(form: dict, user_agent: str) -> dict:
+    return {
+        **form,
+        "user_agent": user_agent,
+        "status": "new",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _save_report(conn, form: dict, user_agent: str):
+    if conn:
+        try:
+            conn.execute(
+                """
+                INSERT INTO error_reports (category, message, contact, page_url, user_agent)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    form["category"],
+                    form["message"],
+                    form["contact"],
+                    form["page_url"],
+                    user_agent,
+                ),
+            )
+            conn.commit()
+            return
+        except Exception as exc:
+            print(f"[report warning] database save failed, falling back to file: {exc}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+    _append_file_report(_build_report_payload(form, user_agent))
 
 
 @report_bp.route("/reports", methods=["GET", "POST"])
@@ -129,33 +188,14 @@ def reports_page():
                 error = "어떤 문제가 있었는지 조금만 더 적어주세요."
             else:
                 user_agent = _clean(request.headers.get("User-Agent"), 500)
-                if conn:
-                    conn.execute(
-                        """
-                        INSERT INTO error_reports (category, message, contact, page_url, user_agent)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (
-                            form["category"],
-                            form["message"],
-                            form["contact"],
-                            form["page_url"],
-                            user_agent,
-                        ),
-                    )
-                    conn.commit()
-                else:
-                    _append_file_report(
-                        {
-                            **form,
-                            "user_agent": user_agent,
-                            "status": "new",
-                            "created_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                    )
+                _save_report(conn, form, user_agent)
                 return redirect(url_for("reports.reports_page", saved=1))
 
-        reports = _recent_reports(conn) if conn else _recent_file_reports()
+        try:
+            reports = _recent_reports(conn) if conn else _safe_recent_file_reports()
+        except Exception as exc:
+            print(f"[report warning] database read failed, falling back to file: {exc}")
+            reports = _safe_recent_file_reports()
         return render_template(
             "reports.html",
             reports=reports,
@@ -166,9 +206,13 @@ def reports_page():
             topbar_desc="",
             active_tab="reports",
         )
-    except Exception:
+    except Exception as exc:
+        print(f"[report error] save failed: {exc}")
         if conn:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         return render_template(
             "reports.html",
             reports=[],
