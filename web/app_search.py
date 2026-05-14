@@ -923,5 +923,5 @@ def api_books():
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("LIBRARY_SEARCH_PORT", "5001"))
+    port = int(os.environ.get("LIBRARY_SEARCH_PORT") or os.environ.get("PORT", "5001"))
     app.run(host='0.0.0.0', port=port)

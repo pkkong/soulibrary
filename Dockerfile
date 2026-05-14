@@ -10,6 +10,7 @@ COPY . /app
 # 4. 필요한 라이브러리를 설치한다
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. web 폴더로 이동해서 앱을 실행한다!
+# 5. web 폴더로 이동해서 검색 앱을 실행한다
 WORKDIR /app/web
-CMD ["python", "app_cloudtype.py"]
+ENV LIBRARY_SEARCH_PORT=5000
+CMD ["python", "app_search.py"]

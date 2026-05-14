@@ -38,5 +38,5 @@ _add_static_route(
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("LIBRARY_SEARCH_PORT", "5000"))
+    port = int(os.environ.get("LIBRARY_SEARCH_PORT") or os.environ.get("PORT", "5000"))
     flask_app.run(host="0.0.0.0", port=port)
