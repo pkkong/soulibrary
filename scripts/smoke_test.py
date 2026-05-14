@@ -12,14 +12,17 @@ sys.path.insert(0, str(WEB_DIR))
 os.environ.setdefault("LIVE_SEARCH_TOTAL_TIMEOUT", "1.0")
 os.environ.setdefault("LIVE_SEARCH_LIBRARY_TIMEOUT", "0.8")
 os.environ.setdefault("ERROR_REPORTS_STORAGE", "file")
-os.environ.setdefault(
-    "ERROR_REPORTS_FILE",
-    str(Path(tempfile.gettempdir()) / "soulib_smoke_error_reports.jsonl"),
-)
-try:
-    Path(os.environ["ERROR_REPORTS_FILE"]).unlink()
-except FileNotFoundError:
-    pass
+BAD_REPORTS_PATH = Path(tempfile.gettempdir()) / "soulib_smoke_bad_reports_path"
+BAD_REPORTS_PATH.mkdir(exist_ok=True)
+os.environ.setdefault("ERROR_REPORTS_FILE", str(BAD_REPORTS_PATH))
+for path in (
+    Path(tempfile.gettempdir()) / "soulib_smoke_error_reports.jsonl",
+    Path(tempfile.gettempdir()) / "soulib" / "error_reports.jsonl",
+):
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
 
 from app_search import app  # noqa: E402
 
@@ -71,6 +74,8 @@ def main():
     saved = assert_response(client, "/reports?saved=1")
     if "신고가 접수되었습니다" not in saved.get_data(as_text=True):
         raise AssertionError("report saved confirmation did not render")
+    if "자동 테스트 신고 내용입니다" not in saved.get_data(as_text=True):
+        raise AssertionError("saved report did not render in recent reports")
 
     print("smoke_test: ok")
 
