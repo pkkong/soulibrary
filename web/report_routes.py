@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import requests
 from flask import Blueprint, redirect, render_template, request, url_for
 
-from db import get_db
+from db import get_db, using_postgres
 
 
 report_bp = Blueprint("reports", __name__)
@@ -164,6 +164,8 @@ def _append_file_report(payload: dict):
 
 def _open_report_db():
     if os.environ.get("ERROR_REPORTS_STORAGE") == "file":
+        return None
+    if not using_postgres():
         return None
     try:
         conn = get_db()

@@ -57,9 +57,9 @@ def main():
     if "/sitemap-static.xml" not in sitemap_body:
         raise AssertionError("sitemap index did not include static sitemap")
 
-    legacy_book = assert_response(client, "/book/1", expected_status=404)
-    if "이전 상세 페이지는 현재 지원하지 않습니다" not in legacy_book.get_data(as_text=True):
-        raise AssertionError("legacy book detail did not render the DB-free fallback")
+    legacy_book = assert_response(client, "/book/1", expected_status=301)
+    if not legacy_book.headers.get("Location", "").endswith("/search"):
+        raise AssertionError(f"legacy book detail did not redirect to search: {legacy_book.headers.get('Location')}")
 
     legacy_libraries = assert_response(client, "/api/book_libraries?book_id=1", expected_status=404)
     legacy_payload = legacy_libraries.get_json()
