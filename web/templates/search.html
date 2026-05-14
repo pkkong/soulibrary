@@ -45,6 +45,15 @@
 
         <div class="content">
             <div class="loader" id="loading-spinner"></div>
+            <div class="search-empty-state" id="search-empty-state" aria-live="polite">
+                <div class="search-empty-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <path d="M21 21l-4.3-4.3"></path>
+                    </svg>
+                </div>
+                <p>책 제목이나 저자를 검색하세요.</p>
+            </div>
             <div id="results" class="grid"></div>
             <button id="load-more" onclick="renderMore()">더 보기</button>
         </div>

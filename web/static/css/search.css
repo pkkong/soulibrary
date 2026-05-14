@@ -308,12 +308,8 @@ body.has-topbar .app-main {
     padding: 0;
 }
 
-.page-landing .bottom-nav {
-    display: none;
-}
-
 .landing-shell {
-    min-height: 100svh;
+    min-height: calc(100svh - var(--bottom-nav-h) - env(safe-area-inset-bottom));
     display: flex;
     justify-content: center;
     padding: calc(18px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
@@ -321,8 +317,8 @@ body.has-topbar .app-main {
 
 .landing-phone {
     width: 100%;
-    max-width: 680px;
-    min-height: calc(100svh - 42px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-width: var(--app-shell-w);
+    min-height: calc(100svh - var(--bottom-nav-h) - 42px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
 }
@@ -337,43 +333,16 @@ body.has-topbar .app-main {
     text-align: center;
 }
 
-.landing-brand {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    color: #1d1d1f;
-    font-size: 28px;
-    line-height: 1;
-    font-weight: 760;
-    text-decoration: none;
-    margin-bottom: 20px;
-}
-
-.landing-brand-img {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    box-shadow: none;
-}
-
 .landing-copy {
-    margin-bottom: 26px;
-}
-
-.landing-eyebrow {
-    margin: 0 0 10px;
-    color: #6e6e73;
-    font-size: 13px;
-    font-weight: 650;
+    margin-bottom: 28px;
 }
 
 .landing-title {
     margin: 0;
     color: #1d1d1f;
-    font-size: 22px;
-    line-height: 1.3;
-    font-weight: 650;
+    font-size: 28px;
+    line-height: 1.22;
+    font-weight: 760;
     letter-spacing: 0;
     word-break: keep-all;
 }
@@ -382,28 +351,40 @@ body.has-topbar .app-main {
     margin: 8px 0 0;
     color: #6e6e73;
     font-size: 15px;
-    line-height: 1.5;
+    line-height: 1.58;
     font-weight: 450;
     word-break: keep-all;
 }
 
 .landing-search {
     width: 100%;
+    max-width: 680px;
     min-height: 54px;
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #f2f2f7;
-    border: 0;
+    background: #ffffff;
+    border: 1.5px solid #d1d1d6;
     border-radius: 18px;
-    padding: 0 8px 0 16px;
+    padding: 0 8px 0 12px;
     box-shadow: none;
 }
 
-.landing-search-icon {
+.landing-search-brand {
     display: inline-flex;
-    color: #8e8e93;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
+}
+
+.landing-search-brand img {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    object-fit: contain;
+    display: block;
 }
 
 .landing-search input {
@@ -458,7 +439,7 @@ body.has-topbar .app-main {
         padding-bottom: 28px;
     }
     .landing-phone {
-        min-height: min(760px, calc(100svh - 56px));
+        min-height: min(760px, calc(100svh - var(--bottom-nav-h) - 56px));
     }
     .landing-center {
         padding-bottom: 8svh;
@@ -523,8 +504,12 @@ body.has-topbar .search-top {
     cursor: pointer;
 }
 .refine-toggle {
+    display: none;
     margin-top: 9px;
     margin-bottom: 0;
+}
+.search-page.has-results .refine-toggle {
+    display: block;
 }
 .toggle {
     display: inline-flex;
@@ -778,6 +763,37 @@ body.has-topbar .search-top {
     padding: 8px 12px 0;
     background: #ffffff;
 }
+.search-empty-state {
+    min-height: calc(100svh - var(--bottom-nav-h) - 132px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #8e8e93;
+    text-align: center;
+    padding: 0 20px 12vh;
+}
+.search-empty-state[hidden] {
+    display: none;
+}
+.search-empty-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 999px;
+    background: #f2f2f7;
+    color: #6e6e73;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.search-empty-state p {
+    margin: 0;
+    color: #6e6e73;
+    font-size: 15px;
+    font-weight: 520;
+    line-height: 1.45;
+}
 .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .result-message {
     display: flex;
@@ -983,103 +999,23 @@ body.has-topbar .search-top {
 
 @media (min-width: 860px) {
     .page-detail .app-main {
-        padding-top: 24px;
-    }
-    .detail-hero {
-        display: grid;
-        grid-template-columns: 190px minmax(0, 1fr);
-        gap: 34px;
-        align-items: center;
-        height: auto;
-        min-height: 318px;
-        padding: 42px 28px 30px;
-        border-bottom: 1px solid #f2f2f7;
-        background: #ffffff;
-    }
-    .detail-bg {
-        inset: 0;
-        opacity: 0.16;
-        filter: blur(22px) saturate(1.02);
-        transform: none;
-    }
-    .detail-bg::after {
-        background: rgba(255, 255, 255, 0.84);
+        padding-top: 0;
     }
     .detail-topbar {
-        top: 14px;
-        left: 14px;
-        right: 14px;
-        padding: 0;
+        padding-left: calc(16px + max(0px, (100% - var(--app-shell-w)) / 2));
+        padding-right: calc(16px + max(0px, (100% - var(--app-shell-w)) / 2));
     }
     .detail-icon-btn {
-        width: 38px;
-        height: 38px;
-        background: #f2f2f7;
-        color: #1d1d1f;
-        font-size: 18px;
-        backdrop-filter: none;
-    }
-    .detail-cover-wrap {
-        position: relative;
-        top: auto;
-        left: auto;
-        right: auto;
-        transform: none;
-        justify-content: flex-start;
-        padding: 0;
-    }
-    .detail-cover {
-        width: 170px;
-        height: 238px;
-        box-shadow: 0 10px 28px rgba(0,0,0,0.14);
-    }
-    .detail-desktop-summary {
-        position: relative;
-        z-index: 2;
-        display: block;
-        min-width: 0;
-        padding-right: 8px;
-    }
-    .detail-desktop-summary .detail-title {
-        margin: 0 0 16px;
-        font-size: 26px;
-        line-height: 1.28;
-        letter-spacing: 0;
-    }
-    .detail-desktop-summary .detail-meta {
-        margin: 0;
-        gap: 10px;
-    }
-    .detail-desktop-summary .detail-meta-k {
-        font-size: 14px;
-    }
-    .detail-desktop-summary .detail-meta-v {
-        font-size: 15px;
+        background: rgba(0,0,0,0.28);
+        color: #ffffff;
+        backdrop-filter: blur(10px);
     }
     .detail-sheet {
-        margin: 0 auto;
-    }
-    .detail-info {
-        display: none;
+        margin: -22px auto 0;
     }
     .detail-inner {
         max-width: var(--app-shell-w);
         padding: 0 28px;
-    }
-    .detail-panel {
-        padding: 22px 0;
-    }
-    .detail-panel + .detail-panel {
-        border-top: none;
-    }
-    .detail-section-head {
-        margin-bottom: 8px;
-    }
-    .detail-section-title {
-        font-size: 18px;
-    }
-    .detail-section-sub {
-        margin-bottom: 16px;
     }
     .lib-groups {
         gap: 10px;

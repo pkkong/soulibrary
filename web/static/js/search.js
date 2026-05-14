@@ -42,6 +42,8 @@ const filterBar = document.querySelector(".filter-bar");
 if (filterBar) filterBar.style.display = "none"; // legacy filter bar hidden
 const filterSummary = document.getElementById("filter-summary");
 const filterSummaryText = document.getElementById("filter-summary-text");
+const searchPageEl = document.querySelector(".search-page");
+const searchEmptyState = document.getElementById("search-empty-state");
 
 function _isValidSearchField(value) {
     return value === "title_author" || value === "title" || value === "author" || value === "publisher";
@@ -50,6 +52,7 @@ function _isValidSearchField(value) {
 function showResultsMessage(text, kind) {
     const resultsDiv = document.getElementById("results");
     if (!resultsDiv) return;
+    setSearchEmpty(false);
     resultsDiv.innerHTML = "";
     const el = document.createElement("div");
     el.className = `card result-message ${kind}`;
@@ -59,7 +62,17 @@ function showResultsMessage(text, kind) {
 
 function providerLabel(raw) {
     if (!raw) return "기타";
-    return PROVIDER_LABELS[raw] || raw;
+    const mapped = PROVIDER_LABELS[raw];
+    if (mapped === "교보" || mapped === "YES24") return mapped;
+    const value = String(raw).trim().toLowerCase();
+    if (value.includes("교보") || value.includes("kyobo")) return "교보";
+    if (value.includes("yes24")) return "YES24";
+    return "기타";
+}
+
+function setSearchEmpty(visible) {
+    if (!searchEmptyState) return;
+    searchEmptyState.hidden = !visible;
 }
 
 function escapeAttr(value) {
@@ -153,6 +166,9 @@ function resetFilters() {
 
 function applyFilters(reset = true) {
     filteredResults = currentResults.slice();
+    if (searchPageEl) {
+        searchPageEl.classList.toggle("has-results", filteredResults.length > 0);
+    }
     if (reset) {
         renderIndex = 0;
         document.getElementById('results').innerHTML = "";
@@ -179,6 +195,8 @@ function fetchSearch(query, refine) {
     const resultsDiv = document.getElementById('results');
     const loader = document.getElementById('loading-spinner');
     const loadMoreBtn = document.getElementById('load-more');
+    setSearchEmpty(false);
+    if (searchPageEl) searchPageEl.classList.remove("has-results");
     statusDiv.innerText = "";
     resultsDiv.innerHTML = "";
     loader.style.display = "block";
@@ -514,7 +532,7 @@ let currentSheet = null; // field, provider, library
 
 const SHEET_LABELS = {
     field: "검색 대상",
-    provider: "플랫폼",
+    provider: "공급사",
     library: "도서관",
 };
 
