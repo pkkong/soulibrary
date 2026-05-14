@@ -53,6 +53,21 @@ jobs:
             exit 0
           fi
 
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            signature_sha1="$(openssl dgst -sha1 -hmac "${CLOUDTYPE_API_KEY}" "${GITHUB_EVENT_PATH}" | awk '{print $2}')"
+            signature_sha256="$(openssl dgst -sha256 -hmac "${CLOUDTYPE_API_KEY}" "${GITHUB_EVENT_PATH}" | awk '{print $2}')"
+
+            curl --fail-with-body --silent --show-error \
+              -X POST "https://api.cloudtype.io/webhooks/github" \
+              -H "Content-Type: application/json" \
+              -H "X-GitHub-Event: push" \
+              -H "X-GitHub-Delivery: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+              -H "X-Hub-Signature: sha1=${signature_sha1}" \
+              -H "X-Hub-Signature-256: sha256=${signature_sha256}" \
+              --data-binary @"${GITHUB_EVENT_PATH}"
+            exit 0
+          fi
+
           if [[ -n "${CLOUDTYPE_PROJECT:-}" && -n "${CLOUDTYPE_APP:-}" ]]; then
             python -c 'import json, os; print(json.dumps({"project": os.environ["CLOUDTYPE_PROJECT"], "app": os.environ["CLOUDTYPE_APP"], "stage": os.environ.get("CLOUDTYPE_STAGE") or "main"}))' > cloudtype-payload.json
             curl --fail-with-body --silent --show-error \
@@ -63,19 +78,5 @@ jobs:
             exit 0
           fi
 
-          if [[ "${GITHUB_EVENT_NAME}" != "push" ]]; then
-            echo "::error::workflow_dispatch requires CLOUDTYPE_PROJECT and CLOUDTYPE_APP repository variables."
-            exit 1
-          fi
-
-          signature_sha1="$(openssl dgst -sha1 -hmac "${CLOUDTYPE_API_KEY}" "${GITHUB_EVENT_PATH}" | awk '{print $2}')"
-          signature_sha256="$(openssl dgst -sha256 -hmac "${CLOUDTYPE_API_KEY}" "${GITHUB_EVENT_PATH}" | awk '{print $2}')"
-
-          curl --fail-with-body --silent --show-error \
-            -X POST "https://api.cloudtype.io/webhooks/github" \
-            -H "Content-Type: application/json" \
-            -H "X-GitHub-Event: push" \
-            -H "X-GitHub-Delivery: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            -H "X-Hub-Signature: sha1=${signature_sha1}" \
-            -H "X-Hub-Signature-256: sha256=${signature_sha256}" \
-            --data-binary @"${GITHUB_EVENT_PATH}"
+          echo "::error::workflow_dispatch requires CLOUDTYPE_PROJECT and CLOUDTYPE_APP repository variables."
+          exit 1
