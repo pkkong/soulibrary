@@ -1,0 +1,13 @@
+name: soulib
+
+app: dockerfile
+
+options:
+  ports: 5000
+  dockerfile: Dockerfile
+
+context:
+  git:
+    url: https://github.com/pkkong/library_crawler.git
+    branch: main
+  preset: dockerfile
