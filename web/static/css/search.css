@@ -1401,6 +1401,28 @@ body.has-topbar .search-top {
     font-weight: 600;
 }
 
+.report-item-meta-main {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.report-status,
+.report-issue-link {
+    border-radius: 999px;
+    background: #f2f2f7;
+    color: #3a3a3c;
+    padding: 3px 7px;
+    line-height: 1.2;
+    text-decoration: none;
+}
+
+.report-issue-link {
+    color: #007aff;
+}
+
 .report-item p {
     margin: 7px 0 0;
     color: #1d1d1f;

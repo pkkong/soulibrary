@@ -62,7 +62,13 @@
                 {% for report in reports %}
                     <article class="report-item">
                         <div class="report-item-meta">
-                            <span>{{ report.category }}</span>
+                            <span class="report-item-meta-main">
+                                <span>{{ report.category }}</span>
+                                <span class="report-status">{{ report.status_label or "접수됨" }}</span>
+                                {% if report.issue_url %}
+                                    <a class="report-issue-link" href="{{ report.issue_url }}" target="_blank" rel="noopener noreferrer">이슈 #{{ report.issue_number }}</a>
+                                {% endif %}
+                            </span>
                             <time>{{ report.created_at.strftime("%Y-%m-%d %H:%M") if report.created_at else "" }}</time>
                         </div>
                         <p>{{ report.message }}</p>
