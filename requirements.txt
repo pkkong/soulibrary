@@ -1,7 +1,8 @@
-flask
-pandas
-requests
+Flask
+gunicorn
 lxml
 openpyxl
+pandas
 psycopg2-binary
-psycopg2-binary
+requests
+Scrapy

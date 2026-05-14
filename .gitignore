@@ -1,16 +1,37 @@
 # Byte-compiled / cache
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# Local virtual environments / editor state
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+.vscode/
 
 # Local data outputs
 data/library.db
+data/library_split.db
+data/*.sqlite
+data/*.sqlite3
+data/*.db-*
 data/*.tmp
 data/guide_stats_cache.json
 data/_tmp_*
 data/auto_*.json
 data/db_apply_state.json
+data/crawler_status.local.json
+data/remote_counts.local.json
 data/telegram_bot_config.json
 data/telegram_bot_state.json
 data/incremental_runs/
 data/incremental_tests/
 run_tg_bot.bat
+
+# Local backups / logs
+*.zip
+*.bak
+*.log
+tmp_ux_review/
