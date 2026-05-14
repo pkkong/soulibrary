@@ -3,7 +3,7 @@ import time
 import re
 import traceback
 from db import get_db, using_postgres
-from flask import Flask, render_template, request, jsonify, send_from_directory, Response, abort, url_for
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response, abort, url_for, redirect
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
 from utils.normalize import (
     normalize_title,
@@ -65,6 +65,10 @@ def get_db_conn():
     return get_db(DB_PATH)
 
 
+def legacy_db_available():
+    return using_postgres() or os.path.exists(DB_PATH)
+
+
 def clean_display_title(value):
     text = str(value or "")
     text = SUBSCRIPTION_TAG_PATTERN.sub(" ", text)
@@ -83,6 +87,9 @@ def _sitemap_stats():
     cached = SITEMAP_CACHE
     if cached["pages"] and (now - cached["ts"]) < SITEMAP_TTL_SEC:
         return cached["count"], cached["pages"]
+    if not legacy_db_available():
+        SITEMAP_CACHE.update({"ts": now, "count": 0, "pages": 0})
+        return 0, 0
     try:
         conn = get_db_conn()
     except Exception as e:
@@ -108,6 +115,8 @@ def _sitemap_page_ids(page: int):
     cached = SITEMAP_PAGE_CACHE.get(page)
     if cached and (now - cached["ts"]) < SITEMAP_TTL_SEC:
         return cached["ids"]
+    if not legacy_db_available():
+        return []
     offset = (page - 1) * SITEMAP_PAGE_SIZE
     try:
         conn = get_db_conn()
@@ -506,6 +515,8 @@ def naver_verify_alt():
 
 @app.route('/book/<int:book_id>')
 def book_detail(book_id: int):
+    if not legacy_db_available():
+        return redirect(url_for("search_page"), code=301)
     try:
         detail = get_book_meta(book_id)
     except Exception as e:
@@ -537,6 +548,9 @@ def api_book_libraries():
         book_id = int(raw_id)
     except Exception:
         return jsonify({"error": "invalid_book_id"}), 400
+
+    if not legacy_db_available():
+        return jsonify({"error": "legacy_detail_unavailable", "libraries": [], "counts": {}}), 404
 
     cached = LIB_DETAIL_CACHE.get(book_id)
     now = time.time()
@@ -882,6 +896,9 @@ def search():
 def api_books():
     raw_ids = (request.args.get("ids") or "").strip()
     if not raw_ids:
+        return jsonify([])
+
+    if not legacy_db_available():
         return jsonify([])
 
     ids = []
