@@ -1,5 +1,5 @@
 Flask
-gunicorn
+gunicorn>=25.1,<27
 lxml
 openpyxl
 pandas
