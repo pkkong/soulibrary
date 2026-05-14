@@ -77,7 +77,7 @@ DB_PASSWORD=
 
 ## 배포
 
-`main`에 push 또는 merge되면 GitHub Actions가 먼저 smoke test를 실행합니다. smoke test가 통과하면 Cloudtype GitHub webhook을 호출합니다.
+`main`에 push 또는 merge되면 GitHub Actions가 먼저 smoke test를 실행합니다. smoke test가 통과하면 Cloudtype GitHub webhook을 호출합니다. 수동 `Run workflow`도 같은 GitHub webhook 경로를 사용합니다.
 
 자동배포에는 GitHub secret 하나가 필요합니다.
 
@@ -86,8 +86,6 @@ CLOUDTYPE_API_KEY
 ```
 
 이 키는 Cloudtype webhook 서명에 사용합니다. Cloudtype 서비스는 Git 저장소 `https://github.com/pkkong/library_crawler.git`의 `main` 브랜치를 바라봐야 합니다.
-
-수동 `workflow_dispatch` 재배포는 Cloudtype의 HTTP deploy API를 사용하므로 `CLOUDTYPE_PROJECT`, `CLOUDTYPE_APP`, `CLOUDTYPE_STAGE`가 추가로 필요할 수 있습니다. 자동배포는 main push 기반 GitHub webhook 경로를 우선 사용합니다.
 
 Docker 기본 실행은 DB 없는 검색 앱입니다.
 
