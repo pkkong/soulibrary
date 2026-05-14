@@ -333,7 +333,7 @@ def api_gangnam_status():
         attempted.append(detail_url)
         res = session.get(detail_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
-        status = parse_gangnam_detail_status(res.text)
+        status = parse_gangnam_detail_status(res.content.decode("euc-kr", "replace"))
     except Exception as e:
         print(f"[status error] {e}")
         print(traceback.format_exc())
@@ -345,7 +345,7 @@ def api_gangnam_status():
                 attempted.append(list_url)
                 res = get_status_session().get(list_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
                 res.raise_for_status()
-                status = parse_gangnam_status(res.text, content_id)
+                status = parse_gangnam_status(res.content.decode("euc-kr", "replace"), content_id)
         except Exception as e:
             print(f"[status error] {e}")
             print(traceback.format_exc())
@@ -485,42 +485,46 @@ def api_eunpyeong_status():
 @status_api_bp.route("/api/dobong_status")
 def api_dobong_status():
     brcd = (request.args.get("brcd") or "").strip()
+    requested_product_cd = (request.args.get("product_cd") or "").strip()
     debug = request.args.get("debug") == "1"
     if not brcd:
         return jsonify({"error": "missing_brcd"}), 400
 
-    cache_key = f"dobong:{brcd}"
+    product_candidates = [requested_product_cd] if requested_product_cd else ["001", "002"]
+    cache_key = f"dobong:{brcd}:{','.join(product_candidates)}"
     cached = STATUS_CACHE.get(cache_key)
     if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
         return jsonify(cached["payload"])
 
     attempted = []
-    try:
-        session = get_status_session()
-        url = "https://elib.dobong.kr/Kyobo_T3_Mobile/Phone/Main/Ebook_Detail.asp"
+    session = get_status_session()
+    url = "https://elib.dobong.kr/Kyobo_T3_Mobile/Phone/Main/Ebook_Detail.asp"
+    for product_cd in product_candidates:
         params = {
             "type": "EBOOK",
             "barcode": brcd,
             "classCode": "",
             "keyWord": "",
-            "product_cd": "001",
+            "product_cd": product_cd,
             "kiduse_yn": "N",
             "borrowRadio": "",
             "sortType": "1",
         }
-        attempted.append(url)
-        res = session.get(url, params=params, timeout=15, headers=DOBONG_HEADERS, verify=False)
-        res.raise_for_status()
-        status = parse_dobong_status(res.text)
-        if not status:
-            raise RuntimeError("status_missing")
-        payload = {"brcd": brcd, "status": status}
-        STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
-        return jsonify(payload)
-    except Exception as e:
-        print(f"[status error] {e}")
-        print(traceback.format_exc())
-        payload = {"brcd": brcd, "status": None}
-        if debug:
-            payload.update({"attempted": attempted})
-        return jsonify(payload), 502
+        attempted.append(f"{url}?{urlencode(params)}")
+        try:
+            res = session.get(url, params=params, timeout=15, headers=DOBONG_HEADERS, verify=False)
+            res.raise_for_status()
+            status = parse_dobong_status(res.text)
+            if not status:
+                continue
+            payload = {"brcd": brcd, "product_cd": product_cd, "status": status}
+            STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+            return jsonify(payload)
+        except Exception as e:
+            print(f"[status error] {e}")
+            print(traceback.format_exc())
+
+    payload = {"brcd": brcd, "status": None}
+    if debug:
+        payload.update({"attempted": attempted})
+    return jsonify(payload), 502

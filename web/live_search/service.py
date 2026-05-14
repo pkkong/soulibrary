@@ -155,6 +155,8 @@ def _detail_cache_key(item: dict) -> str:
                 "ctts_dvsn_code",
                 "ctgr_id",
                 "sntn_auth_code",
+                "product_cd",
+                "category_id",
             }
             and value
         }

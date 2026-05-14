@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from lxml import html as lxml_html
 
@@ -33,12 +33,15 @@ class DobongKyoboConnector:
 
             detail_href = text(node.xpath("string(.//p[contains(@class, 'pic')]/a/@href)"))
             detail_url = absolute_url(detail_href, base_url)
+            query = parse_qs(urlparse(detail_href).query)
             brcd = ""
             match = re.search(r"barcode=([A-Za-z0-9]+)", detail_href)
             if match:
                 brcd = match.group(1)
             if not brcd:
                 brcd = text(node.xpath("string(@id)")).replace("content_", "")
+            product_cd = (query.get("product_cd") or ["001"])[0] or "001"
+            category_id = (query.get("category_id") or [""])[0]
 
             em_text = text(node.xpath("string(.//dd/em)"))
             author = ""
@@ -61,7 +64,7 @@ class DobongKyoboConnector:
                     provider="교보문고",
                     image_url=image_url,
                     detail_url=detail_url,
-                    identifiers={"brcd": brcd},
+                    identifiers={"brcd": brcd, "product_cd": product_cd, "category_id": category_id},
                 )
             )
         return results

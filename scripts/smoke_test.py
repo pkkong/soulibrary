@@ -26,6 +26,8 @@ for path in (
 
 from app_search import app  # noqa: E402
 import report_routes  # noqa: E402
+import status_api_routes  # noqa: E402
+from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
 
 
 def assert_response(client, path, expected_status=200):
@@ -65,6 +67,72 @@ def main():
     legacy_payload = legacy_libraries.get_json()
     if legacy_payload.get("error") != "legacy_detail_unavailable":
         raise AssertionError(f"unexpected legacy libraries payload: {legacy_payload}")
+
+    dobong_html = """
+    <li id="content_450D000228066">
+      <p class="pic"><a href="/Kyobo_T3/Content/audio/audio_View.asp?barcode=450D000228066&product_cd=002&category_id=0733">
+        <img src="/cover.jpg">
+      </a></p>
+      <dt><a>최소한의 삼국지</a></dt>
+      <dd><em>최태성 / [ 프런트페이지 / 2024 ]</em></dd>
+    </li>
+    """
+    dobong_results = DobongKyoboConnector()._parse_results(
+        dobong_html,
+        "https://elib.dobong.kr",
+        "dobong",
+        {"library_name": "도봉", "short_name": "도봉"},
+    )
+    if not dobong_results or (dobong_results[0].identifiers or {}).get("product_cd") != "002":
+        raise AssertionError("dobong live connector did not keep product_cd from result link")
+
+    class FakeStatusResponse:
+        def __init__(self, text="", content=None):
+            self.text = text
+            self.content = content if content is not None else text.encode("utf-8")
+
+        def raise_for_status(self):
+            return None
+
+    class FakeStatusSession:
+        def __init__(self, response):
+            self.response = response
+            self.calls = []
+
+        def get(self, url, params=None, timeout=None, headers=None, verify=None):
+            self.calls.append({"url": url, "params": params or {}})
+            return self.response
+
+    original_status_session = status_api_routes.get_status_session
+    status_api_routes.STATUS_CACHE.clear()
+    dobong_session = FakeStatusSession(FakeStatusResponse(text="<span>대출 5 / 5 예약 0</span>"))
+    status_api_routes.get_status_session = lambda: dobong_session
+    try:
+        dobong_status = assert_response(
+            client,
+            "/api/dobong_status?brcd=450D000228066&product_cd=002",
+        )
+    finally:
+        status_api_routes.get_status_session = original_status_session
+        status_api_routes.STATUS_CACHE.clear()
+    if dobong_status.get_json().get("product_cd") != "002":
+        raise AssertionError(f"dobong status did not preserve product_cd: {dobong_status.get_json()}")
+    if (dobong_session.calls[0]["params"] or {}).get("product_cd") != "002":
+        raise AssertionError(f"dobong status did not request product_cd=002: {dobong_session.calls}")
+
+    gangnam_html = "보유 3 대출 2 예약 0".encode("euc-kr")
+    gangnam_session = FakeStatusSession(FakeStatusResponse(content=gangnam_html))
+    status_api_routes.get_status_session = lambda: gangnam_session
+    try:
+        gangnam_status = assert_response(
+            client,
+            "/api/gangnam_status?library_code=gangnam&content_id=Y167892129",
+        )
+    finally:
+        status_api_routes.get_status_session = original_status_session
+        status_api_routes.STATUS_CACHE.clear()
+    if gangnam_status.get_json().get("status", {}).get("owned") != 3:
+        raise AssertionError(f"gangnam EUC-KR status did not parse: {gangnam_status.get_json()}")
 
     reports = assert_response(client, "/reports")
     if "report-form" not in reports.get_data(as_text=True):
