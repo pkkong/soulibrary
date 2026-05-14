@@ -83,14 +83,22 @@ def _sitemap_stats():
     cached = SITEMAP_CACHE
     if cached["pages"] and (now - cached["ts"]) < SITEMAP_TTL_SEC:
         return cached["count"], cached["pages"]
-    conn = get_db_conn()
+    try:
+        conn = get_db_conn()
+    except Exception as e:
+        print(f"[db warning] sitemap book index unavailable: {e}")
+        SITEMAP_CACHE.update({"ts": now, "count": 0, "pages": 0})
+        return 0, 0
     try:
         cur = conn.execute("SELECT COUNT(*) AS count FROM books;")
         row = cur.fetchone()
         total = row["count"] if row and row.get("count") is not None else 0
+    except Exception as e:
+        print(f"[db warning] sitemap book index unavailable: {e}")
+        total = 0
     finally:
         conn.close()
-    pages = max(1, (total + SITEMAP_PAGE_SIZE - 1) // SITEMAP_PAGE_SIZE)
+    pages = (total + SITEMAP_PAGE_SIZE - 1) // SITEMAP_PAGE_SIZE if total else 0
     SITEMAP_CACHE.update({"ts": now, "count": total, "pages": pages})
     return total, pages
 
@@ -101,7 +109,11 @@ def _sitemap_page_ids(page: int):
     if cached and (now - cached["ts"]) < SITEMAP_TTL_SEC:
         return cached["ids"]
     offset = (page - 1) * SITEMAP_PAGE_SIZE
-    conn = get_db_conn()
+    try:
+        conn = get_db_conn()
+    except Exception as e:
+        print(f"[db warning] sitemap book page unavailable: {e}")
+        return []
     try:
         cur = conn.execute(
             "SELECT id FROM books ORDER BY id LIMIT ? OFFSET ?",
@@ -109,6 +121,9 @@ def _sitemap_page_ids(page: int):
         )
         rows = cur.fetchall()
         ids = [r["id"] if isinstance(r, dict) else r[0] for r in rows]
+    except Exception as e:
+        print(f"[db warning] sitemap book page unavailable: {e}")
+        ids = []
     finally:
         conn.close()
     SITEMAP_PAGE_CACHE[page] = {"ts": now, "ids": ids}
@@ -491,12 +506,16 @@ def naver_verify_alt():
 
 @app.route('/book/<int:book_id>')
 def book_detail(book_id: int):
-    detail = get_book_meta(book_id)
+    try:
+        detail = get_book_meta(book_id)
+    except Exception as e:
+        print(f"[db warning] legacy book detail unavailable for {book_id}: {e}")
+        detail = None
     if not detail:
         return render_template(
             "book.html",
             book=None,
-            error="해당 도서를 찾을 수 없습니다.",
+            error="이전 상세 페이지는 현재 지원하지 않습니다. 검색에서 다시 조회해주세요.",
             show_topbar=False,
             topbar_desc="",
             active_tab="search",
@@ -524,7 +543,11 @@ def api_book_libraries():
     if cached and now - cached["ts"] < LIB_DETAIL_TTL_SEC:
         return jsonify(cached["payload"])
 
-    detail = get_book_detail(book_id)
+    try:
+        detail = get_book_detail(book_id)
+    except Exception as e:
+        print(f"[db warning] legacy book libraries unavailable for {book_id}: {e}")
+        return jsonify({"error": "legacy_detail_unavailable", "libraries": [], "counts": {}}), 404
     if not detail:
         return jsonify({"error": "not_found"}), 404
     payload = {

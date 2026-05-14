@@ -51,6 +51,20 @@ def main():
     if payload != {"total": 0, "items": []}:
         raise AssertionError(f"unexpected empty search payload: {payload}")
 
+    sitemap = assert_response(client, "/sitemap.xml")
+    sitemap_body = sitemap.get_data(as_text=True)
+    if "/sitemap-static.xml" not in sitemap_body:
+        raise AssertionError("sitemap index did not include static sitemap")
+
+    legacy_book = assert_response(client, "/book/1", expected_status=404)
+    if "이전 상세 페이지는 현재 지원하지 않습니다" not in legacy_book.get_data(as_text=True):
+        raise AssertionError("legacy book detail did not render the DB-free fallback")
+
+    legacy_libraries = assert_response(client, "/api/book_libraries?book_id=1", expected_status=404)
+    legacy_payload = legacy_libraries.get_json()
+    if legacy_payload.get("error") != "legacy_detail_unavailable":
+        raise AssertionError(f"unexpected legacy libraries payload: {legacy_payload}")
+
     reports = assert_response(client, "/reports")
     if "report-form" not in reports.get_data(as_text=True):
         raise AssertionError("reports page did not render expected markup")
