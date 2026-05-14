@@ -103,7 +103,9 @@
                                data-content-id="{{ lib.content_id }}"
                                data-ctts="{{ lib.ctts_dvsn_code }}"
                                data-ctgr="{{ lib.ctgr_id }}"
-                               data-sntn="{{ lib.sntn_auth_code }}">
+                               data-sntn="{{ lib.sntn_auth_code }}"
+                               data-product-cd="{{ lib.product_cd }}"
+                               data-category-id="{{ lib.category_id }}">
                                 <span class="lib-badge-name">{{ lib.short or lib.name }}</span>
                                 <span class="lib-status is-loading" data-status-text aria-label="조회 중..."></span>
                             </a>
@@ -176,7 +178,11 @@
                 return `/api/kyobo_status?${params.toString()}`;
             }
             if (kind === "dobong") {
-                const params = new URLSearchParams({ brcd: card.dataset.brcd || "" });
+                const params = new URLSearchParams({
+                    brcd: card.dataset.brcd || "",
+                    product_cd: card.dataset.productCd || "",
+                    category_id: card.dataset.categoryId || "",
+                });
                 return `/api/dobong_status?${params.toString()}`;
             }
             if (kind === "yes24") {
