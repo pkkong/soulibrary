@@ -25,6 +25,7 @@ for path in (
         pass
 
 from app_search import app  # noqa: E402
+import report_routes  # noqa: E402
 
 
 def assert_response(client, path, expected_status=200):
@@ -69,16 +70,43 @@ def main():
     if "report-form" not in reports.get_data(as_text=True):
         raise AssertionError("reports page did not render expected markup")
 
-    submission = client.post(
-        "/reports",
-        data={
-            "category": "오류",
-            "message": "자동 테스트 신고 내용입니다.",
-            "page_url": "https://example.com/search",
-            "contact": "",
-        },
-        follow_redirects=False,
-    )
+    original_post = report_routes.requests.post
+
+    class FakeIssueResponse:
+        status_code = 201
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"number": 123, "html_url": "https://github.com/pkkong/library_crawler/issues/123"}
+
+    def fake_issue_post(url, headers=None, json=None, timeout=None):
+        if url != "https://api.github.com/repos/pkkong/library_crawler/issues":
+            raise AssertionError(f"unexpected issue url: {url}")
+        if not json or "자동 테스트 신고 내용입니다." not in json.get("body", ""):
+            raise AssertionError(f"unexpected issue payload: {json}")
+        return FakeIssueResponse()
+
+    os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
+    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
+    report_routes.requests.post = fake_issue_post
+    try:
+        submission = client.post(
+            "/reports",
+            data={
+                "category": "오류",
+                "message": "자동 테스트 신고 내용입니다.",
+                "page_url": "https://example.com/search",
+                "contact": "",
+            },
+            follow_redirects=False,
+        )
+    finally:
+        report_routes.requests.post = original_post
+        os.environ.pop("GITHUB_ISSUE_TOKEN", None)
+        os.environ.pop("GITHUB_ISSUE_REPO", None)
+
     if submission.status_code not in (302, 303):
         body = submission.get_data(as_text=True)[:500]
         raise AssertionError(f"report submission failed with {submission.status_code}: {body}")
@@ -90,6 +118,8 @@ def main():
         raise AssertionError("report saved confirmation did not render")
     if "자동 테스트 신고 내용입니다" not in saved.get_data(as_text=True):
         raise AssertionError("saved report did not render in recent reports")
+    if "이슈 #123" not in saved.get_data(as_text=True):
+        raise AssertionError("created GitHub issue did not render in recent reports")
 
     print("smoke_test: ok")
 
