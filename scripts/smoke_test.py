@@ -1,6 +1,5 @@
 import os
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,18 +11,6 @@ sys.path.insert(0, str(WEB_DIR))
 # Keep smoke tests DB-free and fast unless the caller explicitly sets values.
 os.environ.setdefault("LIVE_SEARCH_TOTAL_TIMEOUT", "1.0")
 os.environ.setdefault("LIVE_SEARCH_LIBRARY_TIMEOUT", "0.8")
-os.environ.setdefault("ERROR_REPORTS_STORAGE", "file")
-BAD_REPORTS_PATH = Path(tempfile.gettempdir()) / "soulib_smoke_bad_reports_path"
-BAD_REPORTS_PATH.mkdir(exist_ok=True)
-os.environ.setdefault("ERROR_REPORTS_FILE", str(BAD_REPORTS_PATH))
-for path in (
-    Path(tempfile.gettempdir()) / "soulib_smoke_error_reports.jsonl",
-    Path(tempfile.gettempdir()) / "soulib" / "error_reports.jsonl",
-):
-    try:
-        path.unlink()
-    except FileNotFoundError:
-        pass
 
 from app_search import app  # noqa: E402
 import report_routes  # noqa: E402
@@ -70,33 +57,29 @@ def main():
         raise AssertionError(f"unexpected legacy libraries payload: {legacy_payload}")
 
     utc_created_at = datetime(2026, 5, 14, 8, 17, tzinfo=timezone.utc)
-    decorated_report = report_routes._decorate_report({"status": "new", "created_at": utc_created_at})
+    decorated_report = report_routes._issue_to_report(
+        {
+            "number": 1,
+            "title": "[오류신고] 오류 - 테스트",
+            "body": "## 신고 내용\n테스트",
+            "state": "open",
+            "created_at": utc_created_at,
+        }
+    )
     if decorated_report["created_at"].strftime("%Y-%m-%d %H:%M") != "2026-05-14 17:17":
         raise AssertionError(f"report time did not render as KST: {decorated_report['created_at']}")
-    file_report = report_routes._file_report_row({"created_at": "2026-05-14T08:17:00+00:00"})
-    if file_report["created_at"].strftime("%Y-%m-%d %H:%M") != "2026-05-14 17:17":
-        raise AssertionError(f"file report time did not render as KST: {file_report['created_at']}")
-
-    cwd_report_path = Path("soulib_smoke_cwd_report.jsonl")
-    try:
-        cwd_report_path.unlink()
-    except FileNotFoundError:
-        pass
-    original_report_file = os.environ.get("ERROR_REPORTS_FILE")
-    os.environ["ERROR_REPORTS_FILE"] = str(cwd_report_path)
-    try:
-        report_routes._append_file_report({"message": "cwd path smoke"})
-        if not cwd_report_path.exists():
-            raise AssertionError("file report fallback did not create cwd-relative report file")
-    finally:
-        if original_report_file is None:
-            os.environ.pop("ERROR_REPORTS_FILE", None)
-        else:
-            os.environ["ERROR_REPORTS_FILE"] = original_report_file
-        try:
-            cwd_report_path.unlink()
-        except FileNotFoundError:
-            pass
+    parsed_report = report_routes._issue_to_report(
+        {
+            "number": 2,
+            "title": "[오류신고] 대출 상태 - 기존 신고",
+            "body": "## 신고 내용\n기존 신고 내용\n\n## 문제가 있던 주소\nhttps://example.com",
+            "html_url": "https://github.com/pkkong/library_crawler/issues/2",
+            "state": "closed",
+            "created_at": "2026-05-14T08:17:00Z",
+        }
+    )
+    if parsed_report["category"] != "대출 상태" or parsed_report["status_label"] != "처리 완료":
+        raise AssertionError(f"github issue report did not parse correctly: {parsed_report}")
 
     dobong_html = """
     <li id="content_450D000228066">
@@ -164,11 +147,31 @@ def main():
     if gangnam_status.get_json().get("status", {}).get("owned") != 3:
         raise AssertionError(f"gangnam EUC-KR status did not parse: {gangnam_status.get_json()}")
 
-    reports = assert_response(client, "/reports")
-    if "report-form" not in reports.get_data(as_text=True):
-        raise AssertionError("reports page did not render expected markup")
-
+    original_get = report_routes.requests.get
     original_post = report_routes.requests.post
+
+    class FakeIssueListResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {
+                    "number": 122,
+                    "title": "[오류신고] 오류 - 기존 신고 내용입니다.",
+                    "body": "## 신고 내용\n기존 신고 내용입니다.\n\n## 문제가 있던 주소\nhttps://example.com/search",
+                    "html_url": "https://github.com/pkkong/library_crawler/issues/122",
+                    "state": "open",
+                    "created_at": "2026-05-14T08:17:00Z",
+                },
+                {
+                    "number": 14,
+                    "title": "Not a report",
+                    "pull_request": {},
+                    "state": "closed",
+                    "created_at": "2026-05-14T08:18:00Z",
+                },
+            ]
 
     class FakeIssueResponse:
         status_code = 201
@@ -177,7 +180,21 @@ def main():
             return None
 
         def json(self):
-            return {"number": 123, "html_url": "https://github.com/pkkong/library_crawler/issues/123"}
+            return {
+                "number": 123,
+                "title": "[오류신고] 오류 - 자동 테스트 신고 내용입니다.",
+                "body": "## 신고 내용\n자동 테스트 신고 내용입니다.",
+                "html_url": "https://github.com/pkkong/library_crawler/issues/123",
+                "state": "open",
+                "created_at": "2026-05-14T08:17:00Z",
+            }
+
+    def fake_issue_get(url, headers=None, params=None, timeout=None):
+        if url != "https://api.github.com/repos/pkkong/library_crawler/issues":
+            raise AssertionError(f"unexpected issue list url: {url}")
+        if not params or params.get("state") != "all":
+            raise AssertionError(f"unexpected issue list params: {params}")
+        return FakeIssueListResponse()
 
     def fake_issue_post(url, headers=None, json=None, timeout=None):
         if url != "https://api.github.com/repos/pkkong/library_crawler/issues":
@@ -188,6 +205,14 @@ def main():
 
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
     os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
+    report_routes.requests.get = fake_issue_get
+    reports = assert_response(client, "/reports")
+    reports_body = reports.get_data(as_text=True)
+    if "report-form" not in reports_body:
+        raise AssertionError("reports page did not render expected markup")
+    if "기존 신고 내용입니다" not in reports_body or "이슈 #122" not in reports_body:
+        raise AssertionError("reports page did not render GitHub issues as the report store")
+
     report_routes.requests.post = fake_issue_post
     try:
         submission = client.post(
@@ -201,6 +226,7 @@ def main():
             follow_redirects=False,
         )
     finally:
+        report_routes.requests.get = original_get
         report_routes.requests.post = original_post
         os.environ.pop("GITHUB_ISSUE_TOKEN", None)
         os.environ.pop("GITHUB_ISSUE_REPO", None)
@@ -211,13 +237,17 @@ def main():
     if not submission.headers.get("Location", "").endswith("/reports?saved=1"):
         raise AssertionError(f"unexpected report redirect: {submission.headers.get('Location')}")
 
-    saved = assert_response(client, "/reports?saved=1")
+    report_routes.requests.get = fake_issue_get
+    os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
+    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
+    try:
+        saved = assert_response(client, "/reports?saved=1")
+    finally:
+        report_routes.requests.get = original_get
+        os.environ.pop("GITHUB_ISSUE_TOKEN", None)
+        os.environ.pop("GITHUB_ISSUE_REPO", None)
     if "신고가 접수되었습니다" not in saved.get_data(as_text=True):
         raise AssertionError("report saved confirmation did not render")
-    if "자동 테스트 신고 내용입니다" not in saved.get_data(as_text=True):
-        raise AssertionError("saved report did not render in recent reports")
-    if "이슈 #123" not in saved.get_data(as_text=True):
-        raise AssertionError("created GitHub issue did not render in recent reports")
 
     print("smoke_test: ok")
 

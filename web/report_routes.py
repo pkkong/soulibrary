@@ -1,12 +1,8 @@
-import json
 import os
-import tempfile
 from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Blueprint, redirect, render_template, request, url_for
-
-from db import get_db, using_postgres
 
 
 report_bp = Blueprint("reports", __name__)
@@ -14,10 +10,8 @@ report_bp = Blueprint("reports", __name__)
 MAX_MESSAGE_LEN = 1200
 MAX_CONTACT_LEN = 120
 MAX_PAGE_URL_LEN = 500
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_REPORTS_FILE = os.path.join(tempfile.gettempdir(), "soulib", "error_reports.jsonl")
-LEGACY_REPORTS_FILE = os.path.join(ROOT_DIR, "data", "error_reports.jsonl")
 DEFAULT_GITHUB_REPO = "pkkong/library_crawler"
+REPORT_TITLE_PREFIX = "[오류신고]"
 KST = timezone(timedelta(hours=9), "Asia/Seoul")
 
 
@@ -26,106 +20,11 @@ def _clean(value: str, limit: int) -> str:
     return text[:limit]
 
 
-def _report_file_candidates():
-    paths = [
-        os.environ.get("ERROR_REPORTS_FILE"),
-        DEFAULT_REPORTS_FILE,
-        LEGACY_REPORTS_FILE,
-    ]
-    result = []
-    seen = set()
-    for path in paths:
-        if not path or path in seen:
-            continue
-        seen.add(path)
-        result.append(path)
-    return result
-
-
-def _ensure_table(conn):
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS error_reports (
-            id SERIAL PRIMARY KEY,
-            category TEXT NOT NULL DEFAULT '오류',
-            message TEXT NOT NULL,
-            contact TEXT,
-            page_url TEXT,
-            user_agent TEXT,
-            issue_number INTEGER,
-            issue_url TEXT,
-            status TEXT NOT NULL DEFAULT 'new',
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-        """
-    )
-    # Older deployments may already have the table with fewer columns.
-    for sql in (
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT '오류'",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS message TEXT",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS contact TEXT",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS page_url TEXT",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS user_agent TEXT",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS issue_number INTEGER",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS issue_url TEXT",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'new'",
-        "ALTER TABLE error_reports ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
-    ):
-        conn.execute(sql)
-    conn.commit()
-
-
-def _status_label(status: str | None) -> str:
-    labels = {
-        "issue_created": "이슈 등록",
-        "new": "접수됨",
-    }
-    return labels.get(status or "new", "접수됨")
-
-
-def _decorate_report(row: dict) -> dict:
-    data = dict(row)
-    data["status_label"] = _status_label(data.get("status"))
-    data["created_at"] = _to_kst(data.get("created_at"))
-    return data
-
-
-def _recent_reports(conn):
-    cur = conn.execute(
-        """
-        SELECT id, category, message, page_url, issue_number, issue_url, status, created_at
-        FROM error_reports
-        ORDER BY created_at DESC, id DESC
-        LIMIT 10
-        """
-    )
-    return [_decorate_report(row) for row in cur.fetchall()]
-
-
-def _file_report_row(payload: dict, report_id: int | None = None) -> dict:
-    created_at = payload.get("created_at")
-    if isinstance(created_at, str):
-        try:
-            created_at = datetime.fromisoformat(created_at)
-        except ValueError:
-            created_at = None
-    return {
-        "id": report_id or payload.get("id") or 0,
-        "category": payload.get("category") or "오류",
-        "message": payload.get("message") or "",
-        "page_url": payload.get("page_url") or "",
-        "issue_number": payload.get("issue_number"),
-        "issue_url": payload.get("issue_url") or "",
-        "status": payload.get("status") or "new",
-        "status_label": _status_label(payload.get("status")),
-        "created_at": _to_kst(created_at),
-    }
-
-
 def _to_kst(value):
     if not value:
         return None
     if isinstance(value, str):
+        value = value.replace("Z", "+00:00")
         try:
             value = datetime.fromisoformat(value)
         except ValueError:
@@ -135,62 +34,26 @@ def _to_kst(value):
     return value.astimezone(KST)
 
 
-def _recent_file_reports():
-    rows = []
-    for path in _report_file_candidates():
-        if not os.path.exists(path) or os.path.isdir(path):
-            continue
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                for idx, line in enumerate(f, start=1):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        rows.append(_file_report_row(json.loads(line), idx))
-                    except json.JSONDecodeError:
-                        continue
-        except Exception as exc:
-            print(f"[report warning] file report read failed from {path}: {exc}")
-    return list(reversed(rows))[:10]
+def _github_repo() -> str:
+    return os.environ.get("GITHUB_ISSUE_REPO", DEFAULT_GITHUB_REPO).strip() or DEFAULT_GITHUB_REPO
 
 
-def _safe_recent_file_reports():
-    try:
-        return _recent_file_reports()
-    except Exception as exc:
-        print(f"[report warning] file report read failed: {exc}")
-        return []
+def _github_timeout() -> float:
+    return float(os.environ.get("GITHUB_ISSUE_TIMEOUT", "8"))
 
 
-def _append_file_report(payload: dict):
-    last_error = None
-    for path in _report_file_candidates():
-        try:
-            parent_dir = os.path.dirname(path)
-            if parent_dir:
-                os.makedirs(parent_dir, exist_ok=True)
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            return
-        except Exception as exc:
-            last_error = exc
-            print(f"[report warning] file report write failed to {path}: {exc}")
-    raise RuntimeError(f"all report file fallbacks failed: {last_error}")
+def _github_headers(require_token: bool = True) -> dict:
+    token = os.environ.get("GITHUB_ISSUE_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if require_token and not token:
+        raise RuntimeError("GITHUB_ISSUE_TOKEN is required for report storage.")
 
-
-def _open_report_db():
-    if os.environ.get("ERROR_REPORTS_STORAGE") == "file":
-        return None
-    if not using_postgres():
-        return None
-    try:
-        conn = get_db()
-        _ensure_table(conn)
-        return conn
-    except Exception as exc:
-        print(f"[report warning] database unavailable: {exc}")
-        return None
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
 
 
 def _github_issue_labels() -> list[str]:
@@ -198,14 +61,89 @@ def _github_issue_labels() -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def _create_github_issue(form: dict, user_agent: str) -> dict:
-    token = os.environ.get("GITHUB_ISSUE_TOKEN") or os.environ.get("GITHUB_TOKEN")
-    if not token:
-        return {}
+def _status_label(state: str | None) -> str:
+    if state == "closed":
+        return "처리 완료"
+    return "접수됨"
 
-    repo = os.environ.get("GITHUB_ISSUE_REPO", DEFAULT_GITHUB_REPO).strip() or DEFAULT_GITHUB_REPO
-    timeout = float(os.environ.get("GITHUB_ISSUE_TIMEOUT", "8"))
-    title = f"[오류신고] {form['category']} - {_clean(form['message'], 70)}"
+
+def _extract_section(body: str, heading: str) -> str:
+    lines = str(body or "").splitlines()
+    target = f"## {heading}".strip()
+    for idx, line in enumerate(lines):
+        if line.strip() != target:
+            continue
+        values = []
+        for next_line in lines[idx + 1:]:
+            if next_line.startswith("## "):
+                break
+            if next_line.strip():
+                values.append(next_line.strip())
+        return "\n".join(values).strip()
+    return ""
+
+
+def _category_from_title(title: str) -> str:
+    title = str(title or "")
+    if not title.startswith(REPORT_TITLE_PREFIX):
+        return "오류"
+    rest = title[len(REPORT_TITLE_PREFIX):].strip()
+    if " - " in rest:
+        return rest.split(" - ", 1)[0].strip() or "오류"
+    return "오류"
+
+
+def _issue_to_report(issue: dict) -> dict:
+    issue_number = issue.get("number")
+    body = issue.get("body") or ""
+    return {
+        "id": issue_number or 0,
+        "category": _category_from_title(issue.get("title") or ""),
+        "message": _extract_section(body, "신고 내용") or issue.get("title") or "",
+        "page_url": _extract_section(body, "문제가 있던 주소"),
+        "issue_number": issue_number,
+        "issue_url": issue.get("html_url") or "",
+        "status": issue.get("state") or "open",
+        "status_label": _status_label(issue.get("state")),
+        "created_at": _to_kst(issue.get("created_at")),
+    }
+
+
+def _recent_github_reports(limit: int = 10) -> list[dict]:
+    url = f"https://api.github.com/repos/{_github_repo()}/issues"
+    params = {
+        "state": "all",
+        "sort": "created",
+        "direction": "desc",
+        "per_page": "100",
+    }
+    try:
+        response = requests.get(
+            url,
+            headers=_github_headers(require_token=False),
+            params=params,
+            timeout=_github_timeout(),
+        )
+        response.raise_for_status()
+        issues = response.json()
+    except Exception as exc:
+        print(f"[report warning] github issue list failed: {exc}")
+        return []
+
+    reports = []
+    for issue in issues if isinstance(issues, list) else []:
+        if issue.get("pull_request"):
+            continue
+        if not str(issue.get("title") or "").startswith(REPORT_TITLE_PREFIX):
+            continue
+        reports.append(_issue_to_report(issue))
+        if len(reports) >= limit:
+            break
+    return reports
+
+
+def _create_github_issue(form: dict, user_agent: str) -> dict:
+    title = f"{REPORT_TITLE_PREFIX} {form['category']} - {_clean(form['message'], 70)}"
     body = "\n".join(
         [
             "Soulib `/reports`에서 자동 생성된 오류 신고입니다.",
@@ -234,73 +172,23 @@ def _create_github_issue(form: dict, user_agent: str) -> dict:
     if labels:
         payload["labels"] = labels
 
-    url = f"https://api.github.com/repos/{repo}/issues"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=timeout)
-        if labels and response.status_code == 422:
-            payload.pop("labels", None)
-            response = requests.post(url, headers=headers, json=payload, timeout=timeout)
-        response.raise_for_status()
-        data = response.json()
-        return {
-            "issue_number": data.get("number"),
-            "issue_url": data.get("html_url") or "",
-        }
-    except Exception as exc:
-        print(f"[report warning] github issue creation failed: {exc}")
-        return {}
-
-
-def _build_report_payload(form: dict, user_agent: str, issue_info: dict | None = None) -> dict:
-    issue_info = issue_info or {}
-    return {
-        **form,
-        "user_agent": user_agent,
-        "issue_number": issue_info.get("issue_number"),
-        "issue_url": issue_info.get("issue_url") or "",
-        "status": "issue_created" if issue_info.get("issue_url") else "new",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-
-def _save_report(conn, form: dict, user_agent: str, issue_info: dict | None = None):
-    issue_info = issue_info or {}
-    if conn:
-        try:
-            conn.execute(
-                """
-                INSERT INTO error_reports (
-                    category, message, contact, page_url, user_agent,
-                    issue_number, issue_url, status
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    form["category"],
-                    form["message"],
-                    form["contact"],
-                    form["page_url"],
-                    user_agent,
-                    issue_info.get("issue_number"),
-                    issue_info.get("issue_url") or "",
-                    "issue_created" if issue_info.get("issue_url") else "new",
-                ),
-            )
-            conn.commit()
-            return
-        except Exception as exc:
-            print(f"[report warning] database save failed, falling back to file: {exc}")
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-
-    _append_file_report(_build_report_payload(form, user_agent, issue_info))
+    url = f"https://api.github.com/repos/{_github_repo()}/issues"
+    response = requests.post(
+        url,
+        headers=_github_headers(require_token=True),
+        json=payload,
+        timeout=_github_timeout(),
+    )
+    if labels and response.status_code == 422:
+        payload.pop("labels", None)
+        response = requests.post(
+            url,
+            headers=_github_headers(require_token=True),
+            json=payload,
+            timeout=_github_timeout(),
+        )
+    response.raise_for_status()
+    return _issue_to_report(response.json())
 
 
 @report_bp.route("/reports", methods=["GET", "POST"])
@@ -313,8 +201,6 @@ def reports_page():
         "contact": "",
         "page_url": request.args.get("url") or request.referrer or "",
     }
-
-    conn = _open_report_db()
 
     try:
         if request.method == "POST":
@@ -331,18 +217,12 @@ def reports_page():
                 error = "어떤 문제가 있었는지 조금만 더 적어주세요."
             else:
                 user_agent = _clean(request.headers.get("User-Agent"), 500)
-                issue_info = _create_github_issue(form, user_agent)
-                _save_report(conn, form, user_agent, issue_info)
+                _create_github_issue(form, user_agent)
                 return redirect(url_for("reports.reports_page", saved=1))
 
-        try:
-            reports = _recent_reports(conn) if conn else _safe_recent_file_reports()
-        except Exception as exc:
-            print(f"[report warning] database read failed, falling back to file: {exc}")
-            reports = _safe_recent_file_reports()
         return render_template(
             "reports.html",
-            reports=reports,
+            reports=_recent_github_reports(),
             form=form,
             error=error,
             saved=saved,
@@ -351,15 +231,10 @@ def reports_page():
             active_tab="reports",
         )
     except Exception as exc:
-        print(f"[report error] save failed: {exc}")
-        if conn:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
+        print(f"[report error] github issue storage failed: {exc}")
         return render_template(
             "reports.html",
-            reports=[],
+            reports=_recent_github_reports(),
             form=form,
             error="신고를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.",
             saved=False,
@@ -367,6 +242,3 @@ def reports_page():
             topbar_desc="",
             active_tab="reports",
         ), 500
-    finally:
-        if conn:
-            conn.close()

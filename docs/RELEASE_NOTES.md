@@ -51,7 +51,7 @@
 - Cloudtype 운영 앱은 `web/app_cloudtype.py`에서 `web/app_search.py`를 불러오는 구조다.
 - 실시간 조회 기능은 `web/live_search/` 아래 커넥터와 정규화 로직을 사용한다.
 - 실시간 검색은 전체 응답 대기를 줄이기 위해 도서관별 timeout과 전체 timeout을 둔다.
-- 오류 신고는 운영 DB의 `error_reports` 테이블에 저장한다. DB 연결이 없을 때는 로컬 JSONL 파일로 임시 저장한다.
+- 오류 신고는 GitHub Issues를 단일 저장소로 사용한다. DB/JSONL 파일 fallback은 사용하지 않는다.
 - UX/UI 기준은 `docs/UX_UI_Guide.md`에 정리했다.
 - GitHub `main` push 시 Cloudtype webhook을 호출하는 자동 배포 workflow를 추가했다.
 
