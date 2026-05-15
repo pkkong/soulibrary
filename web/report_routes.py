@@ -10,6 +10,7 @@ report_bp = Blueprint("reports", __name__)
 MAX_MESSAGE_LEN = 1200
 MAX_CONTACT_LEN = 120
 MAX_PAGE_URL_LEN = 500
+MAX_RESOLUTION_LEN = 260
 DEFAULT_GITHUB_REPO = "pkkong/library_crawler"
 REPORT_TITLE_PREFIX = "[오류신고]"
 REPORT_STORE_ERROR = "GitHub Issues 저장소 연결에 실패했습니다. GITHUB_ISSUE_TOKEN을 확인해주세요."
@@ -69,6 +70,15 @@ def _status_label(state: str | None) -> str:
     return "접수됨"
 
 
+def _resolution_message(text: str) -> str:
+    lines = []
+    for line in str(text or "").splitlines():
+        clean_line = line.strip().strip("#").strip()
+        if clean_line:
+            lines.append(clean_line)
+    return _clean(" ".join(lines), MAX_RESOLUTION_LEN)
+
+
 def _extract_section(body: str, heading: str) -> str:
     lines = str(body or "").splitlines()
     target = f"## {heading}".strip()
@@ -95,9 +105,50 @@ def _category_from_title(title: str) -> str:
     return "오류"
 
 
-def _issue_to_report(issue: dict) -> dict:
+def _latest_issue_comment(issue: dict) -> dict | None:
+    if issue.get("state") != "closed" or not issue.get("comments"):
+        return None
+    comments_url = issue.get("comments_url")
+    if not comments_url:
+        issue_number = issue.get("number")
+        if not issue_number:
+            return None
+        comments_url = f"https://api.github.com/repos/{_github_repo()}/issues/{issue_number}/comments"
+
+    response = requests.get(
+        comments_url,
+        headers=_github_headers(require_token=True),
+        params={"per_page": "100"},
+        timeout=_github_timeout(),
+    )
+    response.raise_for_status()
+    comments = response.json()
+    if not isinstance(comments, list):
+        return None
+
+    for comment in reversed(comments):
+        message = _resolution_message(comment.get("body") or "")
+        if message:
+            return {
+                "message": message,
+                "created_at": _to_kst(comment.get("created_at")),
+            }
+    return None
+
+
+def _issue_to_report(issue: dict, resolution_comment: dict | None = None) -> dict:
     issue_number = issue.get("number")
     body = issue.get("body") or ""
+    closed_at = _to_kst(issue.get("closed_at"))
+    resolution_message = ""
+    resolution_at = None
+    if issue.get("state") == "closed":
+        resolution_message = "처리 완료로 표시되었습니다."
+        resolution_at = closed_at
+    if resolution_comment:
+        resolution_message = resolution_comment.get("message") or resolution_message
+        resolution_at = resolution_comment.get("created_at") or resolution_at
+
     return {
         "id": issue_number or 0,
         "category": _category_from_title(issue.get("title") or ""),
@@ -108,6 +159,10 @@ def _issue_to_report(issue: dict) -> dict:
         "status": issue.get("state") or "open",
         "status_label": _status_label(issue.get("state")),
         "created_at": _to_kst(issue.get("created_at")),
+        "closed_at": closed_at,
+        "updated_at": _to_kst(issue.get("updated_at")),
+        "resolution_message": resolution_message,
+        "resolution_at": resolution_at,
     }
 
 
@@ -136,7 +191,12 @@ def _recent_github_reports(limit: int = 10) -> list[dict]:
             continue
         if not str(issue.get("title") or "").startswith(REPORT_TITLE_PREFIX):
             continue
-        reports.append(_issue_to_report(issue))
+        resolution_comment = None
+        try:
+            resolution_comment = _latest_issue_comment(issue)
+        except Exception as exc:
+            print(f"[report warning] github issue comment fetch failed: {exc}")
+        reports.append(_issue_to_report(issue, resolution_comment))
         if len(reports) >= limit:
             break
     return reports
