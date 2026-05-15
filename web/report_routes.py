@@ -152,7 +152,9 @@ def _append_file_report(payload: dict):
     last_error = None
     for path in _report_file_candidates():
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+            parent_dir = os.path.dirname(path)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
             with open(path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(payload, ensure_ascii=False) + "\n")
             return

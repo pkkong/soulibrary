@@ -68,6 +68,27 @@ def main():
     if legacy_payload.get("error") != "legacy_detail_unavailable":
         raise AssertionError(f"unexpected legacy libraries payload: {legacy_payload}")
 
+    cwd_report_path = Path("soulib_smoke_cwd_report.jsonl")
+    try:
+        cwd_report_path.unlink()
+    except FileNotFoundError:
+        pass
+    original_report_file = os.environ.get("ERROR_REPORTS_FILE")
+    os.environ["ERROR_REPORTS_FILE"] = str(cwd_report_path)
+    try:
+        report_routes._append_file_report({"message": "cwd path smoke"})
+        if not cwd_report_path.exists():
+            raise AssertionError("file report fallback did not create cwd-relative report file")
+    finally:
+        if original_report_file is None:
+            os.environ.pop("ERROR_REPORTS_FILE", None)
+        else:
+            os.environ["ERROR_REPORTS_FILE"] = original_report_file
+        try:
+            cwd_report_path.unlink()
+        except FileNotFoundError:
+            pass
+
     dobong_html = """
     <li id="content_450D000228066">
       <p class="pic"><a href="/Kyobo_T3/Content/audio/audio_View.asp?barcode=450D000228066&product_cd=002&category_id=0733">
