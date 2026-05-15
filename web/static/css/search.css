@@ -1430,6 +1430,36 @@ body.has-topbar .search-top {
     line-height: 1.45;
 }
 
+.report-resolution-log {
+    margin-top: 10px;
+    border-left: 3px solid #34c759;
+    border-radius: 10px;
+    background: #f4fbf6;
+    padding: 9px 10px;
+}
+
+.report-resolution-log div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: #20813f;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.report-resolution-log time {
+    color: #6e6e73;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.report-resolution-log p {
+    margin-top: 5px;
+    color: #1d1d1f;
+    font-size: 13px;
+}
+
 .report-empty {
     border-radius: 16px;
     background: #f2f2f7;

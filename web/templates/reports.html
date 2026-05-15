@@ -72,6 +72,17 @@
                             <time>{{ report.created_at.strftime("%Y-%m-%d %H:%M") if report.created_at else "" }}</time>
                         </div>
                         <p>{{ report.message }}</p>
+                        {% if report.resolution_message %}
+                            <div class="report-resolution-log">
+                                <div>
+                                    <strong>해결 로그</strong>
+                                    {% if report.resolution_at %}
+                                        <time>{{ report.resolution_at.strftime("%Y-%m-%d %H:%M") }}</time>
+                                    {% endif %}
+                                </div>
+                                <p>{{ report.resolution_message }}</p>
+                            </div>
+                        {% endif %}
                     </article>
                 {% endfor %}
             </div>

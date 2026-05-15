@@ -76,9 +76,15 @@ def main():
             "html_url": "https://github.com/pkkong/library_crawler/issues/2",
             "state": "closed",
             "created_at": "2026-05-14T08:17:00Z",
+            "closed_at": "2026-05-14T09:00:00Z",
         }
     )
-    if parsed_report["category"] != "대출 상태" or parsed_report["status_label"] != "처리 완료":
+    if (
+        parsed_report["category"] != "대출 상태"
+        or parsed_report["status_label"] != "처리 완료"
+        or parsed_report["resolution_message"] != "처리 완료로 표시되었습니다."
+        or parsed_report["resolution_at"].strftime("%Y-%m-%d %H:%M") != "2026-05-14 18:00"
+    ):
         raise AssertionError(f"github issue report did not parse correctly: {parsed_report}")
 
     dobong_html = """
@@ -166,6 +172,18 @@ def main():
         def json(self):
             return [
                 {
+                    "number": 124,
+                    "title": "[오류신고] 대출 상태 - 해결된 신고입니다.",
+                    "body": "## 신고 내용\n해결된 신고입니다.",
+                    "html_url": "https://github.com/pkkong/library_crawler/issues/124",
+                    "comments_url": "https://api.github.com/repos/pkkong/library_crawler/issues/124/comments",
+                    "comments": 1,
+                    "state": "closed",
+                    "created_at": "2026-05-14T08:18:00Z",
+                    "closed_at": "2026-05-14T09:00:00Z",
+                    "updated_at": "2026-05-14T09:00:00Z",
+                },
+                {
                     "number": 122,
                     "title": "[오류신고] 오류 - 기존 신고 내용입니다.",
                     "body": "## 신고 내용\n기존 신고 내용입니다.\n\n## 문제가 있던 주소\nhttps://example.com/search",
@@ -180,6 +198,18 @@ def main():
                     "state": "closed",
                     "created_at": "2026-05-14T08:18:00Z",
                 },
+            ]
+
+    class FakeIssueCommentsResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {
+                    "body": "수정 후 배포 완료했습니다.",
+                    "created_at": "2026-05-14T09:00:00Z",
+                }
             ]
 
     class FakeIssueResponse:
@@ -199,6 +229,8 @@ def main():
             }
 
     def fake_issue_get(url, headers=None, params=None, timeout=None):
+        if url == "https://api.github.com/repos/pkkong/library_crawler/issues/124/comments":
+            return FakeIssueCommentsResponse()
         if url != "https://api.github.com/repos/pkkong/library_crawler/issues":
             raise AssertionError(f"unexpected issue list url: {url}")
         if not params or params.get("state") != "all":
@@ -230,6 +262,8 @@ def main():
         raise AssertionError("reports page did not render expected markup")
     if "기존 신고 내용입니다" not in reports_body or "이슈 #122" not in reports_body:
         raise AssertionError("reports page did not render GitHub issues as the report store")
+    if "해결 로그" not in reports_body or "수정 후 배포 완료했습니다" not in reports_body:
+        raise AssertionError("reports page did not render closed issue resolution log")
 
     report_routes.requests.post = fake_issue_post
     try:
