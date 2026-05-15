@@ -59,6 +59,27 @@ def _github_headers(require_token: bool = True) -> dict:
     return headers
 
 
+def _github_error_detail(exc: Exception) -> str:
+    if str(exc) == "GITHUB_ISSUE_TOKEN is required for report storage.":
+        return "운영 서버에 GITHUB_ISSUE_TOKEN 환경변수가 없습니다."
+
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code == 401:
+        return "GitHub가 토큰을 거부했습니다. 토큰 값이 잘못됐거나 폐기된 상태입니다."
+    if status_code == 403:
+        return "GitHub 토큰 권한이 부족합니다. Issues 권한과 저장소 접근 범위를 확인해야 합니다."
+    if status_code == 404:
+        return "GitHub 저장소를 찾지 못했습니다. GITHUB_ISSUE_REPO 또는 토큰의 저장소 접근 범위가 맞지 않습니다."
+    if status_code:
+        return f"GitHub API가 HTTP {status_code} 응답을 반환했습니다."
+    return "GitHub API 호출 중 알 수 없는 오류가 발생했습니다."
+
+
+def _report_store_error(exc: Exception) -> str:
+    return f"{REPORT_STORE_ERROR} ({_github_error_detail(exc)})"
+
+
 def _github_issue_labels() -> list[str]:
     raw = os.environ.get("GITHUB_ISSUE_LABELS", "")
     return [item.strip() for item in raw.split(",") if item.strip()]
@@ -208,9 +229,10 @@ def _render_reports_page(form: dict, error: str = "", saved: bool = False, statu
     try:
         reports = _recent_github_reports()
     except Exception as exc:
-        print(f"[report error] github issue list failed: {exc}")
+        detail = _github_error_detail(exc)
+        print(f"[report error] github issue list failed: {detail} raw={exc}")
         reports_unavailable = True
-        error = error or REPORT_STORE_ERROR
+        error = error or _report_store_error(exc)
 
     return render_template(
         "reports.html",
@@ -303,7 +325,13 @@ def reports_page():
                 _create_github_issue(form, user_agent)
                 return redirect(url_for("reports.reports_page", saved=1))
             except Exception as exc:
-                print(f"[report error] github issue creation failed: {exc}")
-                return _render_reports_page(form, REPORT_SAVE_ERROR, saved=False, status_code=500)
+                detail = _github_error_detail(exc)
+                print(f"[report error] github issue creation failed: {detail} raw={exc}")
+                return _render_reports_page(
+                    form,
+                    f"{REPORT_SAVE_ERROR} ({detail})",
+                    saved=False,
+                    status_code=500,
+                )
 
     return _render_reports_page(form, error=error, saved=saved)
