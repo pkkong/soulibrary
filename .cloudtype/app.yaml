@@ -5,6 +5,11 @@ app: dockerfile
 options:
   ports: 5000
   dockerfile: Dockerfile
+  env:
+    - name: GITHUB_ISSUE_TOKEN
+      secret: soulib-report-issues
+    - name: GITHUB_ISSUE_REPO
+      value: pkkong/library_crawler
 
 context:
   git:
