@@ -378,7 +378,7 @@ docker exec -e PGPASSWORD=mkfleo93fe570fad soulib-postgres pg_restore -h svc.sel
 - 모바일 중심 Apple style UI 원칙은 `docs/UX_UI_Guide.md`를 기준으로 유지한다.
 - 검색 결과 공급사 분류는 `교보`, `YES24`, `기타` 3개만 사용한다.
 - 랜딩 페이지에는 검색과 직접 관련 없는 플랫폼 뱃지, 예시 결과, 장식 카드를 추가하지 않는다.
-- 오류 신고는 `/reports`에서 접수하며, 운영 DB의 `error_reports` 테이블에 저장한다.
+- 오류 신고는 `/reports`에서 접수하며, GitHub Issues를 단일 저장소로 사용한다.
 - 배포 변경 내역은 `docs/RELEASE_NOTES.md`에 기록한다.
 
 ## Cloudtype 자동 배포
