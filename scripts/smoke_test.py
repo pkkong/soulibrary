@@ -250,6 +250,8 @@ def main():
     missing_store_body = missing_store.get_data(as_text=True)
     if "GitHub Issues 저장소 연결에 실패했습니다" not in missing_store_body:
         raise AssertionError("reports page hid GitHub store connection failure")
+    if "운영 서버에 GITHUB_ISSUE_TOKEN 환경변수가 없습니다" not in missing_store_body:
+        raise AssertionError("reports page did not show the missing token cause")
     if "확인 필요" not in missing_store_body:
         raise AssertionError("reports page did not mark report store status as unavailable")
 
