@@ -12,6 +12,8 @@ MAX_CONTACT_LEN = 120
 MAX_PAGE_URL_LEN = 500
 DEFAULT_GITHUB_REPO = "pkkong/library_crawler"
 REPORT_TITLE_PREFIX = "[오류신고]"
+REPORT_STORE_ERROR = "GitHub Issues 저장소 연결에 실패했습니다. GITHUB_ISSUE_TOKEN을 확인해주세요."
+REPORT_SAVE_ERROR = "신고를 저장하지 못했습니다. GitHub Issues 연결 상태를 확인해주세요."
 KST = timezone(timedelta(hours=9), "Asia/Seoul")
 
 
@@ -117,18 +119,16 @@ def _recent_github_reports(limit: int = 10) -> list[dict]:
         "direction": "desc",
         "per_page": "100",
     }
-    try:
-        response = requests.get(
-            url,
-            headers=_github_headers(require_token=False),
-            params=params,
-            timeout=_github_timeout(),
-        )
-        response.raise_for_status()
-        issues = response.json()
-    except Exception as exc:
-        print(f"[report warning] github issue list failed: {exc}")
-        return []
+    response = requests.get(
+        url,
+        headers=_github_headers(require_token=True),
+        params=params,
+        timeout=_github_timeout(),
+    )
+    response.raise_for_status()
+    issues = response.json()
+    if not isinstance(issues, list):
+        raise RuntimeError("GitHub issue list response was not a list.")
 
     reports = []
     for issue in issues if isinstance(issues, list) else []:
@@ -140,6 +140,29 @@ def _recent_github_reports(limit: int = 10) -> list[dict]:
         if len(reports) >= limit:
             break
     return reports
+
+
+def _render_reports_page(form: dict, error: str = "", saved: bool = False, status_code: int = 200):
+    reports = []
+    reports_unavailable = False
+    try:
+        reports = _recent_github_reports()
+    except Exception as exc:
+        print(f"[report error] github issue list failed: {exc}")
+        reports_unavailable = True
+        error = error or REPORT_STORE_ERROR
+
+    return render_template(
+        "reports.html",
+        reports=reports,
+        reports_unavailable=reports_unavailable,
+        form=form,
+        error=error,
+        saved=saved,
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="reports",
+    ), status_code
 
 
 def _create_github_issue(form: dict, user_agent: str) -> dict:
@@ -202,43 +225,25 @@ def reports_page():
         "page_url": request.args.get("url") or request.referrer or "",
     }
 
-    try:
-        if request.method == "POST":
-            form = {
-                "category": _clean(request.form.get("category") or "오류", 20),
-                "message": _clean(request.form.get("message"), MAX_MESSAGE_LEN),
-                "contact": _clean(request.form.get("contact"), MAX_CONTACT_LEN),
-                "page_url": _clean(request.form.get("page_url"), MAX_PAGE_URL_LEN),
-            }
-            trap = (request.form.get("website") or "").strip()
-            if trap:
-                return redirect(url_for("reports.reports_page", saved=1))
-            if len(form["message"]) < 5:
-                error = "어떤 문제가 있었는지 조금만 더 적어주세요."
-            else:
+    if request.method == "POST":
+        form = {
+            "category": _clean(request.form.get("category") or "오류", 20),
+            "message": _clean(request.form.get("message"), MAX_MESSAGE_LEN),
+            "contact": _clean(request.form.get("contact"), MAX_CONTACT_LEN),
+            "page_url": _clean(request.form.get("page_url"), MAX_PAGE_URL_LEN),
+        }
+        trap = (request.form.get("website") or "").strip()
+        if trap:
+            return redirect(url_for("reports.reports_page", saved=1))
+        if len(form["message"]) < 5:
+            error = "어떤 문제가 있었는지 조금만 더 적어주세요."
+        else:
+            try:
                 user_agent = _clean(request.headers.get("User-Agent"), 500)
                 _create_github_issue(form, user_agent)
                 return redirect(url_for("reports.reports_page", saved=1))
+            except Exception as exc:
+                print(f"[report error] github issue creation failed: {exc}")
+                return _render_reports_page(form, REPORT_SAVE_ERROR, saved=False, status_code=500)
 
-        return render_template(
-            "reports.html",
-            reports=_recent_github_reports(),
-            form=form,
-            error=error,
-            saved=saved,
-            show_topbar=False,
-            topbar_desc="",
-            active_tab="reports",
-        )
-    except Exception as exc:
-        print(f"[report error] github issue storage failed: {exc}")
-        return render_template(
-            "reports.html",
-            reports=_recent_github_reports(),
-            form=form,
-            error="신고를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.",
-            saved=False,
-            show_topbar=False,
-            topbar_desc="",
-            active_tab="reports",
-        ), 500
+    return _render_reports_page(form, error=error, saved=saved)

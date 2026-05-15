@@ -149,6 +149,15 @@ def main():
 
     original_get = report_routes.requests.get
     original_post = report_routes.requests.post
+    github_env_names = ("GITHUB_ISSUE_TOKEN", "GITHUB_TOKEN", "GITHUB_ISSUE_REPO")
+    original_github_env = {name: os.environ.get(name) for name in github_env_names}
+
+    def restore_github_env():
+        for name, value in original_github_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
     class FakeIssueListResponse:
         def raise_for_status(self):
@@ -203,6 +212,15 @@ def main():
             raise AssertionError(f"unexpected issue payload: {json}")
         return FakeIssueResponse()
 
+    for env_name in github_env_names:
+        os.environ.pop(env_name, None)
+    missing_store = assert_response(client, "/reports")
+    missing_store_body = missing_store.get_data(as_text=True)
+    if "GitHub Issues 저장소 연결에 실패했습니다" not in missing_store_body:
+        raise AssertionError("reports page hid GitHub store connection failure")
+    if "확인 필요" not in missing_store_body:
+        raise AssertionError("reports page did not mark report store status as unavailable")
+
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
     os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
     report_routes.requests.get = fake_issue_get
@@ -228,8 +246,6 @@ def main():
     finally:
         report_routes.requests.get = original_get
         report_routes.requests.post = original_post
-        os.environ.pop("GITHUB_ISSUE_TOKEN", None)
-        os.environ.pop("GITHUB_ISSUE_REPO", None)
 
     if submission.status_code not in (302, 303):
         body = submission.get_data(as_text=True)[:500]
@@ -244,8 +260,7 @@ def main():
         saved = assert_response(client, "/reports?saved=1")
     finally:
         report_routes.requests.get = original_get
-        os.environ.pop("GITHUB_ISSUE_TOKEN", None)
-        os.environ.pop("GITHUB_ISSUE_REPO", None)
+        restore_github_env()
     if "신고가 접수되었습니다" not in saved.get_data(as_text=True):
         raise AssertionError("report saved confirmation did not render")
 
