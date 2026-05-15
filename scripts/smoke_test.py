@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -67,6 +68,14 @@ def main():
     legacy_payload = legacy_libraries.get_json()
     if legacy_payload.get("error") != "legacy_detail_unavailable":
         raise AssertionError(f"unexpected legacy libraries payload: {legacy_payload}")
+
+    utc_created_at = datetime(2026, 5, 14, 8, 17, tzinfo=timezone.utc)
+    decorated_report = report_routes._decorate_report({"status": "new", "created_at": utc_created_at})
+    if decorated_report["created_at"].strftime("%Y-%m-%d %H:%M") != "2026-05-14 17:17":
+        raise AssertionError(f"report time did not render as KST: {decorated_report['created_at']}")
+    file_report = report_routes._file_report_row({"created_at": "2026-05-14T08:17:00+00:00"})
+    if file_report["created_at"].strftime("%Y-%m-%d %H:%M") != "2026-05-14 17:17":
+        raise AssertionError(f"file report time did not render as KST: {file_report['created_at']}")
 
     cwd_report_path = Path("soulib_smoke_cwd_report.jsonl")
     try:

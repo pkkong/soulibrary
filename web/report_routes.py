@@ -1,7 +1,7 @@
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Blueprint, redirect, render_template, request, url_for
@@ -18,6 +18,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_REPORTS_FILE = os.path.join(tempfile.gettempdir(), "soulib", "error_reports.jsonl")
 LEGACY_REPORTS_FILE = os.path.join(ROOT_DIR, "data", "error_reports.jsonl")
 DEFAULT_GITHUB_REPO = "pkkong/library_crawler"
+KST = timezone(timedelta(hours=9), "Asia/Seoul")
 
 
 def _clean(value: str, limit: int) -> str:
@@ -85,6 +86,7 @@ def _status_label(status: str | None) -> str:
 def _decorate_report(row: dict) -> dict:
     data = dict(row)
     data["status_label"] = _status_label(data.get("status"))
+    data["created_at"] = _to_kst(data.get("created_at"))
     return data
 
 
@@ -116,8 +118,21 @@ def _file_report_row(payload: dict, report_id: int | None = None) -> dict:
         "issue_url": payload.get("issue_url") or "",
         "status": payload.get("status") or "new",
         "status_label": _status_label(payload.get("status")),
-        "created_at": created_at,
+        "created_at": _to_kst(created_at),
     }
+
+
+def _to_kst(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(KST)
 
 
 def _recent_file_reports():
