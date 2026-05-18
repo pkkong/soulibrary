@@ -451,11 +451,16 @@ def main():
         report_routes.requests.get = original_get
         report_routes.requests.post = original_post
 
-    if submission.status_code not in (302, 303):
+    if submission.status_code != 201:
         body = submission.get_data(as_text=True)[:500]
         raise AssertionError(f"report submission failed with {submission.status_code}: {body}")
-    if not submission.headers.get("Location", "").endswith("/reports?saved=1"):
-        raise AssertionError(f"unexpected report redirect: {submission.headers.get('Location')}")
+    submission_body = submission.get_data(as_text=True)
+    if "신고가 접수되었습니다" not in submission_body:
+        raise AssertionError("report saved confirmation did not render after submission")
+    if "방금 접수" not in submission_body or "자동 테스트 신고 내용입니다." not in submission_body:
+        raise AssertionError("newly submitted report was not shown immediately")
+    if "이슈 #123" not in submission_body:
+        raise AssertionError("newly submitted GitHub issue link was not shown immediately")
 
     report_routes.requests.get = fake_issue_get
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
