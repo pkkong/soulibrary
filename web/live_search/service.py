@@ -195,6 +195,12 @@ def get_cached_live_detail(key: str):
     return _DETAIL_CACHE.get(key)
 
 
+def set_cached_live_detail(key: str, item: dict) -> None:
+    key = (key or "").strip()
+    if key and item:
+        _DETAIL_CACHE.set(key, item)
+
+
 def _filters_from_items(items: list[dict]) -> dict:
     providers_filter = sorted(
         {
