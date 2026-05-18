@@ -458,11 +458,12 @@ def api_sen_status():
 @status_api_bp.route("/api/eunpyeong_status")
 def api_eunpyeong_status():
     content_id = (request.args.get("content_id") or "").strip()
+    content_type = (request.args.get("content_type") or request.args.get("contentType") or "EB").strip() or "EB"
     debug = request.args.get("debug") == "1"
     if not content_id:
         return jsonify({"error": "missing_content_id"}), 400
 
-    cache_key = f"eunpyeong:{content_id}"
+    cache_key = f"eunpyeong:{content_type}:{content_id}"
     cached = STATUS_CACHE.get(cache_key)
     if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
         return jsonify(cached["payload"])
@@ -470,15 +471,16 @@ def api_eunpyeong_status():
     attempted = []
     try:
         session = get_status_session()
-        url = "http://epbook.eplib.or.kr:8100/ebookPlatform/Homepage/ContentsDetail.do"
-        params = {"contentKey": content_id, "libCode": "111042", "userId": "null"}
+        url = "https://epbook.eplib.or.kr/api/service/content/detail"
+        params = {"contentType": content_type, "id": content_id, "libCode": "111042"}
         attempted.append(url)
         res = session.get(url, params=params, timeout=15, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
         status = None
         data = None
         try:
-            data = res.json()
+            raw_data = res.json()
+            data = raw_data.get("data") if isinstance(raw_data, dict) else raw_data
         except Exception as e:
             print(f"[status error] {e}")
             print(traceback.format_exc())
