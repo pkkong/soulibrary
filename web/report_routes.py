@@ -79,6 +79,33 @@ def _report_store_error(exc: Exception) -> str:
     return f"{REPORT_STORE_ERROR} ({_github_error_detail(exc)})"
 
 
+def _default_report_form(page_url: str = "") -> dict:
+    return {
+        "category": "오류",
+        "message": "",
+        "contact": "",
+        "page_url": page_url,
+    }
+
+
+def _prepend_recent_report(reports: list[dict], report: dict | None) -> list[dict]:
+    if not report:
+        return reports
+
+    pinned_report = dict(report)
+    pinned_report["is_new"] = True
+    pinned_key = pinned_report.get("issue_number") or pinned_report.get("id")
+    if not pinned_key:
+        return [pinned_report, *reports]
+
+    deduped = [
+        item
+        for item in reports
+        if (item.get("issue_number") or item.get("id")) != pinned_key
+    ]
+    return [pinned_report, *deduped]
+
+
 def _github_issue_labels() -> list[str]:
     raw = os.environ.get("GITHUB_ISSUE_LABELS", "")
     return [item.strip() for item in raw.split(",") if item.strip()]
@@ -213,21 +240,36 @@ def _recent_github_reports(limit: int = 10) -> list[dict]:
     return reports
 
 
-def _render_reports_page(form: dict, error: str = "", saved: bool = False, status_code: int = 200):
+def _render_reports_page(
+    form: dict,
+    error: str = "",
+    saved: bool = False,
+    status_code: int = 200,
+    saved_report: dict | None = None,
+):
     reports = []
     reports_unavailable = False
+    reports_notice = ""
     try:
         reports = _recent_github_reports()
     except Exception as exc:
         detail = _github_error_detail(exc)
         print(f"[report error] github issue list failed: {detail} raw={exc}")
         reports_unavailable = True
-        error = error or _report_store_error(exc)
+        if saved_report:
+            reports_notice = "최근 접수 목록 동기화가 지연되어 방금 접수한 신고를 먼저 보여드립니다."
+        else:
+            error = error or _report_store_error(exc)
+
+    reports = _prepend_recent_report(reports, saved_report)
+    saved_report = reports[0] if saved_report and reports else None
 
     return render_template(
         "reports.html",
         reports=reports,
         reports_unavailable=reports_unavailable,
+        reports_notice=reports_notice,
+        saved_report=saved_report,
         form=form,
         error=error,
         saved=saved,
@@ -290,12 +332,7 @@ def _create_github_issue(form: dict, user_agent: str) -> dict:
 def reports_page():
     error = ""
     saved = request.args.get("saved") == "1"
-    form = {
-        "category": "오류",
-        "message": "",
-        "contact": "",
-        "page_url": request.args.get("url") or request.referrer or "",
-    }
+    form = _default_report_form(request.args.get("url") or request.referrer or "")
 
     if request.method == "POST":
         form = {
@@ -312,8 +349,13 @@ def reports_page():
         else:
             try:
                 user_agent = _clean(request.headers.get("User-Agent"), 500)
-                _create_github_issue(form, user_agent)
-                return redirect(url_for("reports.reports_page", saved=1))
+                created_report = _create_github_issue(form, user_agent)
+                return _render_reports_page(
+                    _default_report_form(),
+                    saved=True,
+                    status_code=201,
+                    saved_report=created_report,
+                )
             except Exception as exc:
                 detail = _github_error_detail(exc)
                 print(f"[report error] github issue creation failed: {detail} raw={exc}")

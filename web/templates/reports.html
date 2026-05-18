@@ -16,6 +16,21 @@
     {% if error %}
         <div class="report-alert error" role="alert">{{ error }}</div>
     {% endif %}
+    {% if saved_report %}
+        <article class="report-item report-submitted-card" aria-label="방금 접수된 신고">
+            <div class="report-item-meta">
+                <span class="report-item-meta-main">
+                    <span>{{ saved_report.category }}</span>
+                    <span class="report-status is-new">방금 접수</span>
+                    {% if saved_report.issue_url %}
+                        <a class="report-issue-link" href="{{ saved_report.issue_url }}" target="_blank" rel="noopener noreferrer">이슈 #{{ saved_report.issue_number }}</a>
+                    {% endif %}
+                </span>
+                <time>{{ saved_report.created_at.strftime("%Y-%m-%d %H:%M") if saved_report.created_at else "" }}</time>
+            </div>
+            <p>{{ saved_report.message }}</p>
+        </article>
+    {% endif %}
 
     <form class="report-form" method="post" action="/reports">
         <label class="report-field">
@@ -57,6 +72,9 @@
             <h2 id="reports-list-title">최근 접수</h2>
             <span>{% if reports_unavailable %}확인 필요{% else %}{{ reports|length }}건{% endif %}</span>
         </div>
+        {% if reports_notice %}
+            <div class="report-list-notice" role="status">{{ reports_notice }}</div>
+        {% endif %}
         {% if reports %}
             <div class="report-items">
                 {% for report in reports %}
@@ -64,6 +82,9 @@
                         <div class="report-item-meta">
                             <span class="report-item-meta-main">
                                 <span>{{ report.category }}</span>
+                                {% if report.is_new %}
+                                    <span class="report-status is-new">방금 접수</span>
+                                {% endif %}
                                 <span class="report-status">{{ report.status_label or "접수됨" }}</span>
                                 {% if report.issue_url %}
                                     <a class="report-issue-link" href="{{ report.issue_url }}" target="_blank" rel="noopener noreferrer">이슈 #{{ report.issue_number }}</a>
@@ -93,4 +114,21 @@
         {% endif %}
     </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.querySelector(".report-form");
+    const submit = document.querySelector(".report-submit");
+    if (!form || !submit) {
+        return;
+    }
+    form.addEventListener("submit", () => {
+        submit.disabled = true;
+        submit.classList.add("is-loading");
+        submit.textContent = "보내는 중...";
+    });
+});
+</script>
 {% endblock %}

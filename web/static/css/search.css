@@ -1257,6 +1257,12 @@ body.has-topbar .search-top {
     color: #9f1239;
 }
 
+.report-submitted-card {
+    margin-bottom: 14px;
+    border-color: #d9eee3;
+    background: #fbfefc;
+}
+
 .report-form {
     display: flex;
     flex-direction: column;
@@ -1351,6 +1357,12 @@ body.has-topbar .search-top {
     cursor: pointer;
 }
 
+.report-submit:disabled,
+.report-submit.is-loading {
+    cursor: default;
+    opacity: 0.72;
+}
+
 .reports-list {
     margin-top: 26px;
     border-top: 1px solid #f2f2f7;
@@ -1382,6 +1394,17 @@ body.has-topbar .search-top {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.report-list-notice {
+    margin-bottom: 10px;
+    border-radius: 14px;
+    background: #f2f2f7;
+    color: #6e6e73;
+    padding: 11px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
 }
 
 .report-item {
@@ -1421,6 +1444,11 @@ body.has-topbar .search-top {
 
 .report-issue-link {
     color: #007aff;
+}
+
+.report-status.is-new {
+    background: #e9f7ef;
+    color: #1f7a49;
 }
 
 .report-item p {
