@@ -15,6 +15,7 @@ os.environ.setdefault("LIVE_SEARCH_LIBRARY_TIMEOUT", "0.8")
 from app_search import app  # noqa: E402
 import report_routes  # noqa: E402
 import status_api_routes  # noqa: E402
+import live_search_routes  # noqa: E402
 from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
 from live_search.models import LiveSearchResult  # noqa: E402
 from live_search.normalizer import merge_live_results  # noqa: E402
@@ -185,6 +186,52 @@ def main():
     )
     if len(merged_project_hail_mary) != 1 or merged_project_hail_mary[0]["counts"]["total"] != 2:
         raise AssertionError(f"project hail mary author alias did not merge: {merged_project_hail_mary}")
+
+    original_live_search = live_search_routes.live_search
+    original_cached_detail = live_search_routes.get_cached_live_detail
+    partial_book = {
+        "title": "프로젝트 헤일메리",
+        "author": "앤디 위어",
+        "publisher": "알에이치코리아",
+        "counts": {"kyobo": 1, "yes24": 0, "other": 0, "total": 1},
+        "libraries": [
+            {"code": "eunpyeong", "name": "은평구립전자도서관", "short": "은평", "platform_code": "Eunpyeong"},
+        ],
+    }
+    complete_book = {
+        "title": "프로젝트 헤일메리",
+        "author": "앤디 위어",
+        "publisher": "알에이치코리아",
+        "counts": {"kyobo": 1, "yes24": 0, "other": 1, "total": 2},
+        "libraries": [
+            {"code": "eunpyeong", "name": "은평구립전자도서관", "short": "은평", "platform_code": "Eunpyeong"},
+            {"code": "gangnam", "name": "강남구 전자도서관", "short": "강남", "platform_code": "Gangnam"},
+        ],
+    }
+
+    def fake_cached_detail(key):
+        if key != "partial-project":
+            raise AssertionError(f"unexpected detail key: {key}")
+        return partial_book
+
+    def fake_live_search(query, field, providers_raw="", libraries_raw="", limit=20, offset=0, refine=""):
+        if query != "프로젝트 헤일메리" or field != "title":
+            raise AssertionError(f"unexpected detail hydration search: {query} {field}")
+        return {"total": 1, "items": [complete_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
+
+    live_search_routes.get_cached_live_detail = fake_cached_detail
+    live_search_routes.live_search = fake_live_search
+    try:
+        hydrated_detail = assert_response(
+            client,
+            "/live_book?key=partial-project&title=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8+%ED%97%A4%EC%9D%BC%EB%A9%94%EB%A6%AC&author=%EC%95%A4%EB%94%94+%EC%9C%84%EC%96%B4&publisher=%EC%95%8C%EC%97%90%EC%9D%B4%EC%B9%98%EC%BD%94%EB%A6%AC%EC%95%84"
+        )
+    finally:
+        live_search_routes.live_search = original_live_search
+        live_search_routes.get_cached_live_detail = original_cached_detail
+    hydrated_body = hydrated_detail.get_data(as_text=True)
+    if "강남" not in hydrated_body or "은평" not in hydrated_body:
+        raise AssertionError("live detail did not hydrate cached partial search results")
 
     eunpyeong_session = FakeStatusSession(FakeStatusResponse(json_data={
         "data": {

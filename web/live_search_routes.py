@@ -1,3 +1,4 @@
+import copy
 import traceback
 
 from flask import Blueprint, jsonify, render_template, request
@@ -123,6 +124,36 @@ def _decorate_live_book(book: dict | None):
     return book
 
 
+def _library_count(book: dict | None) -> int:
+    if not book:
+        return 0
+    try:
+        return int((book.get("counts") or {}).get("total") or 0)
+    except Exception:
+        return len(book.get("libraries") or [])
+
+
+def _find_complete_live_book(target: dict, fallback: dict | None = None):
+    if not target.get("title"):
+        return copy.deepcopy(fallback) if fallback else None
+    payload = live_search(
+        query=target["title"],
+        field="title",
+        providers_raw="",
+        libraries_raw="",
+        limit=100,
+        offset=0,
+    )
+    items = payload.get("items") or []
+    ranked = sorted(items, key=lambda item: _match_score(target, item), reverse=True)
+    best = ranked[0] if ranked else None
+    if not best or _match_score(target, best) < 70:
+        return copy.deepcopy(fallback) if fallback else None
+    if fallback and _library_count(fallback) > _library_count(best):
+        return copy.deepcopy(fallback)
+    return copy.deepcopy(best)
+
+
 @live_search_bp.route("/live_book")
 def live_book_page():
     cache_key = (request.args.get("key") or "").strip()
@@ -134,6 +165,16 @@ def live_book_page():
 
     cached_book = get_cached_live_detail(cache_key)
     if cached_book:
+        detail_target = {
+            "title": target["title"] or cached_book.get("title") or "",
+            "author": target["author"] or cached_book.get("author") or "",
+            "publisher": target["publisher"] or cached_book.get("publisher") or "",
+        }
+        try:
+            cached_book = _find_complete_live_book(detail_target, cached_book) or cached_book
+        except Exception as exc:
+            print(f"[live_book hydrate error] {exc}")
+            print(traceback.format_exc())
         return render_template(
             "live_book.html",
             book=_decorate_live_book(cached_book),
@@ -154,19 +195,7 @@ def live_book_page():
         ), 400
 
     try:
-        payload = live_search(
-            query=target["title"],
-            field="title",
-            providers_raw="",
-            libraries_raw="",
-            limit=100,
-            offset=0,
-        )
-        items = payload.get("items") or []
-        ranked = sorted(items, key=lambda item: _match_score(target, item), reverse=True)
-        best = ranked[0] if ranked else None
-        if not best or _match_score(target, best) < 70:
-            best = None
+        best = _find_complete_live_book(target)
         best = _decorate_live_book(best)
 
         return render_template(
