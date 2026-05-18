@@ -120,6 +120,7 @@ class BookcubeConnector:
                     provider=provider,
                     image_url=image_url,
                     detail_url=f"{base_url}/FxLibrary/product/view/?num={content_id}&category=&category_type=book" if content_id else "",
+                    service_type=config.get("service_type") or "",
                     identifiers={"content_id": content_id},
                 )
             )

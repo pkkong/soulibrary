@@ -174,6 +174,7 @@ class KyoboNewConnector:
                         ctgr_id,
                         sntn_auth_code,
                     ),
+                    service_type=config.get("service_type") or "",
                     identifiers={
                         "brcd": brcd,
                         "ctts_dvsn_code": ctts_dvsn_code,

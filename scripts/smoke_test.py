@@ -187,6 +187,23 @@ def main():
     if len(merged_project_hail_mary) != 1 or merged_project_hail_mary[0]["counts"]["total"] != 2:
         raise AssertionError(f"project hail mary author alias did not merge: {merged_project_hail_mary}")
 
+    subscription_merge = merge_live_results(
+        [
+            LiveSearchResult(
+                title="구독형 테스트",
+                author="테스터",
+                publisher="테스트출판",
+                library_code="gangdong_subs",
+                library_name="강동구립도서관 (구독)",
+                platform="Kyobo_New",
+                service_type="Subscription",
+                identifiers={"brcd": "SUBS001", "ctts_dvsn_code": "001", "ctgr_id": "001"},
+            )
+        ]
+    )
+    if subscription_merge[0]["libraries"][0].get("service_type") != "Subscription":
+        raise AssertionError(f"subscription service_type was not preserved: {subscription_merge}")
+
     original_live_search = live_search_routes.live_search
     original_cached_detail = live_search_routes.get_cached_live_detail
     partial_book = {
@@ -208,6 +225,24 @@ def main():
             {"code": "gangnam", "name": "강남구 전자도서관", "short": "강남", "platform_code": "Gangnam"},
         ],
     }
+    subscription_book = {
+        "title": "구독형 테스트",
+        "author": "테스터",
+        "publisher": "테스트출판",
+        "counts": {"kyobo": 1, "yes24": 0, "other": 0, "total": 1},
+        "libraries": [
+            {
+                "code": "gangdong_subs",
+                "name": "강동구립도서관 (구독)",
+                "short": "강동",
+                "platform_code": "Kyobo_New",
+                "service_type": "Subscription",
+                "brcd": "SUBS001",
+                "ctts_dvsn_code": "001",
+                "ctgr_id": "001",
+            },
+        ],
+    }
 
     def fake_cached_detail(key):
         if not key:
@@ -221,6 +256,8 @@ def main():
             return {"total": 1, "items": [partial_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
         if query == "프로젝트 헤일메리" and field == "title":
             return {"total": 1, "items": [complete_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
+        if query == "구독형 테스트" and field == "title":
+            return {"total": 1, "items": [subscription_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
         raise AssertionError(f"unexpected live search: {query} {field}")
 
     live_search_routes.get_cached_live_detail = fake_cached_detail
@@ -241,12 +278,20 @@ def main():
             client,
             "/live_book?key=partial-project&title=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8+%ED%97%A4%EC%9D%BC%EB%A9%94%EB%A6%AC&author=%EC%95%A4%EB%94%94+%EC%9C%84%EC%96%B4&publisher=%EC%95%8C%EC%97%90%EC%9D%B4%EC%B9%98%EC%BD%94%EB%A6%AC%EC%95%84"
         )
+        subscription_detail = assert_response(
+            client,
+            "/live_book?title=%EA%B5%AC%EB%8F%85%ED%98%95+%ED%85%8C%EC%8A%A4%ED%8A%B8&author=%ED%85%8C%EC%8A%A4%ED%84%B0&publisher=%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%B6%9C%ED%8C%90",
+        )
     finally:
         live_search_routes.live_search = original_live_search
         live_search_routes.get_cached_live_detail = original_cached_detail
     hydrated_body = hydrated_detail.get_data(as_text=True)
     if "강남" not in hydrated_body or "은평" not in hydrated_body:
         raise AssertionError("live detail did not hydrate cached partial search results")
+
+    subscription_body = subscription_detail.get_data(as_text=True)
+    if 'data-service-type="Subscription"' not in subscription_body:
+        raise AssertionError("live detail did not render subscription service_type")
 
     eunpyeong_session = FakeStatusSession(FakeStatusResponse(json_data={
         "data": {

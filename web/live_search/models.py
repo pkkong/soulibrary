@@ -14,6 +14,7 @@ class LiveSearchResult:
     image_url: str = ""
     isbn: str = ""
     detail_url: str = ""
+    service_type: str = ""
     identifiers: dict = field(default_factory=dict)
 
     def as_dict(self):
@@ -29,5 +30,6 @@ class LiveSearchResult:
             "image_url": self.image_url,
             "isbn": self.isbn,
             "detail_url": self.detail_url,
+            "service_type": self.service_type,
             "identifiers": dict(self.identifiers or {}),
         }

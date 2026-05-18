@@ -95,6 +95,7 @@ class SeoulLibraryConnector:
                             image_url=item.get("coverUrl") or item.get("coverMSizeUrl") or "",
                             detail_url=f"https://elib.seoul.go.kr/contents/detail?no={content_id}",
                             isbn=item.get("isbn") or "",
+                            service_type=config.get("service_type") or "",
                             identifiers={"content_id": content_id},
                         )
                     )
@@ -182,6 +183,7 @@ class SenConnector:
             image_url=item.get("coverUrl") or "",
             detail_url=f"https://e-lib.sen.go.kr/contents/detail?no={content_id}&type=TY01" if content_id else "",
             isbn=(item.get("isbn") or "").strip(),
+            service_type=config.get("service_type") or "",
             identifiers={"content_id": content_id},
         )
 
@@ -199,5 +201,6 @@ class SenConnector:
             image_url=item.get("ucm_cover_url") or "",
             detail_url=f"https://e-lib.sen.go.kr/contents/detail?no={content_id}&type=TY02" if content_id else "",
             isbn=item.get("ucm_ebook_isbn") or item.get("isbn") or "",
+            service_type=config.get("service_type") or "",
             identifiers={"content_id": content_id},
         )

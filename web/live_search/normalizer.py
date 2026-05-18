@@ -104,6 +104,7 @@ def merge_live_results(results):
                     "short": item.get("library_short") or item.get("library_name") or "",
                     "platform_code": item.get("platform") or "",
                     "provider": item.get("provider") or "",
+                    "service_type": item.get("service_type") or "",
                     "homepage_url": item.get("homepage_url") or "",
                     "detail_url": item.get("detail_url") or "",
                     **(item.get("identifiers") or {}),
