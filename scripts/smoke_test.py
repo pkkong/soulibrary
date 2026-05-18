@@ -16,6 +16,8 @@ from app_search import app  # noqa: E402
 import report_routes  # noqa: E402
 import status_api_routes  # noqa: E402
 from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
+from live_search.models import LiveSearchResult  # noqa: E402
+from live_search.normalizer import merge_live_results  # noqa: E402
 
 
 def assert_response(client, path, expected_status=200):
@@ -158,6 +160,31 @@ def main():
         status_api_routes.STATUS_CACHE.clear()
     if gangnam_status.get_json().get("status", {}).get("owned") != 3:
         raise AssertionError(f"gangnam EUC-KR status did not parse: {gangnam_status.get_json()}")
+
+    merged_project_hail_mary = merge_live_results(
+        [
+            LiveSearchResult(
+                title="프로젝트 헤일메리",
+                author="앤디 위어",
+                publisher="알에이치코리아(RHK)",
+                library_code="eunpyeong",
+                library_name="은평구립전자도서관",
+                platform="Eunpyeong",
+                identifiers={"content_id": "101619655"},
+            ),
+            LiveSearchResult(
+                title="프로젝트 헤일메리",
+                author="Andy Weir",
+                publisher="RHK",
+                library_code="gangnam",
+                library_name="강남구 전자도서관",
+                platform="Gangnam",
+                identifiers={"content_id": "B9788925521725"},
+            ),
+        ]
+    )
+    if len(merged_project_hail_mary) != 1 or merged_project_hail_mary[0]["counts"]["total"] != 2:
+        raise AssertionError(f"project hail mary author alias did not merge: {merged_project_hail_mary}")
 
     eunpyeong_session = FakeStatusSession(FakeStatusResponse(json_data={
         "data": {
