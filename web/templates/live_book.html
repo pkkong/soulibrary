@@ -97,6 +97,7 @@
                                rel="noopener noreferrer"
                                data-live-status="1"
                                data-status-kind="{{ lib.status_kind }}"
+                               data-service-type="{{ lib.service_type }}"
                                data-library-code="{{ lib.code }}"
                                data-brcd="{{ lib.brcd }}"
                                data-goods-id="{{ lib.goods_id }}"
@@ -129,7 +130,8 @@
         const TEXT = {
             available: "대출가능",
             reservable: "예약",
-            unknown: "상태 정보 없음"
+            unknown: "상태 정보 없음",
+            subscription: "구독형"
         };
 
         function applyKind(card, kind, reserved) {
@@ -167,6 +169,9 @@
         }
 
         function statusUrl(card) {
+            if (card.dataset.serviceType === "Subscription") {
+                return "";
+            }
             const kind = card.dataset.statusKind || "";
             if (kind === "kyobo") {
                 const params = new URLSearchParams({
@@ -228,6 +233,12 @@
 
         async function fetchStatus(card) {
             const holder = card.querySelector("[data-status-text]");
+            if (card.dataset.serviceType === "Subscription") {
+                holder.textContent = TEXT.subscription;
+                holder.classList.remove("is-loading");
+                applyKind(card, "available", 0);
+                return;
+            }
             try {
                 const url = statusUrl(card);
                 if (!url) throw new Error("unsupported_status");

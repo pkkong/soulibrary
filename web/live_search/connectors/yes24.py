@@ -112,6 +112,7 @@ class Yes24Connector:
                     provider=provider,
                     image_url=image_url,
                     detail_url=f"{base_url}/ebook/detail/?goods_id={goods_id}" if goods_id else "",
+                    service_type=config.get("service_type") or "",
                     identifiers={"goods_id": goods_id},
                 )
             )

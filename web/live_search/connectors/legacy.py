@@ -64,6 +64,7 @@ class DobongKyoboConnector:
                     provider="교보문고",
                     image_url=image_url,
                     detail_url=detail_url,
+                    service_type=config.get("service_type") or "",
                     identifiers={"brcd": brcd, "product_cd": product_cd, "category_id": category_id},
                 )
             )
@@ -144,6 +145,7 @@ class GangnamConnector:
                     provider=provider,
                     image_url=image_url,
                     detail_url=detail_url,
+                    service_type=config.get("service_type") or "",
                     identifiers={"content_id": content_id},
                 )
             )
@@ -217,6 +219,7 @@ class EunpyeongConnector:
                     provider=provider,
                     image_url=item.get("coverUrl") or "",
                     detail_url=f"{base_url}/content/detail?id={content_id}&contentType={content_type}" if content_id else "",
+                    service_type=config.get("service_type") or "",
                     identifiers={"content_id": content_id, "content_type": content_type},
                 )
             )
