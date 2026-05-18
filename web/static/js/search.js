@@ -85,6 +85,15 @@ function escapeAttr(value) {
         .replaceAll(">", "&gt;");
 }
 
+function escapeHtml(value) {
+    return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}
+
 function liveDetailUrlForBook(book) {
     if (book.live_detail_url) return book.live_detail_url;
     if (book.book_id) return "";
@@ -268,64 +277,6 @@ function uniqueLibraries(book) {
     return libs;
 }
 
-const SPECIAL_LIBRARY_CODES = new Set(["seoul", "sen_owned", "sen_subs"]);
-const LIB_COUNT_CACHE = new WeakMap();
-
-function getLibraryCount(book) {
-    if (!book || typeof book !== "object") return 0;
-    const cached = LIB_COUNT_CACHE.get(book);
-    if (cached !== undefined) return cached;
-    const count = uniqueLibraries(book).length;
-    LIB_COUNT_CACHE.set(book, count);
-    return count;
-}
-
-function groupLibraries(libs) {
-    const groups = { kyobo: [], yes24: [], other: [], special: [] };
-    libs.forEach(lib => {
-        const code = lib.code || "";
-        if (SPECIAL_LIBRARY_CODES.has(code)) {
-            groups.special.push(lib);
-            return;
-        }
-        const platform = lib.platform_code || "";
-        if (platform === "YES24") groups.yes24.push(lib);
-        else if (platform === "Kyobo" || platform === "Kyobo_New") groups.kyobo.push(lib);
-        else groups.other.push(lib);
-    });
-    return groups;
-}
-
-function providerCountsForBook(book) {
-    if (book && book.counts) {
-        return {
-            kyobo: Number(book.counts.kyobo) || 0,
-            yes24: Number(book.counts.yes24) || 0,
-            other: (Number(book.counts.other) || 0) + (Number(book.counts.bookcube) || 0),
-        };
-    }
-    const libs = uniqueLibraries(book);
-    const groups = groupLibraries(libs);
-    return {
-        kyobo: groups.kyobo.length,
-        yes24: groups.yes24.length,
-        other: groups.other.length + groups.special.length,
-    };
-}
-
-function countText(value, pending) {
-    if (pending) return "...";
-    return value || "-";
-}
-
-function renderLibraryBadges(libs) {
-    return libs.map(lib => {
-        const name = lib.short || lib.name;
-        const url = lib.homepage_url || LIB_URLS[name] || "#";
-        return `<a class="badge" href="${url}" target="_blank" rel="noopener noreferrer">${name}</a>`;
-    }).join("");
-}
-
 function renderMore() {
     const resultsDiv = document.getElementById('results');
     const loadMoreBtn = document.getElementById('load-more');
@@ -341,47 +292,29 @@ function renderMore() {
     slice.forEach(book => {
         const bookId = book.book_id || "";
         const liveDetailUrl = liveDetailUrlForBook(book);
+        const title = String(book.title || "");
+        const author = String(book.author || "");
+        const publisher = String(book.publisher || "");
+        const ariaLabel = `${title || "도서"} 상세로 이동`;
         const imgHtml = book.image_url
             ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'no-img\'>이미지 없음</div>'">`
             : `<div class="no-img">이미지 없음</div>`;
-    const countsPending = Boolean(book.counts_partial && book.summary_url);
-    const counts = providerCountsForBook(book);
-    const kyoboCount = counts.kyobo;
-    const yes24Count = counts.yes24;
-    const otherCount = counts.other;
-    const kyoboOn = kyoboCount > 0;
-    const yes24On = yes24Count > 0;
-    const otherOn = otherCount > 0;
-    const libBadges = `
-        <div class="supply-summary">
-            <div class="prov-grid">
-                <div class="prov-item ${kyoboOn || countsPending ? "" : "is-off"}" data-provider-item="kyobo">
-                    <div class="prov-chip kyobo"><img src="/static/img/kyobo.webp" alt="교보" loading="lazy"></div>
-                    <div class="prov-count" data-provider-count="kyobo">${countText(kyoboCount, countsPending)}</div>
-                </div>
-                <div class="prov-item ${yes24On || countsPending ? "" : "is-off"}" data-provider-item="yes24">
-                    <div class="prov-chip yes24"><img src="/static/img/yes24.webp" alt="YES24" loading="lazy"></div>
-                    <div class="prov-count" data-provider-count="yes24">${countText(yes24Count, countsPending)}</div>
-                </div>
-                <div class="prov-item ${otherOn || countsPending ? "" : "is-off"}" data-provider-item="other">
-                    <div class="prov-chip other">기타</div>
-                    <div class="prov-count" data-provider-count="other">${countText(otherCount, countsPending)}</div>
-                </div>
-            </div>
-        </div>
-    `;
 
     const html = `
-        <div class="card js-book-card" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""} ${book.summary_url ? `data-summary-url="${escapeAttr(book.summary_url)}"` : ""}>
+        <div class="card js-book-card" role="link" tabindex="0" aria-label="${escapeAttr(ariaLabel)}" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""} ${book.summary_url ? `data-summary-url="${escapeAttr(book.summary_url)}"` : ""}>
             <div class="thumb">${imgHtml}</div>
             <div class="info">
-                <h3 class="title" title="${book.title}">${book.title}</h3>
+                <h3 class="title" title="${escapeAttr(title)}">${escapeHtml(title)}</h3>
                 <div class="meta">
-                    <div class="meta-author">${book.author || ""}</div>
-                    ${book.publisher ? `<div class="meta-publisher">${book.publisher}</div>` : ""}
+                    <div class="meta-author">${escapeHtml(author)}</div>
+                    ${publisher ? `<div class="meta-publisher">${escapeHtml(publisher)}</div>` : ""}
                 </div>
-                <div class="badges">${libBadges}</div>
             </div>
+            <span class="result-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18l6-6-6-6"></path>
+                </svg>
+            </span>
         </div>
     `;
         resultsDiv.insertAdjacentHTML('beforeend', html);
@@ -392,13 +325,6 @@ function renderMore() {
     const canLoadMore = totalCount === 0 ? renderIndex < filteredResults.length : loaded < totalCount;
     loadMoreBtn.style.display = canLoadMore ? "block" : "none";
     if (!canLoadMore) setLoadMoreLoading(false);
-}
-
-function updateCardProviderCount(card, provider, value) {
-    const countEl = card.querySelector(`[data-provider-count="${provider}"]`);
-    const itemEl = card.querySelector(`[data-provider-item="${provider}"]`);
-    if (countEl) countEl.textContent = value || "-";
-    if (itemEl) itemEl.classList.toggle("is-off", !value);
 }
 
 function hydrateSearchCardSummaries() {
@@ -413,11 +339,7 @@ function hydrateSearchCardSummaries() {
         fetch(summaryUrl)
             .then(res => res.ok ? res.json() : null)
             .then(data => {
-                if (!data || !data.counts) return;
-                const counts = providerCountsForBook(data);
-                updateCardProviderCount(card, "kyobo", counts.kyobo);
-                updateCardProviderCount(card, "yes24", counts.yes24);
-                updateCardProviderCount(card, "other", counts.other);
+                if (!data) return;
                 if (data.live_detail_url) {
                     card.dataset.liveDetailUrl = data.live_detail_url;
                 }
@@ -507,6 +429,14 @@ document.addEventListener("click", (event) => {
     const id = card.getAttribute("data-book-id");
     if (!id) return;
     window.location.href = `/book/${id}`;
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const card = event.target.closest(".js-book-card");
+    if (!card) return;
+    event.preventDefault();
+    card.click();
 });
 
 document.addEventListener("DOMContentLoaded", () => {
