@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 from config import LIBRARIES, LIBRARY_SHORT
 from live_search.cache import TTLMemoryCache
+from live_search.connectors.bookers import BookersConnector
 from live_search.connectors.bookcube import BookcubeConnector
 from live_search.connectors.kyobo import KyoboNewConnector
 from live_search.connectors.legacy import DobongKyoboConnector, EunpyeongConnector, GangnamConnector
@@ -31,6 +32,7 @@ CONNECTOR_FACTORIES = {
     "Kyobo": DobongKyoboConnector,
     "YES24": Yes24Connector,
     "Bookcube": BookcubeConnector,
+    "Bookers": BookersConnector,
     "Mixed": None,
     "Unknown": None,
 }
