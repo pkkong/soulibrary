@@ -82,7 +82,7 @@ def main():
     if (
         parsed_report["category"] != "대출 상태"
         or parsed_report["status_label"] != "처리 완료"
-        or parsed_report["resolution_message"] != "처리 완료로 표시되었습니다."
+        or parsed_report["resolution_message"] != "신고해주신 '기존 신고 내용' 문제를 확인했고, 필요한 조치를 완료했습니다. 알려주셔서 감사합니다."
         or parsed_report["resolution_at"].strftime("%Y-%m-%d %H:%M") != "2026-05-14 18:00"
     ):
         raise AssertionError(f"github issue report did not parse correctly: {parsed_report}")
@@ -264,8 +264,12 @@ def main():
         raise AssertionError("reports page did not render expected markup")
     if "기존 신고 내용입니다" not in reports_body or "이슈 #122" not in reports_body:
         raise AssertionError("reports page did not render GitHub issues as the report store")
-    if "해결 로그" not in reports_body or "수정 후 배포 완료했습니다" not in reports_body:
-        raise AssertionError("reports page did not render closed issue resolution log")
+    if "처리 안내" not in reports_body:
+        raise AssertionError("reports page did not render customer-facing resolution heading")
+    if "신고해주신 &#39;해결된 신고입니다.&#39; 문제를 확인했고" not in reports_body:
+        raise AssertionError("reports page did not render customer-facing resolution message")
+    if "수정 후 배포 완료했습니다" in reports_body:
+        raise AssertionError("reports page leaked developer-facing issue comments")
 
     report_routes.requests.post = fake_issue_post
     try:
