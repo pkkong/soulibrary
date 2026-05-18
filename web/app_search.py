@@ -30,6 +30,15 @@ app.register_blueprint(status_api_bp)
 app.register_blueprint(live_search_bp)
 app.register_blueprint(report_bp)
 
+
+@app.after_request
+def add_html_no_cache_headers(response):
+    if response.content_type and response.content_type.startswith("text/html"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
 LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
