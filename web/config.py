@@ -154,6 +154,7 @@ LIBRARIES = {
         "service_type": "Subscription",
         "bookers_org_name": "강북구립도서관",
         "bookers_org_code": "UIS0000000737",
+        "bookers_uis_code": "UIS0000000737",
     },
     "gwangjin": {
         "name": "광진구 (소장)",

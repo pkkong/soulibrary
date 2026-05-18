@@ -213,6 +213,7 @@ def main():
             "service_type": "Subscription",
             "bookers_org_name": "강북구립도서관",
             "bookers_org_code": "UIS0000000737",
+            "bookers_uis_code": "UIS0000000737",
         },
         {
             "ucm_code": "UCM0000157794",
@@ -226,7 +227,9 @@ def main():
     if (
         bookers_result.platform != "Bookers"
         or bookers_result.service_type != "Subscription"
-        or "requestCode=UIS0000000737" not in bookers_result.detail_url
+        or "bookDetail.do" not in bookers_result.detail_url
+        or "ucm_code=UCM0000157794" not in bookers_result.detail_url
+        or "paramUisCode=UIS0000000737" not in bookers_result.detail_url
     ):
         raise AssertionError(f"bookers connector did not map subscription result: {bookers_result}")
 

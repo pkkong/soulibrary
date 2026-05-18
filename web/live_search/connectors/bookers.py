@@ -7,6 +7,7 @@ from live_search.models import LiveSearchResult
 
 
 BOOKERS_CATALOG_URL = "https://e-lib.sen.go.kr/api/contents/catesearch"
+BOOKERS_DETAIL_URL = "https://www.bookers.life/front/home/bookDetail.do"
 BOOKERS_LOGIN_URL = "https://www.bookers.life/login.do"
 
 
@@ -26,6 +27,13 @@ def _login_url(config: dict) -> str:
     if not org_name or not org_code:
         return BOOKERS_LOGIN_URL
     return f"{BOOKERS_LOGIN_URL}?{urlencode({'requestOrgName': org_name, 'requestCode': org_code})}"
+
+
+def _detail_url(config: dict, content_id: str) -> str:
+    uis_code = (config.get("bookers_uis_code") or config.get("bookers_org_code") or "").strip()
+    if not content_id or not uis_code:
+        return _login_url(config)
+    return f"{BOOKERS_DETAIL_URL}?{urlencode({'ucm_code': content_id, 'paramUisCode': uis_code})}"
 
 
 class BookersConnector:
@@ -74,7 +82,7 @@ class BookersConnector:
             platform=self.platform,
             provider="부커스",
             image_url=item.get("ucm_cover_url") or "",
-            detail_url=_login_url(config),
+            detail_url=_detail_url(config, content_id),
             isbn=item.get("ucm_ebook_isbn") or item.get("isbn") or "",
             service_type=config.get("service_type") or "",
             identifiers={"content_id": content_id},
