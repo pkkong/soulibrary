@@ -17,6 +17,7 @@ import report_routes  # noqa: E402
 import status_api_routes  # noqa: E402
 import live_search_routes  # noqa: E402
 from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
+from live_search.connectors.bookers import BookersConnector  # noqa: E402
 from live_search.models import LiveSearchResult  # noqa: E402
 from live_search.normalizer import merge_live_results  # noqa: E402
 
@@ -203,6 +204,31 @@ def main():
     )
     if subscription_merge[0]["libraries"][0].get("service_type") != "Subscription":
         raise AssertionError(f"subscription service_type was not preserved: {subscription_merge}")
+
+    bookers_result = BookersConnector()._result(
+        "gangbuk_subs",
+        {
+            "library_name": "강북구립도서관 (구독)",
+            "short_name": "강북",
+            "service_type": "Subscription",
+            "bookers_org_name": "강북구립도서관",
+            "bookers_org_code": "UIS0000000737",
+        },
+        {
+            "ucm_code": "UCM0000157794",
+            "ucm_title": "프로젝트 헤일메리",
+            "ucm_writer": "앤디 위어",
+            "ucp_brand": "알에이치코리아(RHK)",
+            "ucm_ebook_isbn": "9788925521725",
+            "ucm_cover_url": "https://files.bookers.life/cover.jpg",
+        },
+    )
+    if (
+        bookers_result.platform != "Bookers"
+        or bookers_result.service_type != "Subscription"
+        or "requestCode=UIS0000000737" not in bookers_result.detail_url
+    ):
+        raise AssertionError(f"bookers connector did not map subscription result: {bookers_result}")
 
     original_live_search = live_search_routes.live_search
     original_cached_detail = live_search_routes.get_cached_live_detail
