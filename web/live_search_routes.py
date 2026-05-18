@@ -1,5 +1,6 @@
 import copy
 import traceback
+from urllib.parse import urlencode
 
 from flask import Blueprint, jsonify, render_template, request
 
@@ -8,6 +9,32 @@ from live_search.service import get_cached_live_detail, live_search
 
 
 live_search_bp = Blueprint("live_search", __name__)
+
+
+def _counts_need_hydration(query: str, item: dict) -> bool:
+    query_key = normalize_text(query)
+    title_key = normalize_text(item.get("title"))
+    return bool(query_key and title_key and query_key != title_key)
+
+
+def _attach_summary_urls(payload: dict, query: str) -> dict:
+    for item in payload.get("items") or []:
+        if not isinstance(item, dict) or not item.get("title"):
+            continue
+        needs_hydration = _counts_need_hydration(query, item)
+        item["counts_partial"] = needs_hydration
+        if not needs_hydration:
+            item.pop("summary_url", None)
+            continue
+        params = {"title": item.get("title") or ""}
+        if item.get("author"):
+            params["author"] = item.get("author") or ""
+        if item.get("publisher"):
+            params["publisher"] = item.get("publisher") or ""
+        if item.get("live_detail_key"):
+            params["key"] = item.get("live_detail_key") or ""
+        item["summary_url"] = f"/api/live_book_summary?{urlencode(params)}"
+    return payload
 
 
 @live_search_bp.route("/api/live_search")
@@ -35,6 +62,7 @@ def api_live_search():
             offset=offset,
             refine=(request.args.get("refine") or "").strip(),
         )
+        payload = _attach_summary_urls(payload, query)
         return jsonify(payload)
     except Exception as exc:
         print(f"[live_search error] {exc}")
@@ -152,6 +180,38 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
     if fallback and _library_count(fallback) > _library_count(best):
         return copy.deepcopy(fallback)
     return copy.deepcopy(best)
+
+
+@live_search_bp.route("/api/live_book_summary")
+def api_live_book_summary():
+    cache_key = (request.args.get("key") or "").strip()
+    fallback = get_cached_live_detail(cache_key)
+    target = {
+        "title": (request.args.get("title") or "").strip() or ((fallback or {}).get("title") or ""),
+        "author": (request.args.get("author") or "").strip() or ((fallback or {}).get("author") or ""),
+        "publisher": (request.args.get("publisher") or "").strip() or ((fallback or {}).get("publisher") or ""),
+    }
+    if not target["title"]:
+        return jsonify({"error": "도서 정보가 부족합니다."}), 400
+
+    try:
+        book = _find_complete_live_book(target, fallback)
+        if not book:
+            return jsonify({"error": "실시간 상세 정보를 찾지 못했습니다."}), 404
+        return jsonify(
+            {
+                "title": book.get("title") or "",
+                "author": book.get("author") or "",
+                "publisher": book.get("publisher") or "",
+                "counts": book.get("counts") or {},
+                "live_detail_url": book.get("live_detail_url") or "",
+                "live_detail_key": book.get("live_detail_key") or "",
+            }
+        )
+    except Exception as exc:
+        print(f"[live_book_summary error] {exc}")
+        print(traceback.format_exc())
+        return jsonify({"error": "실시간 요약 조회 중 오류가 발생했습니다."}), 502
 
 
 @live_search_bp.route("/live_book")
