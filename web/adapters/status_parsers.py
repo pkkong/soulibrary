@@ -233,11 +233,32 @@ def parse_sen_xml_status(xml: str):
 
 
 def parse_eunpyeong_status(data: dict):
-    contents = data.get("Contents") if isinstance(data, dict) else None
-    if isinstance(contents, dict):
-        total = _to_int(contents.get("ContentsCopys") or contents.get("Copys"))
-        loaned = _to_int(contents.get("CurrentLoanCount") or contents.get("ContentLoanCount"))
-        reserved = _to_int(contents.get("CurrentResvCount") or contents.get("ContentResevCount"))
+    if not isinstance(data, dict):
+        return None
+    contents = data.get("Contents")
+    if isinstance(contents, list) and contents:
+        contents = contents[0]
+    source = contents if isinstance(contents, dict) else data.get("data") if isinstance(data.get("data"), dict) else data
+    if isinstance(source, dict):
+        has_status_fields = any(
+            key in source
+            for key in (
+                "ContentsCopys",
+                "Copys",
+                "CurrentLoanCount",
+                "ContentLoanCount",
+                "CurrentResvCount",
+                "ContentResevCount",
+                "copys",
+                "loanCnt",
+                "reserveCnt",
+            )
+        )
+        if not has_status_fields:
+            return None
+        total = _to_int(source.get("ContentsCopys") or source.get("Copys") or source.get("copys"))
+        loaned = _to_int(source.get("CurrentLoanCount") or source.get("ContentLoanCount") or source.get("loanCnt"))
+        reserved = _to_int(source.get("CurrentResvCount") or source.get("ContentResevCount") or source.get("reserveCnt"))
         return {
             "loaned": loaned,
             "total": total,

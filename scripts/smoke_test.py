@@ -106,12 +106,18 @@ def main():
         raise AssertionError("dobong live connector did not keep product_cd from result link")
 
     class FakeStatusResponse:
-        def __init__(self, text="", content=None):
+        def __init__(self, text="", content=None, json_data=None):
             self.text = text
             self.content = content if content is not None else text.encode("utf-8")
+            self._json_data = json_data
 
         def raise_for_status(self):
             return None
+
+        def json(self):
+            if self._json_data is None:
+                raise ValueError("no json")
+            return self._json_data
 
     class FakeStatusSession:
         def __init__(self, response):
@@ -152,6 +158,30 @@ def main():
         status_api_routes.STATUS_CACHE.clear()
     if gangnam_status.get_json().get("status", {}).get("owned") != 3:
         raise AssertionError(f"gangnam EUC-KR status did not parse: {gangnam_status.get_json()}")
+
+    eunpyeong_session = FakeStatusSession(FakeStatusResponse(json_data={
+        "data": {
+            "contentKey": "101619655",
+            "copys": 2,
+            "loanCnt": 2,
+            "reserveCnt": 97,
+        }
+    }))
+    status_api_routes.get_status_session = lambda: eunpyeong_session
+    try:
+        eunpyeong_status = assert_response(
+            client,
+            "/api/eunpyeong_status?content_id=101619655",
+        )
+    finally:
+        status_api_routes.get_status_session = original_status_session
+        status_api_routes.STATUS_CACHE.clear()
+    eunpyeong_payload = eunpyeong_status.get_json()
+    if eunpyeong_payload.get("status", {}).get("total") != 2 or eunpyeong_payload.get("status", {}).get("reserved") != 97:
+        raise AssertionError(f"eunpyeong current API status did not parse: {eunpyeong_payload}")
+    eunpyeong_call = eunpyeong_session.calls[0]
+    if "api/service/content/detail" not in eunpyeong_call["url"] or eunpyeong_call["params"].get("id") != "101619655":
+        raise AssertionError(f"eunpyeong status did not request current detail API: {eunpyeong_session.calls}")
 
     original_get = report_routes.requests.get
     original_post = report_routes.requests.post
