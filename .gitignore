@@ -12,6 +12,8 @@ venv/
 .vscode/
 
 # Local data outputs
+data/*
+!data/README.md
 data/library.db
 data/library_split.db
 data/*.sqlite

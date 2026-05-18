@@ -106,11 +106,14 @@ docker run --rm -p 5000:5000 library-crawler
 
 일반적으로 커밋하지 않을 것:
 
+- `data/*.csv`, `data/*.json`
 - `data/*.db`, `data/*.sqlite*`
 - 로컬 캐시/상태 파일
 - 크롤링 결과 CSV 변경분
 - `.env`, 토큰, 개인 설정
 - 로컬 백업 ZIP
+
+`data/`에는 `README.md`만 Git에 남깁니다. 크롤링 결과, 과거 CSV DB, 임시 JSON, 로컬 SQLite/PostgreSQL 덤프는 필요할 때 각 작업 환경에서 생성하거나 별도 백업 위치에서 내려받습니다.
 
 작업 전후 확인:
 
