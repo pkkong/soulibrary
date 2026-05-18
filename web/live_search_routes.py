@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from flask import Blueprint, jsonify, render_template, request
 
 from live_search.normalizer import normalize_text
-from live_search.service import get_cached_live_detail, live_search
+from live_search.service import get_cached_live_detail, live_search, set_cached_live_detail
 
 
 live_search_bp = Blueprint("live_search", __name__)
@@ -34,6 +34,7 @@ def _attach_summary_urls(payload: dict, query: str) -> dict:
         if item.get("live_detail_key"):
             params["key"] = item.get("live_detail_key") or ""
         item["summary_url"] = f"/api/live_book_summary?{urlencode(params)}"
+        set_cached_live_detail(item.get("live_detail_key"), item)
     return payload
 
 
@@ -225,16 +226,17 @@ def live_book_page():
 
     cached_book = get_cached_live_detail(cache_key)
     if cached_book:
-        detail_target = {
-            "title": target["title"] or cached_book.get("title") or "",
-            "author": target["author"] or cached_book.get("author") or "",
-            "publisher": target["publisher"] or cached_book.get("publisher") or "",
-        }
-        try:
-            cached_book = _find_complete_live_book(detail_target, cached_book) or cached_book
-        except Exception as exc:
-            print(f"[live_book hydrate error] {exc}")
-            print(traceback.format_exc())
+        if cached_book.get("counts_partial"):
+            detail_target = {
+                "title": target["title"] or cached_book.get("title") or "",
+                "author": target["author"] or cached_book.get("author") or "",
+                "publisher": target["publisher"] or cached_book.get("publisher") or "",
+            }
+            try:
+                cached_book = _find_complete_live_book(detail_target, cached_book) or cached_book
+            except Exception as exc:
+                print(f"[live_book hydrate error] {exc}")
+                print(traceback.format_exc())
         return render_template(
             "live_book.html",
             book=_decorate_live_book(cached_book),

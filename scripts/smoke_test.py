@@ -240,8 +240,19 @@ def main():
         "author": "앤디 위어",
         "publisher": "알에이치코리아",
         "counts": {"kyobo": 1, "yes24": 0, "other": 0, "total": 1},
+        "counts_partial": True,
         "libraries": [
             {"code": "eunpyeong", "name": "은평구립전자도서관", "short": "은평", "platform_code": "Eunpyeong"},
+        ],
+    }
+    complete_cached_book = {
+        "title": "완성 캐시 테스트",
+        "author": "테스터",
+        "publisher": "테스트출판",
+        "counts": {"kyobo": 1, "yes24": 0, "other": 1, "total": 2},
+        "libraries": [
+            {"code": "eunpyeong", "name": "은평구립전자도서관", "short": "은평", "platform_code": "Eunpyeong"},
+            {"code": "gangnam", "name": "강남구 전자도서관", "short": "강남", "platform_code": "Gangnam"},
         ],
     }
     complete_book = {
@@ -276,6 +287,8 @@ def main():
     def fake_cached_detail(key):
         if not key:
             return None
+        if key == "complete-project":
+            return complete_cached_book
         if key != "partial-project":
             raise AssertionError(f"unexpected detail key: {key}")
         return partial_book
@@ -307,6 +320,10 @@ def main():
             client,
             "/live_book?key=partial-project&title=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8+%ED%97%A4%EC%9D%BC%EB%A9%94%EB%A6%AC&author=%EC%95%A4%EB%94%94+%EC%9C%84%EC%96%B4&publisher=%EC%95%8C%EC%97%90%EC%9D%B4%EC%B9%98%EC%BD%94%EB%A6%AC%EC%95%84"
         )
+        complete_cached_detail = assert_response(
+            client,
+            "/live_book?key=complete-project&title=%EC%99%84%EC%84%B1+%EC%BA%90%EC%8B%9C+%ED%85%8C%EC%8A%A4%ED%8A%B8",
+        )
         subscription_detail = assert_response(
             client,
             "/live_book?title=%EA%B5%AC%EB%8F%85%ED%98%95+%ED%85%8C%EC%8A%A4%ED%8A%B8&author=%ED%85%8C%EC%8A%A4%ED%84%B0&publisher=%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%B6%9C%ED%8C%90",
@@ -317,6 +334,9 @@ def main():
     hydrated_body = hydrated_detail.get_data(as_text=True)
     if "강남" not in hydrated_body or "은평" not in hydrated_body:
         raise AssertionError("live detail did not hydrate cached partial search results")
+    complete_cached_body = complete_cached_detail.get_data(as_text=True)
+    if "완성 캐시 테스트" not in complete_cached_body or "강남" not in complete_cached_body:
+        raise AssertionError("live detail did not render complete cached detail directly")
 
     subscription_body = subscription_detail.get_data(as_text=True)
     if 'data-service-type="Subscription"' not in subscription_body:
