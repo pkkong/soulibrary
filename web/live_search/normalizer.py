@@ -15,7 +15,11 @@ def normalize_author(value: str) -> str:
     text = re.sub(r"\([^)]*\)", "", text)
     text = re.sub(r"\[[^\]]*\]", "", text)
     text = re.sub(r"(지은이|지음|저자|저|글쓴이|글|옮긴이|옮김|역자|역)", "", text)
-    return normalize_text(text)
+    normalized = normalize_text(text)
+    author_aliases = {
+        "andyweir": "앤디위어",
+    }
+    return author_aliases.get(normalized, normalized)
 
 
 def _author_display_quality(value: str) -> int:
