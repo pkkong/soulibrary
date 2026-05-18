@@ -23,6 +23,7 @@ const PROVIDER_LOGOS = {};
 const MSG_NO_RESULTS = "검색 결과가 없습니다.";
 const MSG_ERROR = "검색 중 오류가 발생했습니다.";
 const MSG_ERROR_PREFIX = "오류: ";
+const CARD_SUMMARY_HYDRATE_LIMIT = 5;
 
 let currentResults = [];
 let filteredResults = [];
@@ -38,6 +39,7 @@ let selectedField = "title_author"; // search field: title+author
 let tempSelectedProviders = new Set();
 let tempSelectedLibraries = new Set();
 let tempSelectedField = "title_author";
+const summaryHydrateStarted = new Set();
 const filterBar = document.querySelector(".filter-bar");
 if (filterBar) filterBar.style.display = "none"; // legacy filter bar hidden
 const filterSummary = document.getElementById("filter-summary");
@@ -205,6 +207,7 @@ function fetchSearch(query, refine) {
     currentResults = [];
     filteredResults = [];
     totalCount = 0;
+    summaryHydrateStarted.clear();
     const params = new URLSearchParams();
     params.set("query", query);
     params.set("field", selectedField);
@@ -293,6 +296,28 @@ function groupLibraries(libs) {
     return groups;
 }
 
+function providerCountsForBook(book) {
+    if (book && book.counts) {
+        return {
+            kyobo: Number(book.counts.kyobo) || 0,
+            yes24: Number(book.counts.yes24) || 0,
+            other: (Number(book.counts.other) || 0) + (Number(book.counts.bookcube) || 0),
+        };
+    }
+    const libs = uniqueLibraries(book);
+    const groups = groupLibraries(libs);
+    return {
+        kyobo: groups.kyobo.length,
+        yes24: groups.yes24.length,
+        other: groups.other.length + groups.special.length,
+    };
+}
+
+function countText(value, pending) {
+    if (pending) return "...";
+    return value || "-";
+}
+
 function renderLibraryBadges(libs) {
     return libs.map(lib => {
         const name = lib.short || lib.name;
@@ -319,44 +344,35 @@ function renderMore() {
         const imgHtml = book.image_url
             ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'no-img\'>이미지 없음</div>'">`
             : `<div class="no-img">이미지 없음</div>`;
-    let kyoboCount = 0;
-    let yes24Count = 0;
-    let otherCount = 0;
-    if (book.counts) {
-        kyoboCount = Number(book.counts.kyobo) || 0;
-        yes24Count = Number(book.counts.yes24) || 0;
-        otherCount = (Number(book.counts.other) || 0) + (Number(book.counts.bookcube) || 0);
-    } else {
-        const libs = uniqueLibraries(book);
-        const groups = groupLibraries(libs);
-        kyoboCount = groups.kyobo.length;
-        yes24Count = groups.yes24.length;
-        otherCount = groups.other.length + groups.special.length;
-    }
+    const countsPending = Boolean(book.counts_partial && book.summary_url);
+    const counts = providerCountsForBook(book);
+    const kyoboCount = counts.kyobo;
+    const yes24Count = counts.yes24;
+    const otherCount = counts.other;
     const kyoboOn = kyoboCount > 0;
     const yes24On = yes24Count > 0;
     const otherOn = otherCount > 0;
     const libBadges = `
         <div class="supply-summary">
             <div class="prov-grid">
-                <div class="prov-item ${kyoboOn ? "" : "is-off"}">
+                <div class="prov-item ${kyoboOn || countsPending ? "" : "is-off"}" data-provider-item="kyobo">
                     <div class="prov-chip kyobo"><img src="/static/img/kyobo.webp" alt="교보" loading="lazy"></div>
-                    <div class="prov-count">${kyoboCount || "-"}</div>
+                    <div class="prov-count" data-provider-count="kyobo">${countText(kyoboCount, countsPending)}</div>
                 </div>
-                <div class="prov-item ${yes24On ? "" : "is-off"}">
+                <div class="prov-item ${yes24On || countsPending ? "" : "is-off"}" data-provider-item="yes24">
                     <div class="prov-chip yes24"><img src="/static/img/yes24.webp" alt="YES24" loading="lazy"></div>
-                    <div class="prov-count">${yes24Count || "-"}</div>
+                    <div class="prov-count" data-provider-count="yes24">${countText(yes24Count, countsPending)}</div>
                 </div>
-                <div class="prov-item ${otherOn ? "" : "is-off"}">
+                <div class="prov-item ${otherOn || countsPending ? "" : "is-off"}" data-provider-item="other">
                     <div class="prov-chip other">기타</div>
-                    <div class="prov-count">${otherCount || "-"}</div>
+                    <div class="prov-count" data-provider-count="other">${countText(otherCount, countsPending)}</div>
                 </div>
             </div>
         </div>
     `;
 
     const html = `
-        <div class="card js-book-card" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""}>
+        <div class="card js-book-card" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""} ${book.summary_url ? `data-summary-url="${escapeAttr(book.summary_url)}"` : ""}>
             <div class="thumb">${imgHtml}</div>
             <div class="info">
                 <h3 class="title" title="${book.title}">${book.title}</h3>
@@ -370,11 +386,45 @@ function renderMore() {
     `;
         resultsDiv.insertAdjacentHTML('beforeend', html);
     });
+    hydrateSearchCardSummaries();
     renderIndex += slice.length;
     const loaded = currentResults.length;
     const canLoadMore = totalCount === 0 ? renderIndex < filteredResults.length : loaded < totalCount;
     loadMoreBtn.style.display = canLoadMore ? "block" : "none";
     if (!canLoadMore) setLoadMoreLoading(false);
+}
+
+function updateCardProviderCount(card, provider, value) {
+    const countEl = card.querySelector(`[data-provider-count="${provider}"]`);
+    const itemEl = card.querySelector(`[data-provider-item="${provider}"]`);
+    if (countEl) countEl.textContent = value || "-";
+    if (itemEl) itemEl.classList.toggle("is-off", !value);
+}
+
+function hydrateSearchCardSummaries() {
+    const cards = Array.from(document.querySelectorAll(".js-book-card[data-summary-url]"))
+        .filter(card => !summaryHydrateStarted.has(card.dataset.summaryUrl))
+        .slice(0, CARD_SUMMARY_HYDRATE_LIMIT);
+
+    cards.forEach(card => {
+        const summaryUrl = card.dataset.summaryUrl;
+        if (!summaryUrl) return;
+        summaryHydrateStarted.add(summaryUrl);
+        fetch(summaryUrl)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (!data || !data.counts) return;
+                const counts = providerCountsForBook(data);
+                updateCardProviderCount(card, "kyobo", counts.kyobo);
+                updateCardProviderCount(card, "yes24", counts.yes24);
+                updateCardProviderCount(card, "other", counts.other);
+                if (data.live_detail_url) {
+                    card.dataset.liveDetailUrl = data.live_detail_url;
+                }
+                card.removeAttribute("data-summary-url");
+            })
+            .catch(err => console.error(err));
+    });
 }
 
 function setLoadMoreLoading(isLoading) {

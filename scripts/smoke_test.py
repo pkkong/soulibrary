@@ -210,18 +210,33 @@ def main():
     }
 
     def fake_cached_detail(key):
+        if not key:
+            return None
         if key != "partial-project":
             raise AssertionError(f"unexpected detail key: {key}")
         return partial_book
 
     def fake_live_search(query, field, providers_raw="", libraries_raw="", limit=20, offset=0, refine=""):
-        if query != "프로젝트 헤일메리" or field != "title":
-            raise AssertionError(f"unexpected detail hydration search: {query} {field}")
-        return {"total": 1, "items": [complete_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
+        if query == "프로젝트" and field == "title_author":
+            return {"total": 1, "items": [partial_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
+        if query == "프로젝트 헤일메리" and field == "title":
+            return {"total": 1, "items": [complete_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
+        raise AssertionError(f"unexpected live search: {query} {field}")
 
     live_search_routes.get_cached_live_detail = fake_cached_detail
     live_search_routes.live_search = fake_live_search
     try:
+        partial_search = assert_response(
+            client,
+            "/api/live_search?query=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8&field=title_author&limit=20&offset=0",
+        ).get_json()
+        partial_item = partial_search["items"][0]
+        if not partial_item.get("counts_partial") or not partial_item.get("summary_url"):
+            raise AssertionError(f"broad search card was not marked for count hydration: {partial_item}")
+        summary = assert_response(client, partial_item["summary_url"]).get_json()
+        if summary.get("counts", {}).get("total") != 2:
+            raise AssertionError(f"search card summary did not return complete counts: {summary}")
+
         hydrated_detail = assert_response(
             client,
             "/live_book?key=partial-project&title=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8+%ED%97%A4%EC%9D%BC%EB%A9%94%EB%A6%AC&author=%EC%95%A4%EB%94%94+%EC%9C%84%EC%96%B4&publisher=%EC%95%8C%EC%97%90%EC%9D%B4%EC%B9%98%EC%BD%94%EB%A6%AC%EC%95%84"
