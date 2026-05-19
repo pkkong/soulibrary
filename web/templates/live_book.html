@@ -34,6 +34,10 @@
             <div class="detail-cover" data-detail-cover>
                 {% if book.image_url %}
                     <img src="{{ book.image_url }}" loading="lazy" alt="커버">
+                {% elif detail_hydrate_url %}
+                    <div class="detail-cover-loading" aria-label="표지 조회 중">
+                        <span class="detail-inline-spinner" aria-hidden="true"></span>
+                    </div>
                 {% else %}
                     <div class="no-img">이미지 없음</div>
                 {% endif %}
@@ -280,15 +284,23 @@
             next();
         }
 
-        function applyHydratedBook(book) {
+        function applyHydratedBook(book, hydrated) {
             const imageUrl = (book && book.image_url || "").trim();
-            if (!imageUrl) return;
+            const cover = document.querySelector("[data-detail-cover]");
+            if (!imageUrl) {
+                if (hydrated && cover && !cover.querySelector("img")) {
+                    const fallback = document.createElement("div");
+                    fallback.className = "no-img";
+                    fallback.textContent = "이미지 없음";
+                    cover.replaceChildren(fallback);
+                }
+                return;
+            }
             const bg = document.querySelector("[data-detail-bg]");
             if (bg) {
                 bg.classList.remove("detail-bg-fallback");
                 bg.style.backgroundImage = `url("${imageUrl.replace(/"/g, "%22")}")`;
             }
-            const cover = document.querySelector("[data-detail-cover]");
             if (cover && !cover.querySelector("img")) {
                 const img = document.createElement("img");
                 img.src = imageUrl;
@@ -318,12 +330,19 @@
                 const current = document.querySelector("[data-live-library-groups]");
                 if (!current) throw new Error("detail_container_missing");
                 current.outerHTML = data.groups_html;
-                applyHydratedBook(data.book || {});
+                applyHydratedBook(data.book || {}, true);
                 window.dispatchEvent(new CustomEvent("soulib:live-book-hydrated", {detail: data.book || {}}));
                 if (note) note.textContent = "";
                 return true;
             } catch (err) {
                 if (note) note.textContent = "";
+                const placeholder = document.querySelector("[data-library-placeholder]");
+                if (placeholder) {
+                    placeholder.classList.add("is-error");
+                    placeholder.removeAttribute("aria-hidden");
+                    placeholder.textContent = "도서관 정보를 불러오지 못했습니다.";
+                }
+                applyHydratedBook({}, true);
                 return false;
             }
         }

@@ -930,6 +930,23 @@ body.has-topbar .search-top {
     border: none;
 }
 .detail-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.detail-cover-loading {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.36);
+    backdrop-filter: blur(10px);
+}
+.detail-inline-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(142,142,147,0.28);
+    border-top-color: #6e6e73;
+    border-radius: 999px;
+    animation: libspin 0.85s linear infinite;
+}
 .detail-sheet {
     margin: -22px auto 0;
     position: relative;
@@ -982,6 +999,36 @@ body.has-topbar .search-top {
 .detail-toggle { border: 1px solid #e5e7eb; background:#fff; color:#111827; font-size:12px; font-weight:600; padding:6px 10px; border-radius:999px; }
 .detail-toggle:hover { background:#f9fafb; }
 .lib-groups { display:flex; flex-direction:column; gap:0; }
+.lib-groups-placeholder {
+    min-height: 118px;
+    padding: 4px 0 2px;
+    color: #8e8e93;
+    font-size: 12px;
+}
+.lib-placeholder-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    font-weight: 600;
+}
+.lib-placeholder-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 12px;
+}
+.lib-placeholder-card {
+    min-height: 48px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #f2f2f7 0%, #f8f8fb 50%, #f2f2f7 100%);
+    background-size: 220% 100%;
+    animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+.lib-groups-placeholder.is-error {
+    min-height: auto;
+    padding: 10px 0;
+}
 .lib-group-row { display:flex; flex-direction:column; gap:6px; align-items:stretch; padding: 12px 0; border-top: 1px solid #f1f5f9; }
 .lib-group-row:first-child { border-top: none; }
 .lib-provider { flex: 0 0 auto; padding-top: 2px; margin-right: 18px; }
@@ -1028,6 +1075,10 @@ body.has-topbar .search-top {
   font-size:12px;
 }
 @keyframes libspin { to { transform:rotate(360deg); } }
+@keyframes skeleton-shimmer {
+    0% { background-position: 120% 0; }
+    100% { background-position: -120% 0; }
+}
 .lib-group-title { font-weight:700; font-size:14px; color:#111827; margin: 6px 0 8px; }
 .lib-card { display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 6px; border:1px solid #e5e7eb; border-radius:10px; background:#ffffff; text-decoration:none; transition:transform .15s ease, border-color .15s ease, color .15s ease, background-color .15s ease; text-align:center; }
 .lib-card:hover { transform:translateY(-1px); }

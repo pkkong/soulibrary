@@ -1,6 +1,18 @@
 <div class="lib-groups" data-live-library-groups>
     {% if not book.library_groups %}
-    <div class="lib-groups-placeholder" data-library-placeholder aria-hidden="true"></div>
+    <div class="lib-groups-placeholder{% if detail_hydrate_url %} is-loading{% endif %}" data-library-placeholder{% if not detail_hydrate_url %} aria-hidden="true"{% endif %}>
+        {% if detail_hydrate_url %}
+        <div class="lib-placeholder-head">
+            <span class="detail-inline-spinner" aria-hidden="true"></span>
+            <span>도서관 조회 중</span>
+        </div>
+        <div class="lib-placeholder-grid" aria-hidden="true">
+            {% for _ in range(8) %}
+            <span class="lib-placeholder-card"></span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
     {% endif %}
     {% for group in book.library_groups %}
     <div class="lib-group-row is-pending">
