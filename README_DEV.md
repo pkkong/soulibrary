@@ -75,7 +75,7 @@ DB_USER=
 DB_PASSWORD=
 ```
 
-공유 서재는 운영에서 Cloudtype PostgreSQL을 사용합니다. Cloudtype에는 `SHARED_SHELVES_STORAGE=postgres`를 명시하고, `DATABASE_URL` 또는 `DB_HOST` 계열 env가 실제로 주입되어야 합니다. 연결값이 없으면 공유 저장은 JSON으로 조용히 fallback하지 않고 실패하도록 둡니다. 로컬 smoke test나 DB 없는 개발에서는 `SHARED_SHELVES_STORAGE=json`과 `SHARED_SHELVES_FILE`을 사용할 수 있습니다.
+공유 서재는 운영에서 `SHARED_SHELVES_STORAGE=auto`를 사용합니다. `DATABASE_URL` 또는 `DB_HOST` 계열 env가 실제로 주입되면 Cloudtype PostgreSQL에 저장하고, 연결값이 없으면 JSON 저장으로 fallback해 공유 링크 생성 자체는 막지 않습니다. 로컬 smoke test나 DB 없는 개발에서는 `SHARED_SHELVES_STORAGE=json`과 `SHARED_SHELVES_FILE`을 사용할 수 있습니다.
 
 ## 배포
 
