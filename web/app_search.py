@@ -451,6 +451,16 @@ def search_page():
     )
 
 
+@app.route('/my-shelf')
+def my_shelf_page():
+    return render_template(
+        "my_shelf.html",
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="shelf",
+    )
+
+
 @app.route('/robots.txt')
 def robots_txt():
     return send_from_directory(os.path.join(app.root_path, "static"), "robots.txt")

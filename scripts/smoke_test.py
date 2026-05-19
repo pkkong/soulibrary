@@ -41,6 +41,10 @@ def main():
     if "search-page" not in search.get_data(as_text=True):
         raise AssertionError("search page did not render expected markup")
 
+    my_shelf = assert_response(client, "/my-shelf")
+    if "shelf-shell" not in my_shelf.get_data(as_text=True):
+        raise AssertionError("my shelf page did not render expected markup")
+
     empty_search = assert_response(client, "/api/search")
     payload = empty_search.get_json()
     if payload != {"total": 0, "items": []}:
@@ -337,9 +341,9 @@ def main():
         live_search_routes.live_search = original_live_search
         live_search_routes.get_cached_live_detail = original_cached_detail
     hydrated_body = hydrated_detail.get_data(as_text=True)
-    if "\uc740\ud3c9" not in hydrated_body or "\uac15\ub0a8" in hydrated_body or "/api/live_book_detail" not in hydrated_body:
+    if "은평" not in hydrated_body or "강남" in hydrated_body or "/api/live_book_detail" not in hydrated_body:
         raise AssertionError("live detail should render cached partial result before background hydration")
-    if "\uac15\ub0a8" not in (hydrated_payload.get("groups_html") or "") or "\uc740\ud3c9" not in (hydrated_payload.get("groups_html") or ""):
+    if "강남" not in (hydrated_payload.get("groups_html") or "") or "은평" not in (hydrated_payload.get("groups_html") or ""):
         raise AssertionError(f"background live detail hydration did not return complete libraries: {hydrated_payload}")
     complete_cached_body = complete_cached_detail.get_data(as_text=True)
     if "완성 캐시 테스트" not in complete_cached_body or "강남" not in complete_cached_body:

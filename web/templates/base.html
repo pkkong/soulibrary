@@ -22,7 +22,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png', v='20260512a') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico', v='20260512a') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css', v='20260518a') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css', v='20260519c') }}">
     <meta name="google-site-verification" content="ufWk5RmswC8ZKqrvZg49uBbt6tEZDffAyp-0AG16l9k" />
     <meta name="naver-site-verification" content="f4cb296e8b2fe391bf2b6df997e7445491043c7f" />
     <!-- Google tag (gtag.js) -->
@@ -64,7 +64,15 @@
             </span>
             <span class="nav-label">홈</span>
         </a>
-        <a class="nav-item nav-item-search {% if active_tab == 'search' %}is-active{% endif %}" href="/search">
+        <a class="nav-item nav-item-shelf {% if active_tab == 'shelf' %}is-active{% endif %}" href="/my-shelf" aria-label="내 서재">
+            <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"></path>
+                </svg>
+            </span>
+            <span class="nav-label">서재</span>
+        </a>
+        <a class="nav-item nav-item-search {% if active_tab == 'search' %}is-active{% endif %}" href="/search" aria-label="검색">
             <span class="nav-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="7"></circle>
@@ -83,6 +91,7 @@
             </span>
             <span class="nav-label">신고</span>
         </a>
+        <span class="nav-spacer" aria-hidden="true"></span>
     </nav>
 
     {% block scripts %}{% endblock %}

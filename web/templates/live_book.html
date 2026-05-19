@@ -25,7 +25,7 @@
 
         <div class="detail-topbar">
             <button class="detail-icon-btn" type="button" onclick="history.length > 1 ? history.back() : (location.href='/search')">✕</button>
-            <span></span>
+            <button class="detail-icon-btn detail-shelf-btn" type="button" data-detail-shelf aria-label="내 서재에 담기"></button>
         </div>
 
         <div class="detail-cover-wrap">
@@ -100,6 +100,8 @@
 
 {% block scripts %}
 {% if book %}
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519c') }}"></script>
+<script src="{{ url_for('static', filename='js/shelf_picker.js', v='20260519c') }}"></script>
 <script>
     (function () {
         const BOOK_TITLE = {{ book.title|tojson }};
@@ -310,6 +312,30 @@
         } else {
             initStatuses(document);
         }
+    })();
+</script>
+<script>
+    (function () {
+        const button = document.querySelector("[data-detail-shelf]");
+        const picker = window.SoulibShelfPicker;
+        if (!button || !picker) return;
+        const book = {
+            title: {{ book.title|tojson }},
+            author: {{ (book.author or "")|tojson }},
+            publisher: {{ (book.publisher or "")|tojson }},
+            image_url: {{ (book.image_url or "")|tojson }},
+            live_detail_url: {{ request.full_path.rstrip("?")|tojson }},
+            counts: {{ (book.counts or {})|tojson }},
+            libraries: {{ (book.libraries or [])|tojson }}
+        };
+
+        function sync() {
+            picker.syncTrigger(button, book);
+        }
+
+        button.addEventListener("click", () => picker.open(book));
+        window.addEventListener("soulib:shelf-changed", sync);
+        sync();
     })();
 </script>
 {% endif %}
