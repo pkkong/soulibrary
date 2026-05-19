@@ -4,9 +4,13 @@ import re
 import json
 import secrets
 import traceback
+from urllib.parse import urlencode
+
 from db import get_db, using_postgres
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, abort, url_for, redirect
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
+from seo_books import SEO_BOOKS, SEO_BOOK_BY_SLUG
 from utils.normalize import (
     normalize_title,
     normalize_author,
@@ -27,6 +31,7 @@ from status_api_routes import (
 )
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.register_blueprint(data_quality_bp)
 app.register_blueprint(status_api_bp)
 app.register_blueprint(live_search_bp)
@@ -46,7 +51,9 @@ DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
 LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
 DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
 SHARED_SHELVES_FILE = os.environ.get("SHARED_SHELVES_FILE", os.path.join(ROOT_DIR, "data", "shared_shelves.json"))
+SHARED_SHELVES_STORAGE = os.environ.get("SHARED_SHELVES_STORAGE", "json").strip().lower()
 MAX_SHARED_SHELF_BOOKS = 200
+SHARED_SHELF_SLUG_LENGTH = 16
 LIB_DETAIL_TTL_SEC = int(os.environ.get("LIB_DETAIL_TTL", "300"))
 LIB_DETAIL_CACHE = {}
 SITEMAP_PAGE_SIZE = min(int(os.environ.get("SITEMAP_PAGE_SIZE", "50000")), 50000)
@@ -54,6 +61,7 @@ SITEMAP_TTL_SEC = int(os.environ.get("SITEMAP_TTL", "21600"))
 SITEMAP_CACHE = {"ts": 0, "count": 0, "pages": 0}
 SITEMAP_PAGE_CACHE = {}
 HOLDINGS_COLUMNS = None
+SHARED_SHELVES_TABLE_READY = False
 SUBSCRIPTION_TAG_PATTERN = re.compile(r"\s*\[구독형전자책\]\s*")
 
 
@@ -92,6 +100,76 @@ def _clean_shared_text(value, limit=200):
     return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
 
 
+def _shared_shelves_use_postgres():
+    if SHARED_SHELVES_STORAGE == "postgres":
+        return True
+    if SHARED_SHELVES_STORAGE == "json":
+        return False
+    return using_postgres()
+
+
+def _require_shared_shelves_postgres_config():
+    if not using_postgres():
+        raise RuntimeError("SHARED_SHELVES_STORAGE=postgres requires DATABASE_URL or DB_HOST.")
+
+
+def _shared_shelf_timestamp(value):
+    if not value:
+        return ""
+    if hasattr(value, "isoformat"):
+        return value.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return str(value)
+
+
+def _shared_shelf_from_row(row):
+    if not row:
+        return None
+    books = row.get("books") or []
+    if isinstance(books, str):
+        try:
+            books = json.loads(books)
+        except Exception:
+            books = []
+    return {
+        "slug": row.get("slug") or "",
+        "title": row.get("title") or "공유 서재",
+        "description": row.get("description") or "",
+        "books": books if isinstance(books, list) else [],
+        "view_count": int(row.get("view_count") or 0),
+        "created_at": _shared_shelf_timestamp(row.get("created_at")),
+        "updated_at": _shared_shelf_timestamp(row.get("updated_at")),
+    }
+
+
+def _ensure_shared_shelves_table(conn):
+    global SHARED_SHELVES_TABLE_READY
+    if SHARED_SHELVES_TABLE_READY:
+        return
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS shared_shelves (
+            id BIGSERIAL PRIMARY KEY,
+            slug VARCHAR(40) NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            description TEXT,
+            books JSONB NOT NULL,
+            view_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            deleted_at TIMESTAMPTZ
+        );
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_shelves_slug ON shared_shelves(slug);")
+    conn.commit()
+    SHARED_SHELVES_TABLE_READY = True
+
+
+def _generate_shared_shelf_slug():
+    alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    return "".join(secrets.choice(alphabet) for _ in range(SHARED_SHELF_SLUG_LENGTH))
+
+
 def _load_shared_shelves():
     if not os.path.exists(SHARED_SHELVES_FILE):
         return {}
@@ -111,6 +189,113 @@ def _save_shared_shelves(data):
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp_path, SHARED_SHELVES_FILE)
+
+
+def _create_shared_shelf_json(title, description, books):
+    store = _load_shared_shelves()
+    slug = _generate_shared_shelf_slug()
+    while slug in store:
+        slug = _generate_shared_shelf_slug()
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    shelf = {
+        "slug": slug,
+        "title": title,
+        "description": description,
+        "books": books,
+        "view_count": 0,
+        "created_at": created_at,
+        "updated_at": created_at,
+    }
+    store[slug] = shelf
+    _save_shared_shelves(store)
+    return shelf
+
+
+def _get_shared_shelf_json(slug, increment_view=False):
+    store = _load_shared_shelves()
+    shelf = store.get(slug)
+    if not shelf:
+        return None
+    if increment_view:
+        shelf["view_count"] = int(shelf.get("view_count") or 0) + 1
+        store[slug] = shelf
+        _save_shared_shelves(store)
+    return shelf
+
+
+def _create_shared_shelf_postgres(title, description, books):
+    _require_shared_shelves_postgres_config()
+    conn = get_db_conn()
+    try:
+        _ensure_shared_shelves_table(conn)
+        for _ in range(5):
+            slug = _generate_shared_shelf_slug()
+            existing = conn.execute("SELECT 1 AS exists FROM shared_shelves WHERE slug = ?", (slug,)).fetchone()
+            if existing:
+                continue
+            cur = conn.execute(
+                """
+                INSERT INTO shared_shelves (slug, title, description, books)
+                VALUES (?, ?, ?, ?::jsonb)
+                RETURNING slug, title, description, books, view_count, created_at, updated_at;
+                """,
+                (slug, title, description, json.dumps(books, ensure_ascii=False)),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return _shared_shelf_from_row(row)
+        raise RuntimeError("shared shelf slug generation failed")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _get_shared_shelf_postgres(slug, increment_view=False):
+    _require_shared_shelves_postgres_config()
+    conn = get_db_conn()
+    try:
+        _ensure_shared_shelves_table(conn)
+        if increment_view:
+            cur = conn.execute(
+                """
+                UPDATE shared_shelves
+                   SET view_count = view_count + 1
+                 WHERE slug = ? AND deleted_at IS NULL
+             RETURNING slug, title, description, books, view_count, created_at, updated_at;
+                """,
+                (slug,),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return _shared_shelf_from_row(row)
+        cur = conn.execute(
+            """
+            SELECT slug, title, description, books, view_count, created_at, updated_at
+              FROM shared_shelves
+             WHERE slug = ? AND deleted_at IS NULL;
+            """,
+            (slug,),
+        )
+        return _shared_shelf_from_row(cur.fetchone())
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _create_shared_shelf(title, description, books):
+    if _shared_shelves_use_postgres():
+        return _create_shared_shelf_postgres(title, description, books)
+    return _create_shared_shelf_json(title, description, books)
+
+
+def _get_shared_shelf(slug, increment_view=False):
+    if _shared_shelves_use_postgres():
+        return _get_shared_shelf_postgres(slug, increment_view=increment_view)
+    return _get_shared_shelf_json(slug, increment_view=increment_view)
 
 
 def _normalize_shared_book(raw):
@@ -145,7 +330,7 @@ def _normalize_shared_book(raw):
 
 
 def _shared_shelf_public_url(slug):
-    return f"{request.url_root.rstrip('/')}/shelf/{slug}"
+    return _public_url(f"/shelf/{slug}")
 
 
 def _sitemap_base_url():
@@ -153,6 +338,37 @@ def _sitemap_base_url():
     if base:
         return base.rstrip("/")
     return request.url_root.rstrip("/")
+
+
+def _public_url(path="/"):
+    base = _sitemap_base_url()
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{base}{path}"
+
+
+def _seo_book_live_detail_url(book):
+    params = {
+        "title": book["title"],
+        "author": book.get("author") or "",
+        "publisher": book.get("publisher") or "",
+    }
+    return f"/api/live_book_detail?{urlencode(params)}"
+
+
+def _seo_book_structured_data(book, canonical_url):
+    data = {
+        "@context": "https://schema.org",
+        "@type": "Book",
+        "name": book["title"],
+        "url": canonical_url,
+        "description": book["summary"],
+    }
+    if book.get("author"):
+        data["author"] = {"@type": "Person", "name": book["author"]}
+    if book.get("publisher"):
+        data["publisher"] = {"@type": "Organization", "name": book["publisher"]}
+    return data
 
 
 def _sitemap_stats():
@@ -493,6 +709,7 @@ if "기타" not in PROVIDER_LABEL_TO_PLATFORMS:
 def index():
     return render_template(
         "index.html",
+        seo_books=SEO_BOOKS,
         show_topbar=False,
         topbar_desc="",
         active_tab="home",
@@ -512,6 +729,47 @@ def search_page():
         show_topbar=False,
         topbar_desc="",
         active_tab="search",
+    )
+
+
+@app.route("/books/<slug>")
+def seo_book_page(slug):
+    seo_book = SEO_BOOK_BY_SLUG.get(slug)
+    if not seo_book:
+        abort(404)
+
+    canonical_url = _public_url(f"/books/{slug}")
+    target = {
+        "title": seo_book["title"],
+        "author": seo_book.get("author") or "",
+        "publisher": seo_book.get("publisher") or "",
+    }
+    book = {
+        **target,
+        "image_url": "",
+        "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
+        "libraries": [],
+        "library_groups": [],
+        "counts_partial": True,
+    }
+    detail_hydrate_url = _seo_book_live_detail_url(seo_book)
+    meta_title = f"{seo_book['title']} 전자도서관 검색 - 서울 전자도서관 통합검색"
+    return render_template(
+        "live_book.html",
+        book=book,
+        seo_book=seo_book,
+        error=None,
+        detail_hydrate_url=detail_hydrate_url,
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="search",
+        canonical_url=canonical_url,
+        meta_title=meta_title,
+        meta_description=seo_book["summary"],
+        og_title=meta_title,
+        og_description=seo_book["summary"],
+        og_url=canonical_url,
+        structured_data=_seo_book_structured_data(seo_book, canonical_url),
     )
 
 
@@ -546,27 +804,31 @@ def api_share_shelf():
 
     title = _clean_shared_text(list_meta.get("name") or payload.get("title"), 80) or "공유 서재"
     description = _clean_shared_text(list_meta.get("description") or payload.get("description"), 300)
-    store = _load_shared_shelves()
-    slug = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:8]
-    while slug in store:
-        slug = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:8]
-    created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    store[slug] = {
-        "slug": slug,
-        "title": title,
-        "description": description,
-        "books": books,
-        "created_at": created_at,
-        "updated_at": created_at,
-    }
-    _save_shared_shelves(store)
-    return jsonify({"slug": slug, "url": _shared_shelf_public_url(slug), "shelf": store[slug]}), 201
+    try:
+        shelf = _create_shared_shelf(title, description, books)
+    except Exception as e:
+        print(f"[shelf error] shared shelf create failed: {e}")
+        print(traceback.format_exc())
+        return jsonify({"error": "공유 서재 저장소에 연결하지 못했습니다."}), 503
+    return jsonify({"slug": shelf["slug"], "url": _shared_shelf_public_url(shelf["slug"]), "shelf": shelf}), 201
 
 
 @app.route("/shelf/<slug>")
 def shared_shelf_page(slug):
     slug = _clean_shared_text(slug, 40)
-    shelf = _load_shared_shelves().get(slug)
+    try:
+        shelf = _get_shared_shelf(slug, increment_view=True)
+    except Exception as e:
+        print(f"[shelf error] shared shelf read failed: {e}")
+        print(traceback.format_exc())
+        return render_template(
+            "shared_shelf.html",
+            shelf=None,
+            error="공유 서재 저장소에 연결하지 못했습니다.",
+            show_topbar=False,
+            topbar_desc="",
+            active_tab="shelf",
+        ), 503
     if not shelf:
         return render_template(
             "shared_shelf.html",
@@ -618,6 +880,7 @@ def sitemap_static():
     base = _sitemap_base_url()
     today = time.strftime("%Y-%m-%d")
     urls = [f"{base}/", f"{base}/search", f"{base}/reports"]
+    urls.extend(f"{base}/books/{book['slug']}" for book in SEO_BOOKS)
     parts = ['<?xml version="1.0" encoding="UTF-8"?>']
     parts.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
     for url in urls:

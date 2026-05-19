@@ -10,6 +10,10 @@ options:
       secret: soulib-report-issues
     - name: GITHUB_ISSUE_REPO
       value: pkkong/library_crawler
+    - name: PUBLIC_BASE_URL
+      value: https://www.soulib.kr
+    - name: SHARED_SHELVES_STORAGE
+      value: postgres
 
 context:
   git:
