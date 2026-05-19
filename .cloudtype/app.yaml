@@ -13,7 +13,7 @@ options:
     - name: PUBLIC_BASE_URL
       value: https://www.soulib.kr
     - name: SHARED_SHELVES_STORAGE
-      value: postgres
+      value: auto
 
 context:
   git:
