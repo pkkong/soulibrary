@@ -1,0 +1,43 @@
+{% if reports_loading %}
+    <div class="report-empty">최근 접수 목록을 불러오는 중입니다.</div>
+{% elif reports_notice %}
+    <div class="report-list-notice" role="status">{{ reports_notice }}</div>
+{% endif %}
+
+{% if reports %}
+    <div class="report-items">
+        {% for report in reports %}
+            <article class="report-item">
+                <div class="report-item-meta">
+                    <span class="report-item-meta-main">
+                        <span>{{ report.category }}</span>
+                        {% if report.is_new %}
+                            <span class="report-status is-new">방금 접수</span>
+                        {% endif %}
+                        <span class="report-status">{{ report.status_label or "접수됨" }}</span>
+                        {% if report.issue_url %}
+                            <a class="report-issue-link" href="{{ report.issue_url }}" target="_blank" rel="noopener noreferrer">이슈 #{{ report.issue_number }}</a>
+                        {% endif %}
+                    </span>
+                    <time>{{ report.created_at.strftime("%Y-%m-%d %H:%M") if report.created_at else "" }}</time>
+                </div>
+                <p>{{ report.message }}</p>
+                {% if report.resolution_message %}
+                    <div class="report-resolution-log">
+                        <div>
+                            <strong>처리 안내</strong>
+                            {% if report.resolution_at %}
+                                <time>{{ report.resolution_at.strftime("%Y-%m-%d %H:%M") }}</time>
+                            {% endif %}
+                        </div>
+                        <p>{{ report.resolution_message }}</p>
+                    </div>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+{% elif reports_unavailable %}
+    <div class="report-empty">최근 접수 목록을 불러오지 못했습니다.</div>
+{% elif not reports_loading %}
+    <div class="report-empty">아직 접수된 신고가 없습니다.</div>
+{% endif %}
