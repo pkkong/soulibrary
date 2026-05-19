@@ -28,6 +28,13 @@
                     </svg>
                 </button>
             </form>
+            {% if seo_books %}
+            <nav class="landing-seo-links" aria-label="인기 전자책 바로가기">
+                {% for book in seo_books %}
+                <a href="/books/{{ book.slug }}">{{ book.title }}</a>
+                {% endfor %}
+            </nav>
+            {% endif %}
         </div>
     </div>
 </section>

@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
-{% if book %}
+{% if seo_book %}
+{% set page_title = seo_book.title ~ " 전자도서관 검색 - 서울 전자도서관 통합검색" %}
+{% elif book %}
 {% set page_title = book.title ~ " - 실시간 상세" %}
 {% else %}
 {% set page_title = "실시간 도서 상세" %}
@@ -295,7 +297,7 @@
                 const current = document.querySelector("[data-live-library-groups]");
                 if (!current) throw new Error("detail_container_missing");
                 current.outerHTML = data.groups_html;
-                if (note) note.textContent = "전체 보유처 확인이 완료되었습니다.";
+                if (note) note.textContent = "실시간으로 조회한 결과입니다.";
                 return true;
             } catch (err) {
                 if (note) note.textContent = "먼저 확인된 도서관을 표시하고 있습니다.";

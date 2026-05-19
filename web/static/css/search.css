@@ -430,6 +430,35 @@ body.has-topbar .app-main {
     justify-content: center;
 }
 
+.landing-seo-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    max-width: 440px;
+    margin: 18px auto 0;
+}
+
+.landing-seo-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 7px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+}
+
+.landing-seo-links a:hover {
+    border-color: #cfd6e1;
+    background: #f9fafb;
+}
+
 @media (max-width: 360px) {
     .landing-shell {
         padding-left: 12px;

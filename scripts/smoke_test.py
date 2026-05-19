@@ -11,6 +11,7 @@ sys.path.insert(0, str(WEB_DIR))
 # Keep smoke tests DB-free and fast unless the caller explicitly sets values.
 os.environ.setdefault("LIVE_SEARCH_TOTAL_TIMEOUT", "1.0")
 os.environ.setdefault("LIVE_SEARCH_LIBRARY_TIMEOUT", "0.8")
+os.environ.setdefault("SHARED_SHELVES_STORAGE", "json")
 os.environ.setdefault("SHARED_SHELVES_FILE", str(ROOT_DIR / "data" / "_tmp_smoke_shared_shelves.json"))
 
 from app_search import app  # noqa: E402
