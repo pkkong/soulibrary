@@ -1,6 +1,6 @@
 (function () {
     const DETAIL_LOADING_TEXT = "상세 페이지 여는 중";
-    const DETAIL_PATHS = ["/book/", "/live_book"];
+    const DETAIL_PATHS = ["/book/", "/books/", "/live_book"];
     const REPORT_PATH = "/reports";
     const SEARCH_PATH = "/search";
     const QUICK_SEARCH_ID = "quick-search-overlay";
