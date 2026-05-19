@@ -310,16 +310,17 @@ def main():
             "/api/live_search?query=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8&field=title_author&limit=20&offset=0",
         ).get_json()
         partial_item = partial_search["items"][0]
-        if not partial_item.get("counts_partial") or not partial_item.get("summary_url"):
-            raise AssertionError(f"broad search card was not marked for count hydration: {partial_item}")
-        summary = assert_response(client, partial_item["summary_url"]).get_json()
-        if summary.get("counts", {}).get("total") != 2:
-            raise AssertionError(f"search card summary did not return complete counts: {summary}")
+        if not partial_item.get("counts_partial") or partial_item.get("summary_url"):
+            raise AssertionError(f"broad search card should defer detail hydration: {partial_item}")
 
         hydrated_detail = assert_response(
             client,
             "/live_book?key=partial-project&title=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8+%ED%97%A4%EC%9D%BC%EB%A9%94%EB%A6%AC&author=%EC%95%A4%EB%94%94+%EC%9C%84%EC%96%B4&publisher=%EC%95%8C%EC%97%90%EC%9D%B4%EC%B9%98%EC%BD%94%EB%A6%AC%EC%95%84"
         )
+        hydrated_payload = assert_response(
+            client,
+            "/api/live_book_detail?key=partial-project&title=%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8+%ED%97%A4%EC%9D%BC%EB%A9%94%EB%A6%AC&author=%EC%95%A4%EB%94%94+%EC%9C%84%EC%96%B4&publisher=%EC%95%8C%EC%97%90%EC%9D%B4%EC%B9%98%EC%BD%94%EB%A6%AC%EC%95%84",
+        ).get_json()
         complete_cached_detail = assert_response(
             client,
             "/live_book?key=complete-project&title=%EC%99%84%EC%84%B1+%EC%BA%90%EC%8B%9C+%ED%85%8C%EC%8A%A4%ED%8A%B8",
@@ -332,8 +333,10 @@ def main():
         live_search_routes.live_search = original_live_search
         live_search_routes.get_cached_live_detail = original_cached_detail
     hydrated_body = hydrated_detail.get_data(as_text=True)
-    if "강남" not in hydrated_body or "은평" not in hydrated_body:
-        raise AssertionError("live detail did not hydrate cached partial search results")
+    if "\uc740\ud3c9" not in hydrated_body or "\uac15\ub0a8" in hydrated_body or "/api/live_book_detail" not in hydrated_body:
+        raise AssertionError("live detail should render cached partial result before background hydration")
+    if "\uac15\ub0a8" not in (hydrated_payload.get("groups_html") or "") or "\uc740\ud3c9" not in (hydrated_payload.get("groups_html") or ""):
+        raise AssertionError(f"background live detail hydration did not return complete libraries: {hydrated_payload}")
     complete_cached_body = complete_cached_detail.get_data(as_text=True)
     if "완성 캐시 테스트" not in complete_cached_body or "강남" not in complete_cached_body:
         raise AssertionError("live detail did not render complete cached detail directly")

@@ -1,0 +1,31 @@
+<div class="lib-groups" data-live-library-groups>
+    {% for group in book.library_groups %}
+    <div class="lib-group-row is-pending">
+        <div class="lib-group-title">{{ group.label }}</div>
+        <div class="lib-grid" data-lib-group>
+            {% for lib in group.libraries %}
+            <a class="lib-card status-unknown"
+               href="{{ lib.detail_url or '#' }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               data-live-status="1"
+               data-status-kind="{{ lib.status_kind }}"
+               data-service-type="{{ lib.service_type }}"
+               data-library-code="{{ lib.code }}"
+               data-brcd="{{ lib.brcd }}"
+               data-goods-id="{{ lib.goods_id }}"
+               data-content-id="{{ lib.content_id }}"
+               data-ctts="{{ lib.ctts_dvsn_code }}"
+               data-ctgr="{{ lib.ctgr_id }}"
+               data-sntn="{{ lib.sntn_auth_code }}"
+               data-product-cd="{{ lib.product_cd }}"
+               data-category-id="{{ lib.category_id }}">
+                <span class="lib-badge-name">{{ lib.short or lib.name }}</span>
+                <span class="lib-status is-loading" data-status-text aria-label="조회 중..."></span>
+            </a>
+            {% endfor %}
+        </div>
+        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
+    </div>
+    {% endfor %}
+</div>
