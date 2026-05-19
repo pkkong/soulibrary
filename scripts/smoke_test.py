@@ -2,6 +2,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -497,6 +498,12 @@ def main():
 
     for env_name in github_env_names:
         os.environ.pop(env_name, None)
+    report_source_url = "https://www.soulib.kr/search?q=언스크립티드&field=title_author"
+    prefilled_report = assert_response(client, f"/reports?url={quote(report_source_url, safe='')}")
+    prefilled_body = prefilled_report.get_data(as_text=True)
+    if "https://www.soulib.kr/search?q=언스크립티드" not in prefilled_body or "field=title_author" not in prefilled_body:
+        raise AssertionError("reports page did not preserve full source URL query string")
+
     missing_store = assert_response(client, "/reports")
     missing_store_body = missing_store.get_data(as_text=True)
     if "report-form" not in missing_store_body:
