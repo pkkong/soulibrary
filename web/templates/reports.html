@@ -70,48 +70,11 @@
     <section class="reports-list" aria-labelledby="reports-list-title">
         <div class="reports-list-head">
             <h2 id="reports-list-title">최근 접수</h2>
-            <span>{% if reports_unavailable %}확인 필요{% else %}{{ reports|length }}건{% endif %}</span>
+            <span data-reports-count>{{ reports_count_label }}</span>
         </div>
-        {% if reports_notice %}
-            <div class="report-list-notice" role="status">{{ reports_notice }}</div>
-        {% endif %}
-        {% if reports %}
-            <div class="report-items">
-                {% for report in reports %}
-                    <article class="report-item">
-                        <div class="report-item-meta">
-                            <span class="report-item-meta-main">
-                                <span>{{ report.category }}</span>
-                                {% if report.is_new %}
-                                    <span class="report-status is-new">방금 접수</span>
-                                {% endif %}
-                                <span class="report-status">{{ report.status_label or "접수됨" }}</span>
-                                {% if report.issue_url %}
-                                    <a class="report-issue-link" href="{{ report.issue_url }}" target="_blank" rel="noopener noreferrer">이슈 #{{ report.issue_number }}</a>
-                                {% endif %}
-                            </span>
-                            <time>{{ report.created_at.strftime("%Y-%m-%d %H:%M") if report.created_at else "" }}</time>
-                        </div>
-                        <p>{{ report.message }}</p>
-                        {% if report.resolution_message %}
-                            <div class="report-resolution-log">
-                                <div>
-                                    <strong>처리 안내</strong>
-                                    {% if report.resolution_at %}
-                                        <time>{{ report.resolution_at.strftime("%Y-%m-%d %H:%M") }}</time>
-                                    {% endif %}
-                                </div>
-                                <p>{{ report.resolution_message }}</p>
-                            </div>
-                        {% endif %}
-                    </article>
-                {% endfor %}
-            </div>
-        {% elif reports_unavailable %}
-            <div class="report-empty">GitHub Issues 저장소를 불러오지 못했습니다.</div>
-        {% else %}
-            <div class="report-empty">아직 접수된 신고가 없습니다.</div>
-        {% endif %}
+        <div data-reports-list-body>
+            {% include "partials/report_recent_list.html" %}
+        </div>
     </section>
 </div>
 {% endblock %}
@@ -129,6 +92,23 @@ document.addEventListener("DOMContentLoaded", () => {
         submit.classList.add("is-loading");
         submit.textContent = "보내는 중...";
     });
+
+    const recentBody = document.querySelector("[data-reports-list-body]");
+    const recentCount = document.querySelector("[data-reports-count]");
+    if (recentBody && !document.querySelector(".report-submitted-card")) {
+        fetch("/api/reports/recent", {headers: {"Accept": "application/json"}})
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.html) recentBody.innerHTML = data.html;
+                if (recentCount && data.count_label) recentCount.textContent = data.count_label;
+            })
+            .catch(() => {
+                if (recentBody) {
+                    recentBody.innerHTML = '<div class="report-empty">최근 접수 목록을 불러오지 못했습니다.</div>';
+                }
+                if (recentCount) recentCount.textContent = "확인 필요";
+            });
+    }
 });
 </script>
 {% endblock %}

@@ -499,20 +499,25 @@ def main():
         os.environ.pop(env_name, None)
     missing_store = assert_response(client, "/reports")
     missing_store_body = missing_store.get_data(as_text=True)
-    if "GitHub Issues 저장소 연결에 실패했습니다" not in missing_store_body:
-        raise AssertionError("reports page hid GitHub store connection failure")
-    if "운영 서버에 GITHUB_ISSUE_TOKEN 환경변수가 없습니다" not in missing_store_body:
-        raise AssertionError("reports page did not show the missing token cause")
-    if "확인 필요" not in missing_store_body:
-        raise AssertionError("reports page did not mark report store status as unavailable")
+    if "report-form" not in missing_store_body:
+        raise AssertionError("reports page did not render expected markup")
+    if "GitHub Issues 저장소 연결에 실패했습니다" in missing_store_body:
+        raise AssertionError("reports page blocked initial render on GitHub store status")
+    missing_recent = client.get("/api/reports/recent")
+    if missing_recent.status_code != 503:
+        raise AssertionError(f"missing report store API returned {missing_recent.status_code}, expected 503")
+    missing_recent_payload = missing_recent.get_json()
+    if "운영 서버에 GITHUB_ISSUE_TOKEN 환경변수가 없습니다" not in (missing_recent_payload.get("html") or ""):
+        raise AssertionError("reports API did not show the missing token cause")
 
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
     os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
     report_routes.requests.get = fake_issue_get
-    reports = assert_response(client, "/reports")
-    reports_body = reports.get_data(as_text=True)
-    if "report-form" not in reports_body:
-        raise AssertionError("reports page did not render expected markup")
+    reports_shell = assert_response(client, "/reports")
+    reports_body = reports_shell.get_data(as_text=True)
+    if "기존 신고 내용입니다" not in reports_body or "이슈 #122" not in reports_body:
+        recent_reports = assert_response(client, "/api/reports/recent")
+        reports_body = recent_reports.get_json().get("html") or ""
     if "기존 신고 내용입니다" not in reports_body or "이슈 #122" not in reports_body:
         raise AssertionError("reports page did not render GitHub issues as the report store")
     if "처리 안내" not in reports_body:

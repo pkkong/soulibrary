@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import requests
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
 
 report_bp = Blueprint("reports", __name__)
@@ -246,29 +246,35 @@ def _render_reports_page(
     saved: bool = False,
     status_code: int = 200,
     saved_report: dict | None = None,
+    load_reports: bool = False,
 ):
     reports = []
     reports_unavailable = False
     reports_notice = ""
-    try:
-        reports = _recent_github_reports()
-    except Exception as exc:
-        detail = _github_error_detail(exc)
-        print(f"[report error] github issue list failed: {detail} raw={exc}")
-        reports_unavailable = True
-        if saved_report:
-            reports_notice = "최근 접수 목록 동기화가 지연되어 방금 접수한 신고를 먼저 보여드립니다."
-        else:
-            error = error or _report_store_error(exc)
+    reports_loading = not load_reports and not saved_report
+    if load_reports:
+        try:
+            reports = _recent_github_reports()
+        except Exception as exc:
+            detail = _github_error_detail(exc)
+            print(f"[report error] github issue list failed: {detail} raw={exc}")
+            reports_unavailable = True
+            if saved_report:
+                reports_notice = "최근 접수 목록 동기화가 지연되어 방금 접수한 신고를 먼저 보여드립니다."
+            else:
+                error = error or _report_store_error(exc)
 
     reports = _prepend_recent_report(reports, saved_report)
     saved_report = reports[0] if saved_report and reports else None
+    reports_count_label = "확인 중" if reports_loading else ("확인 필요" if reports_unavailable else f"{len(reports)}건")
 
     return render_template(
         "reports.html",
         reports=reports,
         reports_unavailable=reports_unavailable,
         reports_notice=reports_notice,
+        reports_loading=reports_loading,
+        reports_count_label=reports_count_label,
         saved_report=saved_report,
         form=form,
         error=error,
@@ -277,6 +283,16 @@ def _render_reports_page(
         topbar_desc="",
         active_tab="reports",
     ), status_code
+
+
+def _render_recent_reports_fragment(reports, reports_unavailable=False, reports_notice="", reports_loading=False):
+    return render_template(
+        "partials/report_recent_list.html",
+        reports=reports,
+        reports_unavailable=reports_unavailable,
+        reports_notice=reports_notice,
+        reports_loading=reports_loading,
+    )
 
 
 def _create_github_issue(form: dict, user_agent: str) -> dict:
@@ -367,3 +383,31 @@ def reports_page():
                 )
 
     return _render_reports_page(form, error=error, saved=saved)
+
+
+@report_bp.route("/api/reports/recent")
+def api_recent_reports():
+    reports = []
+    reports_unavailable = False
+    reports_notice = ""
+    status_code = 200
+    try:
+        reports = _recent_github_reports()
+    except Exception as exc:
+        detail = _github_error_detail(exc)
+        print(f"[report error] github issue list failed: {detail} raw={exc}")
+        reports_unavailable = True
+        reports_notice = _report_store_error(exc)
+        status_code = 503
+
+    html = _render_recent_reports_fragment(
+        reports,
+        reports_unavailable=reports_unavailable,
+        reports_notice=reports_notice,
+    )
+    count_label = "확인 필요" if reports_unavailable else f"{len(reports)}건"
+    return jsonify({
+        "html": html,
+        "count_label": count_label,
+        "unavailable": reports_unavailable,
+    }), status_code
