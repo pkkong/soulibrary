@@ -1101,7 +1101,7 @@ body.has-topbar .search-top {
 .title {
     margin:0;
     font-size:16px;
-    font-weight:720;
+    font-weight:640;
     letter-spacing: 0;
     line-height:1.32;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
