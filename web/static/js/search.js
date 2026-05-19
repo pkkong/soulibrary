@@ -112,10 +112,6 @@ function liveDetailUrlForBook(book) {
 
 function navigateToDetail(url) {
     if (!url) return;
-    if (window.SoulibPageLoading && typeof window.SoulibPageLoading.navigate === "function") {
-        window.SoulibPageLoading.navigate(url, "상세 페이지 여는 중");
-        return;
-    }
     window.location.href = url;
 }
 

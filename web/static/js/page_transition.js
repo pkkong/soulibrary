@@ -1,5 +1,5 @@
 (function () {
-    const DETAIL_LOADING_TEXT = "상세 페이지 여는 중";
+    const DEFAULT_LOADING_TEXT = "불러오는 중";
     const DETAIL_PATHS = ["/book/", "/books/", "/live_book"];
     const REPORT_PATH = "/reports";
     const SEARCH_PATH = "/search";
@@ -68,7 +68,7 @@
         const loader = getLoader();
         if (!loader) return;
         const text = loader.querySelector("[data-page-loading-text]");
-        if (text) text.textContent = label || DETAIL_LOADING_TEXT;
+        if (text) text.textContent = label || DEFAULT_LOADING_TEXT;
         loader.removeAttribute("aria-hidden");
         document.body.classList.add("is-page-loading");
     }
@@ -189,8 +189,7 @@
             link.setAttribute("href", currentReportUrl());
             return;
         }
-        if (!isDetailUrl(link.href)) return;
-        show(DETAIL_LOADING_TEXT);
+        if (isDetailUrl(link.href)) return;
     }, true);
 
     document.addEventListener("DOMContentLoaded", syncReportLinks);
