@@ -1,6 +1,7 @@
 (function () {
     const DETAIL_LOADING_TEXT = "상세 페이지 여는 중";
     const DETAIL_PATHS = ["/book/", "/live_book"];
+    const REPORT_PATH = "/reports";
 
     function getLoader() {
         return document.getElementById("page-loading");
@@ -19,6 +20,32 @@
         } catch (err) {
             return false;
         }
+    }
+
+    function isReportUrl(href) {
+        if (!href) return false;
+        try {
+            const url = new URL(href, window.location.href);
+            return url.origin === window.location.origin && url.pathname === REPORT_PATH;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function currentReportUrl() {
+        const target = new URL(REPORT_PATH, window.location.origin);
+        if (window.location.pathname !== REPORT_PATH) {
+            target.searchParams.set("url", window.location.href);
+        }
+        return `${target.pathname}${target.search}`;
+    }
+
+    function syncReportLinks() {
+        document.querySelectorAll('a[href="/reports"], a.nav-item-report').forEach(link => {
+            if (isReportUrl(link.href)) {
+                link.setAttribute("href", currentReportUrl());
+            }
+        });
     }
 
     function show(label) {
@@ -48,16 +75,25 @@
         if (!link) return;
         if (link.target && link.target !== "_self") return;
         if (link.hasAttribute("download")) return;
+        if (isReportUrl(link.href)) {
+            link.setAttribute("href", currentReportUrl());
+            return;
+        }
         if (!isDetailUrl(link.href)) return;
         show(DETAIL_LOADING_TEXT);
     }, true);
 
-    window.addEventListener("pageshow", hide);
+    document.addEventListener("DOMContentLoaded", syncReportLinks);
+    window.addEventListener("pageshow", () => {
+        hide();
+        syncReportLinks();
+    });
 
     window.SoulibPageLoading = {
         hide,
         isDetailUrl,
         navigate,
+        syncReportLinks,
         show,
     };
 })();
