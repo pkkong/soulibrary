@@ -112,14 +112,17 @@ function liveDetailUrlForBook(book) {
 
 function fallbackShelfKey(book) {
     const clean = value => String(value || "").trim().toLowerCase().replace(/[\s\[\]\(\){}<>.,/|\\\-_:;"'`~!?]/g, "");
-    const liveKey = String(book && book.live_detail_key || "").trim();
-    if (liveKey) return `live:${liveKey}`;
-    return `meta:${clean(book && book.title)}|${clean(book && book.author)}|${clean(book && book.publisher)}`;
+    const title = clean(book && book.title);
+    if (!title) return "";
+    const author = clean(book && book.author);
+    const publisher = clean(book && book.publisher);
+    const secondary = author || publisher;
+    return secondary ? `meta:${title}|${secondary}` : `meta:${title}`;
 }
 
 function shelfButtonHtml(book) {
     const key = shelf ? shelf.keyFor(book) : fallbackShelfKey(book);
-    if (!key || key === "meta:||") return "";
+    if (!key) return "";
     renderedBooksByShelfKey.set(key, book);
     const title = String(book.title || "도서");
     return `

@@ -1,6 +1,8 @@
 ﻿import os
 import time
 import re
+import json
+import secrets
 import traceback
 from db import get_db, using_postgres
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, abort, url_for, redirect
@@ -43,6 +45,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
 LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
 DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
+SHARED_SHELVES_FILE = os.environ.get("SHARED_SHELVES_FILE", os.path.join(ROOT_DIR, "data", "shared_shelves.json"))
+MAX_SHARED_SHELF_BOOKS = 200
 LIB_DETAIL_TTL_SEC = int(os.environ.get("LIB_DETAIL_TTL", "300"))
 LIB_DETAIL_CACHE = {}
 SITEMAP_PAGE_SIZE = min(int(os.environ.get("SITEMAP_PAGE_SIZE", "50000")), 50000)
@@ -82,6 +86,66 @@ def clean_display_title(value):
     text = str(value or "")
     text = SUBSCRIPTION_TAG_PATTERN.sub(" ", text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _clean_shared_text(value, limit=200):
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+
+def _load_shared_shelves():
+    if not os.path.exists(SHARED_SHELVES_FILE):
+        return {}
+    try:
+        with open(SHARED_SHELVES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception as e:
+        print(f"[shelf warning] shared shelf load failed: {e}")
+    return {}
+
+
+def _save_shared_shelves(data):
+    os.makedirs(os.path.dirname(SHARED_SHELVES_FILE), exist_ok=True)
+    tmp_path = f"{SHARED_SHELVES_FILE}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, SHARED_SHELVES_FILE)
+
+
+def _normalize_shared_book(raw):
+    if not isinstance(raw, dict):
+        return None
+    title = _clean_shared_text(raw.get("title"), 160)
+    if not title:
+        return None
+    counts = raw.get("counts") if isinstance(raw.get("counts"), dict) else {}
+    def _count_value(key):
+        try:
+            return max(0, int(counts.get(key) or 0))
+        except Exception:
+            return 0
+    return {
+        "key": _clean_shared_text(raw.get("key"), 160),
+        "title": title,
+        "author": _clean_shared_text(raw.get("author"), 120),
+        "publisher": _clean_shared_text(raw.get("publisher"), 120),
+        "image_url": _clean_shared_text(raw.get("image_url"), 500),
+        "live_detail_key": _clean_shared_text(raw.get("live_detail_key"), 80),
+        "live_detail_url": _clean_shared_text(raw.get("live_detail_url"), 500),
+        "book_id": raw.get("book_id") if isinstance(raw.get("book_id"), int) else None,
+        "counts": {
+            "kyobo": _count_value("kyobo"),
+            "yes24": _count_value("yes24"),
+            "other": _count_value("other"),
+            "total": _count_value("total"),
+        },
+        "note": _clean_shared_text(raw.get("note"), 500),
+    }
+
+
+def _shared_shelf_public_url(slug):
+    return f"{request.url_root.rstrip('/')}/shelf/{slug}"
 
 
 def _sitemap_base_url():
@@ -455,6 +519,67 @@ def search_page():
 def my_shelf_page():
     return render_template(
         "my_shelf.html",
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="shelf",
+    )
+
+
+@app.route("/api/shelves/share", methods=["POST"])
+def api_share_shelf():
+    payload = request.get_json(silent=True) or {}
+    list_meta = payload.get("list") if isinstance(payload.get("list"), dict) else {}
+    books_raw = payload.get("books") if isinstance(payload.get("books"), list) else []
+    books = []
+    seen = set()
+    for raw in books_raw[:MAX_SHARED_SHELF_BOOKS]:
+        book = _normalize_shared_book(raw)
+        if not book:
+            continue
+        dedupe_key = book.get("key") or f"{book['title']}|{book.get('author')}|{book.get('publisher')}"
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        books.append(book)
+    if not books:
+        return jsonify({"error": "공유할 책이 없습니다."}), 400
+
+    title = _clean_shared_text(list_meta.get("name") or payload.get("title"), 80) or "공유 서재"
+    description = _clean_shared_text(list_meta.get("description") or payload.get("description"), 300)
+    store = _load_shared_shelves()
+    slug = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:8]
+    while slug in store:
+        slug = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:8]
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    store[slug] = {
+        "slug": slug,
+        "title": title,
+        "description": description,
+        "books": books,
+        "created_at": created_at,
+        "updated_at": created_at,
+    }
+    _save_shared_shelves(store)
+    return jsonify({"slug": slug, "url": _shared_shelf_public_url(slug), "shelf": store[slug]}), 201
+
+
+@app.route("/shelf/<slug>")
+def shared_shelf_page(slug):
+    slug = _clean_shared_text(slug, 40)
+    shelf = _load_shared_shelves().get(slug)
+    if not shelf:
+        return render_template(
+            "shared_shelf.html",
+            shelf=None,
+            error="공유 서재를 찾지 못했습니다.",
+            show_topbar=False,
+            topbar_desc="",
+            active_tab="shelf",
+        ), 404
+    return render_template(
+        "shared_shelf.html",
+        shelf=shelf,
+        error=None,
         show_topbar=False,
         topbar_desc="",
         active_tab="shelf",

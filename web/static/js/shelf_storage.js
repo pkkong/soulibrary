@@ -11,6 +11,15 @@
         return cleanText(value).toLowerCase().replace(/[\s\[\]\(\){}<>.,/|\\\-_:;"'`~!?]/g, "");
     }
 
+    function canonicalKeyFor(book) {
+        const title = normalizeKeyPart(book && book.title);
+        if (!title) return "";
+        const author = normalizeKeyPart(book && book.author);
+        const publisher = normalizeKeyPart(book && book.publisher);
+        const secondary = author || publisher;
+        return secondary ? `meta:${title}|${secondary}` : `meta:${title}`;
+    }
+
     function nowIso() {
         return new Date().toISOString();
     }
@@ -81,11 +90,18 @@
             lists: raw.lists.map(normalizeList),
             books: {},
         };
+        const keyMap = new Map();
         Object.entries(raw.books).forEach(([key, book]) => {
             const item = toShelfBook({ ...book, key });
-            if (item.title) state.books[item.key] = item;
+            if (item.title) {
+                state.books[item.key] = item;
+                keyMap.set(cleanText(key), item.key);
+            }
         });
         if (!state.lists.length) state.lists = emptyState().lists;
+        state.lists.forEach(list => {
+            list.book_keys = [...new Set(list.book_keys.map(key => keyMap.get(key) || key).filter(Boolean))];
+        });
         const knownKeys = new Set(Object.keys(state.books));
         state.lists.forEach(list => {
             list.book_keys = list.book_keys.filter(key => knownKeys.has(key));
@@ -120,14 +136,15 @@
     }
 
     function keyFor(book) {
+        const canonicalKey = canonicalKeyFor(book);
+        if (canonicalKey) return canonicalKey;
         const directKey = cleanText(book && book.key);
         if (directKey) return directKey;
         const liveKey = cleanText(book && book.live_detail_key);
         if (liveKey) return `live:${liveKey}`;
-        const title = normalizeKeyPart(book && book.title);
-        const author = normalizeKeyPart(book && book.author);
-        const publisher = normalizeKeyPart(book && book.publisher);
-        return `meta:${title}|${author}|${publisher}`;
+        const bookId = cleanText(book && book.book_id);
+        if (bookId) return `book:${bookId}`;
+        return "";
     }
 
     function detailUrl(book) {

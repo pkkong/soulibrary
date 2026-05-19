@@ -11,6 +11,7 @@ sys.path.insert(0, str(WEB_DIR))
 # Keep smoke tests DB-free and fast unless the caller explicitly sets values.
 os.environ.setdefault("LIVE_SEARCH_TOTAL_TIMEOUT", "1.0")
 os.environ.setdefault("LIVE_SEARCH_LIBRARY_TIMEOUT", "0.8")
+os.environ.setdefault("SHARED_SHELVES_FILE", str(ROOT_DIR / "data" / "_tmp_smoke_shared_shelves.json"))
 
 from app_search import app  # noqa: E402
 import report_routes  # noqa: E402
@@ -31,6 +32,8 @@ def assert_response(client, path, expected_status=200):
 
 
 def main():
+    shared_shelves_tmp = Path(os.environ["SHARED_SHELVES_FILE"])
+    shared_shelves_tmp.unlink(missing_ok=True)
     client = app.test_client()
 
     landing = assert_response(client, "/")
@@ -44,6 +47,27 @@ def main():
     my_shelf = assert_response(client, "/my-shelf")
     if "shelf-shell" not in my_shelf.get_data(as_text=True):
         raise AssertionError("my shelf page did not render expected markup")
+
+    share_response = client.post(
+        "/api/shelves/share",
+        json={
+            "list": {"name": "스모크 서재"},
+            "books": [
+                {
+                    "title": "프로젝트 헤일메리",
+                    "author": "앤디 위어",
+                    "publisher": "알에이치코리아",
+                    "counts": {"kyobo": 1, "yes24": 0, "other": 1, "total": 2},
+                }
+            ],
+        },
+    )
+    if share_response.status_code != 201:
+        raise AssertionError(f"shared shelf creation failed: {share_response.status_code} {share_response.get_data(as_text=True)[:500]}")
+    shared_payload = share_response.get_json()
+    shared_page = assert_response(client, f"/shelf/{shared_payload['slug']}")
+    if "shared-shelf-shell" not in shared_page.get_data(as_text=True):
+        raise AssertionError("shared shelf page did not render expected markup")
 
     empty_search = assert_response(client, "/api/search")
     payload = empty_search.get_json()
@@ -535,6 +559,7 @@ def main():
     if "신고가 접수되었습니다" not in saved.get_data(as_text=True):
         raise AssertionError("report saved confirmation did not render")
 
+    shared_shelves_tmp.unlink(missing_ok=True)
     print("smoke_test: ok")
 
 

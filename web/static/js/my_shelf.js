@@ -9,8 +9,15 @@ const shelfListDesc = document.getElementById("shelf-list-desc");
 const shelfCreateForm = document.getElementById("shelf-create-form");
 const shelfCreateName = document.getElementById("shelf-create-name");
 const shelfCreateToggle = document.getElementById("shelf-create-toggle");
+const shelfManageToggle = document.getElementById("shelf-manage-toggle");
+const shelfManageActions = document.getElementById("shelf-manage-actions");
 const shelfRename = document.getElementById("shelf-rename");
 const shelfDeleteList = document.getElementById("shelf-delete-list");
+const shelfShare = document.getElementById("shelf-share");
+const shelfSharePanel = document.getElementById("shelf-share-panel");
+const shelfShareUrl = document.getElementById("shelf-share-url");
+const shelfCopyShare = document.getElementById("shelf-copy-share");
+const shelfShareStatus = document.getElementById("shelf-share-status");
 const shelf = window.SoulibShelf;
 const ACTIVE_LIST_KEY = "soulib.myShelf.activeList";
 const ICONS = {
@@ -59,13 +66,25 @@ function ensureActiveList() {
 function setActiveList(listId) {
     activeListId = listId;
     localStorage.setItem(ACTIVE_LIST_KEY, activeListId);
+    shelfSharePanel.hidden = true;
+    shelfShareUrl.value = "";
+    shelfShareStatus.textContent = "";
+    setManageOpen(false);
     renderShelf();
 }
 
 function setCreateFormOpen(open) {
     shelfCreateForm.hidden = !open;
     shelfCreateToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) setManageOpen(false);
     if (open) shelfCreateName.focus();
+}
+
+function setManageOpen(open) {
+    if (!shelfManageActions || !shelfManageToggle) return;
+    shelfManageActions.hidden = !open;
+    shelfManageToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) setCreateFormOpen(false);
 }
 
 function renderListTabs(lists) {
@@ -98,8 +117,14 @@ function renderShelf() {
     shelfCount.textContent = `${books.length.toLocaleString()}권`;
     shelfEmpty.hidden = books.length > 0;
     shelfClear.hidden = books.length === 0;
+    shelfShare.disabled = books.length === 0;
     shelfDeleteList.disabled = lists.length <= 1;
     shelfDeleteList.hidden = lists.length <= 1;
+    if (!books.length) {
+        shelfSharePanel.hidden = true;
+        shelfShareUrl.value = "";
+        shelfShareStatus.textContent = "";
+    }
 
     shelfItems.innerHTML = books.map(book => {
         const author = cleanText(book.author);
@@ -123,6 +148,52 @@ function renderShelf() {
     }).join("");
 }
 
+async function copyShareUrl() {
+    const url = shelfShareUrl.value;
+    if (!url) return;
+    try {
+        await navigator.clipboard.writeText(url);
+        shelfShareStatus.textContent = "링크를 복사했습니다.";
+    } catch (err) {
+        shelfShareUrl.focus();
+        shelfShareUrl.select();
+        shelfShareStatus.textContent = "링크를 선택했습니다.";
+    }
+}
+
+async function shareActiveList() {
+    const activeList = shelf.getList(activeListId);
+    const books = shelf.booksForList(activeListId);
+    if (!activeList || !books.length) return;
+    shelfShare.disabled = true;
+    shelfShareStatus.textContent = "공유 링크 생성 중...";
+    shelfSharePanel.hidden = false;
+    try {
+        const response = await fetch("/api/shelves/share", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                list: {
+                    id: activeList.id,
+                    name: activeList.name,
+                    description: activeList.description || "",
+                },
+                books,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "share_failed");
+        shelfShareUrl.value = data.url || "";
+        shelfShareStatus.textContent = "공유 링크를 만들었습니다.";
+        await copyShareUrl();
+    } catch (err) {
+        console.error(err);
+        shelfShareStatus.textContent = "공유 링크를 만들지 못했습니다.";
+    } finally {
+        shelfShare.disabled = false;
+    }
+}
+
 shelfCreateForm.addEventListener("submit", event => {
     event.preventDefault();
     const list = shelf.createList(shelfCreateName.value);
@@ -134,6 +205,10 @@ shelfCreateForm.addEventListener("submit", event => {
 
 shelfCreateToggle.addEventListener("click", () => {
     setCreateFormOpen(shelfCreateForm.hidden);
+});
+
+shelfManageToggle.addEventListener("click", () => {
+    setManageOpen(shelfManageActions.hidden);
 });
 
 shelfCreateName.addEventListener("keydown", event => {
@@ -161,7 +236,10 @@ shelfRename.addEventListener("click", () => {
     const nextName = window.prompt("서재 이름", activeList.name);
     if (nextName === null) return;
     const list = shelf.renameList(activeList.id, nextName);
-    if (list) renderShelf();
+    if (list) {
+        setManageOpen(false);
+        renderShelf();
+    }
 });
 
 shelfDeleteList.addEventListener("click", () => {
@@ -171,8 +249,15 @@ shelfDeleteList.addEventListener("click", () => {
     shelf.deleteList(activeList.id);
     activeListId = "";
     ensureActiveList();
+    setManageOpen(false);
     renderShelf();
 });
+
+shelfShare.addEventListener("click", () => {
+    setManageOpen(false);
+    shareActiveList();
+});
+shelfCopyShare.addEventListener("click", copyShareUrl);
 
 shelfClear.addEventListener("click", () => {
     const activeList = shelf.getList(activeListId);
@@ -180,6 +265,7 @@ shelfClear.addEventListener("click", () => {
     if (!activeList || !books.length) return;
     if (!window.confirm(`'${activeList.name}' 서재에서 모든 책을 뺄까요?`)) return;
     books.forEach(book => shelf.removeFromList(book.key, activeList.id));
+    setManageOpen(false);
     renderShelf();
 });
 

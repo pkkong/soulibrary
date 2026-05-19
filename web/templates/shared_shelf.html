@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% if shelf %}
+{% set page_title = shelf.title ~ " - 공유 서재" %}
+{% else %}
+{% set page_title = "공유 서재" %}
+{% endif %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block body_class %}page-shared-shelf{% endblock %}
+
+{% block content %}
+<div class="shelf-shell shared-shelf-shell">
+    {% if error %}
+        <section class="shelf-head">
+            <div>
+                <div class="shelf-kicker">공유 서재</div>
+                <h1>공유 서재</h1>
+                <p>{{ error }}</p>
+            </div>
+        </section>
+    {% else %}
+        <section class="shelf-head shared-shelf-head" aria-labelledby="shared-shelf-title">
+            <div>
+                <div class="shelf-kicker">공유 서재</div>
+                <h1 id="shared-shelf-title">{{ shelf.title }}</h1>
+                {% if shelf.description %}
+                    <p>{{ shelf.description }}</p>
+                {% endif %}
+            </div>
+            <button class="shelf-icon-button" id="shared-copy-list" type="button" aria-label="내 서재에 복사">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                </svg>
+            </button>
+        </section>
+
+        <section class="shelf-panel shared-shelf-summary" aria-label="공유 서재 요약">
+            <div class="shared-summary-row">
+                <span>총 {{ shelf.books|length }}권</span>
+                <span id="shared-availability-summary">소장 정보 확인 가능</span>
+            </div>
+            <div id="shared-copy-status" class="shelf-share-status" aria-live="polite"></div>
+        </section>
+
+        <section class="shelf-panel" aria-labelledby="shared-books-title">
+            <div class="shelf-section-head">
+                <h2 id="shared-books-title">책 목록</h2>
+            </div>
+            <div id="shared-shelf-items" class="shelf-items"></div>
+        </section>
+    {% endif %}
+</div>
+{% if shelf %}
+<script>
+    window.__SHARED_SHELF__ = {{ shelf|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519i') }}"></script>
+<script src="{{ url_for('static', filename='js/shared_shelf.js', v='20260519b') }}"></script>
+{% endif %}
+{% endblock %}
