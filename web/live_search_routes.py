@@ -261,6 +261,16 @@ def api_live_book_detail():
         decorated = _decorate_live_book(book)
         return jsonify(
             {
+                "book": {
+                    "title": decorated.get("title") or "",
+                    "author": decorated.get("author") or "",
+                    "publisher": decorated.get("publisher") or "",
+                    "image_url": decorated.get("image_url") or "",
+                    "counts": decorated.get("counts") or {},
+                    "libraries": decorated.get("libraries") or [],
+                    "live_detail_key": decorated.get("live_detail_key") or cache_key,
+                    "live_detail_url": decorated.get("live_detail_url") or "",
+                },
                 "groups_html": render_template("partials/live_library_groups.html", book=decorated),
                 "counts": decorated.get("counts") or {},
                 "live_detail_key": decorated.get("live_detail_key") or cache_key,

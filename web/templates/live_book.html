@@ -20,9 +20,9 @@
 {% else %}
     <div class="detail-hero">
         {% if book.image_url %}
-            <div class="detail-bg" style="background-image: url('{{ book.image_url }}');"></div>
+            <div class="detail-bg" data-detail-bg style="background-image: url('{{ book.image_url }}');"></div>
         {% else %}
-            <div class="detail-bg detail-bg-fallback"></div>
+            <div class="detail-bg detail-bg-fallback" data-detail-bg></div>
         {% endif %}
 
         <div class="detail-topbar">
@@ -31,7 +31,7 @@
         </div>
 
         <div class="detail-cover-wrap">
-            <div class="detail-cover">
+            <div class="detail-cover" data-detail-cover>
                 {% if book.image_url %}
                     <img src="{{ book.image_url }}" loading="lazy" alt="커버">
                 {% else %}
@@ -280,6 +280,33 @@
             next();
         }
 
+        function applyHydratedBook(book) {
+            const imageUrl = (book && book.image_url || "").trim();
+            if (!imageUrl) return;
+            const bg = document.querySelector("[data-detail-bg]");
+            if (bg) {
+                bg.classList.remove("detail-bg-fallback");
+                bg.style.backgroundImage = `url("${imageUrl.replace(/"/g, "%22")}")`;
+            }
+            const cover = document.querySelector("[data-detail-cover]");
+            if (cover && !cover.querySelector("img")) {
+                const img = document.createElement("img");
+                img.src = imageUrl;
+                img.loading = "lazy";
+                img.alt = "커버";
+                img.onerror = () => {
+                    img.remove();
+                    if (!cover.querySelector(".no-img")) {
+                        const fallback = document.createElement("div");
+                        fallback.className = "no-img";
+                        fallback.textContent = "이미지 없음";
+                        cover.appendChild(fallback);
+                    }
+                };
+                cover.replaceChildren(img);
+            }
+        }
+
         async function hydrateFullDetail() {
             if (!DETAIL_HYDRATE_URL) return false;
             const note = document.querySelector("[data-detail-status-note]");
@@ -291,6 +318,8 @@
                 const current = document.querySelector("[data-live-library-groups]");
                 if (!current) throw new Error("detail_container_missing");
                 current.outerHTML = data.groups_html;
+                applyHydratedBook(data.book || {});
+                window.dispatchEvent(new CustomEvent("soulib:live-book-hydrated", {detail: data.book || {}}));
                 if (note) note.textContent = "";
                 return true;
             } catch (err) {
@@ -330,6 +359,14 @@
         }
 
         button.addEventListener("click", () => picker.open(book));
+        window.addEventListener("soulib:live-book-hydrated", (event) => {
+            const next = event.detail || {};
+            if (next.image_url) book.image_url = next.image_url;
+            if (next.counts) book.counts = next.counts;
+            if (next.libraries) book.libraries = next.libraries;
+            if (next.live_detail_url) book.live_detail_url = next.live_detail_url;
+            sync();
+        });
         window.addEventListener("soulib:shelf-changed", sync);
         sync();
     })();
