@@ -23,9 +23,17 @@
     <section class="shelf-panel" aria-labelledby="shelf-manager-title">
         <div class="shelf-section-head">
             <h2 id="shelf-manager-title">서재</h2>
-            <span id="shelf-list-count" class="shelf-muted">1개</span>
+            <div class="shelf-section-actions">
+                <span id="shelf-list-count" class="shelf-muted">1개</span>
+                <button class="shelf-mini-button" id="shelf-create-toggle" type="button" aria-label="새 서재 만들기" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                        <path d="M12 5v14"></path>
+                        <path d="M5 12h14"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
-        <form class="shelf-create-form" id="shelf-create-form">
+        <form class="shelf-create-form" id="shelf-create-form" hidden>
             <label class="sr-only" for="shelf-create-name">새 서재 이름</label>
             <input id="shelf-create-name" type="text" maxlength="80" placeholder="새 서재 이름" enterkeyhint="done">
             <button type="submit" aria-label="새 서재 추가">
@@ -62,11 +70,12 @@
             </button>
         </div>
         <div id="shelf-empty" class="shelf-empty">
-            담은 책이 없습니다.
+            <div class="shelf-empty-title">담은 책이 없습니다.</div>
+            <a class="shelf-empty-link" href="/search">검색하기</a>
         </div>
         <div id="shelf-items" class="shelf-items"></div>
     </section>
 </div>
-<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519c') }}"></script>
-<script src="{{ url_for('static', filename='js/my_shelf.js', v='20260519c') }}"></script>
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519d') }}"></script>
+<script src="{{ url_for('static', filename='js/my_shelf.js', v='20260519d') }}"></script>
 {% endblock %}

@@ -8,6 +8,7 @@ const shelfListTitle = document.getElementById("shelf-list-title");
 const shelfListDesc = document.getElementById("shelf-list-desc");
 const shelfCreateForm = document.getElementById("shelf-create-form");
 const shelfCreateName = document.getElementById("shelf-create-name");
+const shelfCreateToggle = document.getElementById("shelf-create-toggle");
 const shelfRename = document.getElementById("shelf-rename");
 const shelfDeleteList = document.getElementById("shelf-delete-list");
 const shelf = window.SoulibShelf;
@@ -60,6 +61,12 @@ function setActiveList(listId) {
     activeListId = listId;
     localStorage.setItem(ACTIVE_LIST_KEY, activeListId);
     renderShelf();
+}
+
+function setCreateFormOpen(open) {
+    shelfCreateForm.hidden = !open;
+    shelfCreateToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) shelfCreateName.focus();
 }
 
 function renderListTabs(lists) {
@@ -123,7 +130,18 @@ shelfCreateForm.addEventListener("submit", event => {
     const list = shelf.createList(shelfCreateName.value);
     if (!list) return;
     shelfCreateName.value = "";
+    setCreateFormOpen(false);
     setActiveList(list.id);
+});
+
+shelfCreateToggle.addEventListener("click", () => {
+    setCreateFormOpen(shelfCreateForm.hidden);
+});
+
+shelfCreateName.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    shelfCreateName.value = "";
+    setCreateFormOpen(false);
 });
 
 shelfListTabs.addEventListener("click", event => {

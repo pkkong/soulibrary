@@ -46,6 +46,9 @@ const filterSummary = document.getElementById("filter-summary");
 const filterSummaryText = document.getElementById("filter-summary-text");
 const searchPageEl = document.querySelector(".search-page");
 const searchEmptyState = document.getElementById("search-empty-state");
+const shelf = window.SoulibShelf;
+const shelfPicker = window.SoulibShelfPicker;
+const renderedBooksByShelfKey = new Map();
 
 function _isValidSearchField(value) {
     return value === "title_author" || value === "title" || value === "author" || value === "publisher";
@@ -104,6 +107,29 @@ function liveDetailUrlForBook(book) {
     params.set("author", String(book.author || "").trim());
     params.set("publisher", String(book.publisher || "").trim());
     return `/live_book?${params.toString()}`;
+}
+
+function shelfButtonHtml(book) {
+    if (!shelf || !shelfPicker) return "";
+    const key = shelf.keyFor(book);
+    renderedBooksByShelfKey.set(key, book);
+    const title = String(book.title || "도서");
+    return `
+        <button class="thumb-shelf-btn js-shelf-add"
+                type="button"
+                data-shelf-key="${escapeAttr(key)}"
+                aria-label="${escapeAttr(`${title} 내 서재에 담기`)}"
+                title="내 서재에 담기"></button>
+    `;
+}
+
+function syncShelfButtons() {
+    if (!shelf || !shelfPicker) return;
+    document.querySelectorAll(".js-shelf-add[data-shelf-key]").forEach(button => {
+        const key = button.getAttribute("data-shelf-key");
+        const book = renderedBooksByShelfKey.get(key);
+        if (book) shelfPicker.syncTrigger(button, book);
+    });
 }
 
 function extractLibraries(book) {
@@ -216,6 +242,7 @@ function fetchSearch(query, refine) {
     currentResults = [];
     filteredResults = [];
     totalCount = 0;
+    renderedBooksByShelfKey.clear();
     summaryHydrateStarted.clear();
     const params = new URLSearchParams();
     params.set("query", query);
@@ -302,7 +329,10 @@ function renderMore() {
 
     const html = `
         <div class="card js-book-card" role="link" tabindex="0" aria-label="${escapeAttr(ariaLabel)}" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""} ${book.summary_url ? `data-summary-url="${escapeAttr(book.summary_url)}"` : ""}>
-            <div class="thumb">${imgHtml}</div>
+            <div class="thumb-wrap">
+                <div class="thumb">${imgHtml}</div>
+                ${shelfButtonHtml(book)}
+            </div>
             <div class="info">
                 <h3 class="title" title="${escapeAttr(title)}">${escapeHtml(title)}</h3>
                 <div class="meta">
@@ -319,6 +349,7 @@ function renderMore() {
     `;
         resultsDiv.insertAdjacentHTML('beforeend', html);
     });
+    syncShelfButtons();
     hydrateSearchCardSummaries();
     renderIndex += slice.length;
     const loaded = currentResults.length;
@@ -419,6 +450,18 @@ function loadMoreFromServer() {
 }
 
 document.addEventListener("click", (event) => {
+    const shelfButton = event.target.closest(".js-shelf-add");
+    if (shelfButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!shelfPicker) return;
+        const key = shelfButton.getAttribute("data-shelf-key");
+        const book = renderedBooksByShelfKey.get(key);
+        if (!book) return;
+        shelfPicker.open(book);
+        return;
+    }
+
     const card = event.target.closest(".js-book-card");
     if (!card) return;
     const liveUrl = card.getAttribute("data-live-detail-url");
@@ -432,12 +475,15 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+    if (event.target.closest(".js-shelf-add")) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     const card = event.target.closest(".js-book-card");
     if (!card) return;
     event.preventDefault();
     card.click();
 });
+
+window.addEventListener("soulib:shelf-changed", syncShelfButtons);
 
 document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(window.location.search);

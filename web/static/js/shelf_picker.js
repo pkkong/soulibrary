@@ -7,6 +7,8 @@
         plus: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>',
         check: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>',
         close: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6 6 18"></path></svg>',
+        bookmark: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"></path></svg>',
+        bookmarkSaved: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M6.75 3h10.5A2.75 2.75 0 0 1 20 5.75v14.1a1.1 1.1 0 0 1-1.67.94L12 16.96l-6.33 3.83A1.1 1.1 0 0 1 4 19.85V5.75A2.75 2.75 0 0 1 6.75 3Z"></path></svg>',
     };
 
     function cleanText(value) {
@@ -123,7 +125,7 @@
         if (!button || !shelf || !book) return;
         const saved = isSaved(book);
         const title = cleanText(book.title) || "도서";
-        button.innerHTML = saved ? ICONS.check : ICONS.plus;
+        button.innerHTML = saved ? ICONS.bookmarkSaved : ICONS.bookmark;
         button.classList.toggle("is-saved", saved);
         button.setAttribute("aria-label", saved ? `${title} 내 서재에 담김` : `${title} 내 서재에 담기`);
         button.title = saved ? "내 서재에 담김" : "내 서재에 담기";

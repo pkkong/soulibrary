@@ -1111,6 +1111,12 @@ body.has-topbar .search-top {
     background:#f2f2f7;
     display:flex; align-items:center; justify-content:center; overflow:hidden;
 }
+.thumb-wrap {
+    position: relative;
+    width: 72px;
+    min-width: 72px;
+    height: 104px;
+}
 .thumb img { width:100%; height:100%; object-fit: cover; }
 .no-img { font-size: 11px; color:#9ca3af; text-align:center; padding:6px; line-height:1.4; }
 .info { display:flex; flex-direction:column; gap:0; flex:1; min-width:0; min-height: auto; }
@@ -1131,6 +1137,32 @@ body.has-topbar .search-top {
     align-items: center;
     justify-content: center;
     color: #c7c7cc;
+}
+.thumb-shelf-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.92);
+    color: #1d1d1f;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.12);
+    -webkit-tap-highlight-color: transparent;
+}
+.thumb-shelf-btn.is-saved {
+    background: #1d1d1f;
+    color: #ffffff;
+}
+.thumb-shelf-btn svg {
+    width: 17px;
+    height: 17px;
 }
 .shelf-picker-open {
     overflow: hidden;
@@ -1330,6 +1362,11 @@ body.has-topbar .search-top {
         height: 122px;
         border-radius: 10px;
     }
+    .thumb-wrap {
+        width: 84px;
+        min-width: 84px;
+        height: 122px;
+    }
     .title {
         font-size: 17px;
         -webkit-line-clamp: 1;
@@ -1493,10 +1530,16 @@ body.has-topbar .search-top {
 
 .shelf-section-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
+}
+
+.shelf-section-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .shelf-section-head h2 {
@@ -1775,11 +1818,32 @@ body.has-topbar .search-top {
     border-radius: 16px;
     background: #f2f2f7;
     color: #6e6e73;
-    padding: 18px;
+    padding: 22px 18px;
     text-align: center;
     font-size: 14px;
     font-weight: 600;
     line-height: 1.5;
+}
+
+.shelf-empty-title {
+    color: #6e6e73;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.shelf-empty-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    margin-top: 12px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: #1d1d1f;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 720;
 }
 
 @media (max-width: 420px) {
