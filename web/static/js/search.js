@@ -115,7 +115,7 @@ function shelfButtonHtml(book) {
     renderedBooksByShelfKey.set(key, book);
     const title = String(book.title || "도서");
     return `
-        <button class="thumb-shelf-btn js-shelf-add"
+        <button class="result-shelf-btn js-shelf-add"
                 type="button"
                 data-shelf-key="${escapeAttr(key)}"
                 aria-label="${escapeAttr(`${title} 내 서재에 담기`)}"
@@ -331,9 +331,9 @@ function renderMore() {
         <div class="card js-book-card" role="link" tabindex="0" aria-label="${escapeAttr(ariaLabel)}" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""} ${book.summary_url ? `data-summary-url="${escapeAttr(book.summary_url)}"` : ""}>
             <div class="thumb-wrap">
                 <div class="thumb">${imgHtml}</div>
-                ${shelfButtonHtml(book)}
             </div>
             <div class="info">
+                ${shelfButtonHtml(book)}
                 <h3 class="title" title="${escapeAttr(title)}">${escapeHtml(title)}</h3>
                 <div class="meta">
                     <div class="meta-author">${escapeHtml(author)}</div>
