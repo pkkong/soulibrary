@@ -110,6 +110,15 @@ function liveDetailUrlForBook(book) {
     return `/live_book?${params.toString()}`;
 }
 
+function navigateToDetail(url) {
+    if (!url) return;
+    if (window.SoulibPageLoading && typeof window.SoulibPageLoading.navigate === "function") {
+        window.SoulibPageLoading.navigate(url, "상세 페이지 여는 중");
+        return;
+    }
+    window.location.href = url;
+}
+
 function fallbackShelfKey(book) {
     const clean = value => String(value || "").trim().toLowerCase().replace(/[\s\[\]\(\){}<>.,/|\\\-_:;"'`~!?]/g, "");
     const title = clean(book && book.title);
@@ -472,12 +481,12 @@ document.addEventListener("click", (event) => {
     if (!card) return;
     const liveUrl = card.getAttribute("data-live-detail-url");
     if (liveUrl) {
-        window.location.href = liveUrl;
+        navigateToDetail(liveUrl);
         return;
     }
     const id = card.getAttribute("data-book-id");
     if (!id) return;
-    window.location.href = `/book/${id}`;
+    navigateToDetail(`/book/${id}`);
 });
 
 document.addEventListener("keydown", (event) => {
