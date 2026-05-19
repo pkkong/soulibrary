@@ -746,21 +746,15 @@ def seo_book_page(slug):
         "author": seo_book.get("author") or "",
         "publisher": seo_book.get("publisher") or "",
     }
-    book = _find_complete_live_book(target)
-    if book:
-        book = _decorate_live_book(book)
-        detail_hydrate_url = ""
-    else:
-        book = {
-            **target,
-            "image_url": "",
-            "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
-            "libraries": [],
-            "library_groups": [],
-            "counts_partial": True,
-        }
-        detail_hydrate_url = _seo_book_live_detail_url(seo_book)
-    book.update(target)
+    book = {
+        **target,
+        "image_url": "",
+        "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
+        "libraries": [],
+        "library_groups": [],
+        "counts_partial": True,
+    }
+    detail_hydrate_url = _seo_book_live_detail_url(seo_book)
     meta_title = f"{seo_book['title']} 전자도서관 검색 - 서울 전자도서관 통합검색"
     return render_template(
         "live_book.html",

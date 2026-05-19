@@ -15,6 +15,7 @@ os.environ.setdefault("LIVE_SEARCH_LIBRARY_TIMEOUT", "0.8")
 os.environ.setdefault("SHARED_SHELVES_STORAGE", "json")
 os.environ.setdefault("SHARED_SHELVES_FILE", str(ROOT_DIR / "data" / "_tmp_smoke_shared_shelves.json"))
 
+import app_search  # noqa: E402
 from app_search import app  # noqa: E402
 import report_routes  # noqa: E402
 import status_api_routes  # noqa: E402
@@ -71,6 +72,17 @@ def main():
     shared_page = assert_response(client, f"/shelf/{shared_payload['slug']}")
     if "shared-shelf-shell" not in shared_page.get_data(as_text=True):
         raise AssertionError("shared shelf page did not render expected markup")
+
+    original_find_complete_live_book = app_search._find_complete_live_book
+    app_search._find_complete_live_book = lambda *args, **kwargs: (_ for _ in ()).throw(
+        AssertionError("SEO book pages must not block on live detail lookup")
+    )
+    try:
+        seo_page = assert_response(client, "/books/project-hail-mary")
+    finally:
+        app_search._find_complete_live_book = original_find_complete_live_book
+    if "/api/live_book_detail?" not in seo_page.get_data(as_text=True):
+        raise AssertionError("SEO book page did not include async detail hydration")
 
     empty_search = assert_response(client, "/api/search")
     payload = empty_search.get_json()
