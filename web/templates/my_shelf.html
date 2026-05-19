@@ -6,9 +6,7 @@
 {% block content %}
 <div class="shelf-shell">
     <section class="shelf-head" aria-labelledby="shelf-title">
-        <div>
-            <h1 id="shelf-title">내 서재</h1>
-        </div>
+        <h1 id="shelf-title">내 서재</h1>
         <button class="shelf-danger-lite shelf-icon-button" id="shelf-clear" type="button" aria-label="현재 서재 비우기">
             <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 6h18"></path>
@@ -20,18 +18,17 @@
         </button>
     </section>
 
-    <section class="shelf-panel" aria-labelledby="shelf-manager-title">
-        <div class="shelf-section-head">
-            <h2 id="shelf-manager-title">서재</h2>
-            <div class="shelf-section-actions">
-                <span id="shelf-list-count" class="shelf-muted">1개</span>
-                <button class="shelf-mini-button" id="shelf-create-toggle" type="button" aria-label="새 서재 만들기" aria-expanded="false">
-                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
-                        <path d="M12 5v14"></path>
-                        <path d="M5 12h14"></path>
-                    </svg>
-                </button>
-            </div>
+    <section class="shelf-panel shelf-manager" aria-labelledby="shelf-manager-title">
+        <div class="shelf-manager-row">
+            <h2 id="shelf-manager-title" class="sr-only">서재</h2>
+            <div id="shelf-list-tabs" class="shelf-list-tabs" role="tablist" aria-label="서재 목록"></div>
+            <span id="shelf-list-count" class="shelf-muted shelf-list-count">1개</span>
+            <button class="shelf-mini-button" id="shelf-create-toggle" type="button" aria-label="새 서재 만들기" aria-expanded="false">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                </svg>
+            </button>
         </div>
         <form class="shelf-create-form" id="shelf-create-form" hidden>
             <label class="sr-only" for="shelf-create-name">새 서재 이름</label>
@@ -43,7 +40,6 @@
                 </svg>
             </button>
         </form>
-        <div id="shelf-list-tabs" class="shelf-list-tabs" role="tablist" aria-label="서재 목록"></div>
     </section>
 
     <section class="shelf-panel" aria-labelledby="shelf-list-title">
@@ -52,30 +48,35 @@
                 <h2 id="shelf-list-title">담은 책</h2>
                 <p id="shelf-list-desc" class="shelf-active-desc"></p>
             </div>
-            <span id="shelf-count" class="shelf-muted">0권</span>
-        </div>
-        <div class="shelf-active-actions">
-            <button class="shelf-mini-button" id="shelf-rename" type="button" aria-label="서재 이름 변경">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 20h9"></path>
-                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                </svg>
-            </button>
-            <button class="shelf-mini-button danger" id="shelf-delete-list" type="button" aria-label="서재 삭제">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 6h18"></path>
-                    <path d="M8 6V4h8v2"></path>
-                    <path d="M19 6l-1 14H6L5 6"></path>
-                </svg>
-            </button>
+            <div class="shelf-section-actions shelf-active-actions">
+                <span id="shelf-count" class="shelf-muted">0권</span>
+                <button class="shelf-mini-button" id="shelf-rename" type="button" aria-label="서재 이름 변경">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                    </svg>
+                </button>
+                <button class="shelf-mini-button danger" id="shelf-delete-list" type="button" aria-label="서재 삭제">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 6h18"></path>
+                        <path d="M8 6V4h8v2"></path>
+                        <path d="M19 6l-1 14H6L5 6"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div id="shelf-empty" class="shelf-empty">
-            <div class="shelf-empty-title">담은 책이 없습니다.</div>
+            <div class="shelf-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"></path>
+                </svg>
+            </div>
+            <div class="shelf-empty-title">아직 담은 책이 없습니다.</div>
             <a class="shelf-empty-link" href="/search">검색하기</a>
         </div>
         <div id="shelf-items" class="shelf-items"></div>
     </section>
 </div>
-<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519e') }}"></script>
-<script src="{{ url_for('static', filename='js/my_shelf.js', v='20260519e') }}"></script>
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519g') }}"></script>
+<script src="{{ url_for('static', filename='js/my_shelf.js', v='20260519g') }}"></script>
 {% endblock %}

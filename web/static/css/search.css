@@ -1088,12 +1088,13 @@ body.has-topbar .search-top {
     align-items: flex-start;
 }
 .js-book-card {
+    position: relative;
     display: grid;
-    grid-template-columns: 72px minmax(0, 1fr) 20px;
+    grid-template-columns: 72px minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     min-height: 116px;
-    padding: 10px 12px 10px 10px;
+    padding: 10px 56px 10px 10px;
     cursor: pointer;
     transition: transform 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
     -webkit-tap-highlight-color: transparent;
@@ -1119,19 +1120,17 @@ body.has-topbar .search-top {
 .thumb img { width:100%; height:100%; object-fit: cover; }
 .no-img { font-size: 11px; color:#9ca3af; text-align:center; padding:6px; line-height:1.4; }
 .info {
-    position: relative;
     display:flex;
     flex-direction:column;
     gap:0;
     flex:1;
     min-width:0;
     min-height: auto;
-    padding-right: 64px;
 }
 .title {
     margin:0;
     font-size:16px;
-    font-weight:640;
+    font-weight:600;
     letter-spacing: 0;
     line-height:1.32;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
@@ -1139,19 +1138,13 @@ body.has-topbar .search-top {
 .meta { display:flex; flex-direction:column; gap:3px; margin-top:7px; }
 .meta-author { font-size:14px; color: #3a3a3c; line-height:1.38; font-weight:560; }
 .meta-publisher { font-size:13px; color: #8e8e93; line-height:1.38; font-weight:450; }
-.result-chevron {
-    justify-self: end;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #c7c7cc;
-}
 .result-shelf-btn {
     position: absolute;
-    top: -4px;
-    right: 28px;
-    width: 34px;
-    height: 34px;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
     border: 0;
     border-radius: 999px;
     background: transparent;
@@ -1171,8 +1164,8 @@ body.has-topbar .search-top {
     color: #1d1d1f;
 }
 .result-shelf-btn svg {
-    width: 17px;
-    height: 17px;
+    width: 19px;
+    height: 19px;
 }
 .shelf-picker-open {
     overflow: hidden;
@@ -1517,7 +1510,7 @@ body.has-topbar .search-top {
     width: 100%;
     max-width: var(--app-shell-w);
     margin: 0 auto;
-    padding: calc(18px + env(safe-area-inset-top)) 16px 26px;
+    padding: calc(18px + env(safe-area-inset-top)) 16px 28px;
 }
 
 .shelf-head {
@@ -1525,7 +1518,7 @@ body.has-topbar .search-top {
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    padding: 8px 0 20px;
+    padding: 8px 0 18px;
 }
 
 .shelf-head h1 {
@@ -1538,16 +1531,26 @@ body.has-topbar .search-top {
 }
 
 .shelf-panel {
-    padding: 18px 0;
+    padding: 16px 0;
     border-top: 1px solid #f2f2f7;
+}
+
+.shelf-manager {
+    padding: 12px 0 14px;
+}
+
+.shelf-manager-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .shelf-section-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .shelf-section-actions {
@@ -1560,7 +1563,7 @@ body.has-topbar .search-top {
     margin: 0;
     color: #1d1d1f;
     font-size: 17px;
-    font-weight: 680;
+    font-weight: 650;
 }
 
 .shelf-muted {
@@ -1574,7 +1577,7 @@ body.has-topbar .search-top {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 44px;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-top: 12px;
 }
 
 .shelf-create-form input {
@@ -1606,10 +1609,12 @@ body.has-topbar .search-top {
 }
 
 .shelf-list-tabs {
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding-bottom: 2px;
+    padding: 2px 0;
     scrollbar-width: none;
 }
 
@@ -1631,6 +1636,10 @@ body.has-topbar .search-top {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+}
+
+.shelf-list-count {
+    display: none;
 }
 
 .shelf-list-tab span {
@@ -1669,8 +1678,10 @@ body.has-topbar .search-top {
 
 .shelf-active-actions {
     display: flex;
+    align-items: center;
     gap: 8px;
-    margin: -2px 0 14px;
+    margin: 0;
+    flex: 0 0 auto;
 }
 
 .shelf-mini-button {
@@ -1697,27 +1708,36 @@ body.has-topbar .search-top {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-top: 12px;
+    margin-top: 10px;
 }
 
 .shelf-item {
     position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    align-items: center;
     border: 1px solid #f2f2f7;
     border-radius: 16px;
     background: #ffffff;
     overflow: hidden;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 
 .shelf-item-link {
     display: grid;
-    grid-template-columns: 56px minmax(0, 1fr) 18px;
+    grid-template-columns: 56px minmax(0, 1fr);
     align-items: center;
     gap: 11px;
     min-height: 96px;
-    padding: 9px 46px 9px 9px;
+    padding: 9px 0 9px 9px;
     color: inherit;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
+}
+
+.shelf-item:hover {
+    border-color: #e5e5ea;
+    background: #fbfbfd;
 }
 
 .shelf-item:active {
@@ -1791,13 +1811,6 @@ body.has-topbar .search-top {
     font-weight: 450;
 }
 
-.shelf-item-chevron {
-    color: #c7c7cc;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
 .shelf-icon-button,
 .shelf-remove-button,
 .shelf-danger-lite {
@@ -1817,26 +1830,45 @@ body.has-topbar .search-top {
 
 .shelf-remove-button,
 .shelf-danger-lite {
-    background: #f2f2f7;
+    background: transparent;
     color: #6e6e73;
 }
 
 .shelf-remove-button {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
+    justify-self: center;
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+}
+
+.shelf-remove-button:hover,
+.shelf-danger-lite:hover,
+.shelf-mini-button:hover {
+    background: #f2f2f7;
 }
 
 .shelf-empty {
     border-radius: 16px;
-    background: #f2f2f7;
+    background: #fbfbfd;
+    border: 1px solid #f2f2f7;
     color: #6e6e73;
-    padding: 22px 18px;
+    padding: 26px 18px;
     text-align: center;
     font-size: 14px;
     font-weight: 600;
     line-height: 1.5;
+}
+
+.shelf-empty-icon {
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 10px;
+    border-radius: 999px;
+    background: #f2f2f7;
+    color: #8e8e93;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .shelf-empty-title {
@@ -1863,9 +1895,8 @@ body.has-topbar .search-top {
 
 @media (max-width: 420px) {
     .shelf-item-link {
-        grid-template-columns: 52px minmax(0, 1fr) 18px;
+        grid-template-columns: 52px minmax(0, 1fr);
         gap: 10px;
-        padding-right: 44px;
     }
     .shelf-item-cover {
         width: 52px;

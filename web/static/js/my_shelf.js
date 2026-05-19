@@ -14,7 +14,6 @@ const shelfDeleteList = document.getElementById("shelf-delete-list");
 const shelf = window.SoulibShelf;
 const ACTIVE_LIST_KEY = "soulib.myShelf.activeList";
 const ICONS = {
-    chevron: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>',
     remove: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6 6 18"></path></svg>',
 };
 
@@ -94,7 +93,7 @@ function renderShelf() {
     const books = shelf.booksForList(activeListId);
 
     renderListTabs(lists);
-    shelfListTitle.textContent = activeList ? activeList.name : "담은 책";
+    shelfListTitle.textContent = "담은 책";
     shelfListDesc.textContent = activeList && activeList.description ? activeList.description : "";
     shelfCount.textContent = `${books.length.toLocaleString()}권`;
     shelfEmpty.hidden = books.length > 0;
@@ -111,13 +110,12 @@ function renderShelf() {
                 <a class="shelf-item-link" href="${escapeAttr(shelf.detailUrl(book))}" aria-label="${escapeAttr(`${title} 상세로 이동`)}">
                     ${coverHtml(book, "shelf-item-cover")}
                     <div class="shelf-book-main">
-                        <h3>${escapeHtml(title)}</h3>
+                        <h3 title="${escapeAttr(title)}">${escapeHtml(title)}</h3>
                         <div class="shelf-book-meta">
                             ${author ? `<span class="shelf-book-author">${escapeHtml(author)}</span>` : ""}
                             ${publisher ? `<span class="shelf-book-publisher">${escapeHtml(publisher)}</span>` : ""}
                         </div>
                     </div>
-                    <span class="shelf-item-chevron" aria-hidden="true">${ICONS.chevron}</span>
                 </a>
                 <button class="shelf-remove-button" type="button" data-shelf-remove-key="${escapeAttr(book.key)}" aria-label="${escapeAttr(`${title} 서재에서 빼기`)}">${ICONS.remove}</button>
             </article>

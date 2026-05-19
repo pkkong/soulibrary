@@ -49,6 +49,7 @@ const searchEmptyState = document.getElementById("search-empty-state");
 const shelf = window.SoulibShelf;
 const shelfPicker = window.SoulibShelfPicker;
 const renderedBooksByShelfKey = new Map();
+const RESULT_BOOKMARK_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"></path></svg>';
 
 function _isValidSearchField(value) {
     return value === "title_author" || value === "title" || value === "author" || value === "publisher";
@@ -109,9 +110,16 @@ function liveDetailUrlForBook(book) {
     return `/live_book?${params.toString()}`;
 }
 
+function fallbackShelfKey(book) {
+    const clean = value => String(value || "").trim().toLowerCase().replace(/[\s\[\]\(\){}<>.,/|\\\-_:;"'`~!?]/g, "");
+    const liveKey = String(book && book.live_detail_key || "").trim();
+    if (liveKey) return `live:${liveKey}`;
+    return `meta:${clean(book && book.title)}|${clean(book && book.author)}|${clean(book && book.publisher)}`;
+}
+
 function shelfButtonHtml(book) {
-    if (!shelf || !shelfPicker) return "";
-    const key = shelf.keyFor(book);
+    const key = shelf ? shelf.keyFor(book) : fallbackShelfKey(book);
+    if (!key || key === "meta:||") return "";
     renderedBooksByShelfKey.set(key, book);
     const title = String(book.title || "도서");
     return `
@@ -119,7 +127,7 @@ function shelfButtonHtml(book) {
                 type="button"
                 data-shelf-key="${escapeAttr(key)}"
                 aria-label="${escapeAttr(`${title} 내 서재에 담기`)}"
-                title="내 서재에 담기"></button>
+                title="내 서재에 담기">${RESULT_BOOKMARK_ICON}</button>
     `;
 }
 
@@ -333,18 +341,13 @@ function renderMore() {
                 <div class="thumb">${imgHtml}</div>
             </div>
             <div class="info">
-                ${shelfButtonHtml(book)}
                 <h3 class="title" title="${escapeAttr(title)}">${escapeHtml(title)}</h3>
                 <div class="meta">
                     <div class="meta-author">${escapeHtml(author)}</div>
                     ${publisher ? `<div class="meta-publisher">${escapeHtml(publisher)}</div>` : ""}
                 </div>
             </div>
-            <span class="result-chevron" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 18l6-6-6-6"></path>
-                </svg>
-            </span>
+            ${shelfButtonHtml(book)}
         </div>
     `;
         resultsDiv.insertAdjacentHTML('beforeend', html);
