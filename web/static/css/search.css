@@ -1344,6 +1344,8 @@ body.has-topbar .search-top {
     grid-template-columns: minmax(0, 1fr) 42px;
     gap: 8px;
     margin-top: 12px;
+    width: 100%;
+    max-width: 100%;
 }
 .shelf-picker-form input {
     min-width: 0;
@@ -1353,7 +1355,7 @@ body.has-topbar .search-top {
     background: #f2f2f7;
     color: #1d1d1f;
     font: inherit;
-    font-size: 15px;
+    font-size: 16px;
     outline: none;
     padding: 0 12px;
 }
@@ -1726,6 +1728,8 @@ body.has-topbar .search-top {
     grid-template-columns: minmax(0, 1fr) 44px;
     gap: 8px;
     margin-top: 12px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .shelf-create-form input {
@@ -1736,7 +1740,7 @@ body.has-topbar .search-top {
     background: #f2f2f7;
     color: #1d1d1f;
     font: inherit;
-    font-size: 15px;
+    font-size: 16px;
     outline: none;
     padding: 0 12px;
 }
@@ -1858,6 +1862,8 @@ body.has-topbar .search-top {
     gap: 8px;
     align-items: center;
     margin: 0 0 12px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .shelf-share-panel[hidden] {
@@ -1872,7 +1878,7 @@ body.has-topbar .search-top {
     background: #f2f2f7;
     color: #1d1d1f;
     font: inherit;
-    font-size: 13px;
+    font-size: 16px;
     outline: none;
     padding: 0 12px;
 }
