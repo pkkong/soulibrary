@@ -329,6 +329,10 @@ def main():
             client,
             "/live_book?title=%EA%B5%AC%EB%8F%85%ED%98%95+%ED%85%8C%EC%8A%A4%ED%8A%B8&author=%ED%85%8C%EC%8A%A4%ED%84%B0&publisher=%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%B6%9C%ED%8C%90",
         )
+        subscription_payload = assert_response(
+            client,
+            "/api/live_book_detail?title=%EA%B5%AC%EB%8F%85%ED%98%95+%ED%85%8C%EC%8A%A4%ED%8A%B8&author=%ED%85%8C%EC%8A%A4%ED%84%B0&publisher=%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%B6%9C%ED%8C%90",
+        ).get_json()
     finally:
         live_search_routes.live_search = original_live_search
         live_search_routes.get_cached_live_detail = original_cached_detail
@@ -342,8 +346,10 @@ def main():
         raise AssertionError("live detail did not render complete cached detail directly")
 
     subscription_body = subscription_detail.get_data(as_text=True)
-    if 'data-service-type="Subscription"' not in subscription_body:
-        raise AssertionError("live detail did not render subscription service_type")
+    if "/api/live_book_detail" not in subscription_body or 'data-service-type="Subscription"' in subscription_body:
+        raise AssertionError("uncached live detail should defer subscription library hydration")
+    if 'data-service-type="Subscription"' not in (subscription_payload.get("groups_html") or ""):
+        raise AssertionError("background live detail did not render subscription service_type")
 
     eunpyeong_session = FakeStatusSession(FakeStatusResponse(json_data={
         "data": {

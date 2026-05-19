@@ -192,6 +192,21 @@ def _detail_hydrate_url(cache_key: str, target: dict, fallback: dict | None = No
     return f"/api/live_book_detail?{urlencode(params)}" if params.get("title") else ""
 
 
+def _placeholder_live_book(target: dict) -> dict | None:
+    title = (target.get("title") or "").strip()
+    if not title:
+        return None
+    return {
+        "title": title,
+        "author": (target.get("author") or "").strip(),
+        "publisher": (target.get("publisher") or "").strip(),
+        "image_url": "",
+        "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
+        "libraries": [],
+        "counts_partial": True,
+    }
+
+
 @live_search_bp.route("/api/live_book_summary")
 def api_live_book_summary():
     cache_key = (request.args.get("key") or "").strip()
@@ -292,28 +307,13 @@ def live_book_page():
             active_tab="search",
         ), 400
 
-    try:
-        best = _find_complete_live_book(target)
-        best = _decorate_live_book(best)
-
-        return render_template(
-            "live_book.html",
-            book=best,
-            error=None if best else "실시간 상세 정보를 찾지 못했습니다. 다시 검색해주세요.",
-            detail_hydrate_url="",
-            show_topbar=False,
-            topbar_desc="",
-            active_tab="search",
-        ), 200 if best else 404
-    except Exception as exc:
-        print(f"[live_book error] {exc}")
-        print(traceback.format_exc())
-        return render_template(
-            "live_book.html",
-            book=None,
-            error="실시간 상세 조회 중 오류가 발생했습니다.",
-            detail_hydrate_url="",
-            show_topbar=False,
-            topbar_desc="",
-            active_tab="search",
-        ), 502
+    placeholder = _placeholder_live_book(target)
+    return render_template(
+        "live_book.html",
+        book=_decorate_live_book(placeholder),
+        error=None,
+        detail_hydrate_url=_detail_hydrate_url("", target, placeholder),
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="search",
+    )
