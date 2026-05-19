@@ -258,9 +258,28 @@
             scope.querySelectorAll("[data-lib-group]").forEach((group) => {
                 group.dataset.pendingCount = String(group.querySelectorAll("[data-live-status]").length);
             });
-            cards.forEach((card) => {
-                fetchStatus(card).finally(() => resolveGroup(card));
-            });
+            runStatusQueue(cards);
+        }
+
+        function runStatusQueue(cards) {
+            const queue = cards.slice();
+            const maxConcurrent = 6;
+            let active = 0;
+
+            function next() {
+                while (active < maxConcurrent && queue.length) {
+                    const card = queue.shift();
+                    active += 1;
+                    fetchStatus(card)
+                        .finally(() => resolveGroup(card))
+                        .finally(() => {
+                            active -= 1;
+                            next();
+                        });
+                }
+            }
+
+            next();
         }
 
         async function hydrateFullDetail() {
@@ -283,7 +302,9 @@
         }
 
         if (DETAIL_HYDRATE_URL) {
-            hydrateFullDetail().finally(() => {
+            initStatuses(document);
+            hydrateFullDetail().then((updated) => {
+                if (!updated) return;
                 initStatuses(document);
             });
         } else {

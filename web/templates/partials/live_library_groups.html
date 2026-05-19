@@ -1,4 +1,11 @@
 <div class="lib-groups" data-live-library-groups>
+    {% if not book.library_groups %}
+    <div class="lib-group-row is-pending" data-library-placeholder>
+        <div class="lib-group-title">확인 중</div>
+        <div class="lib-empty-state">보유 도서관을 확인하고 있습니다.</div>
+        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
+    </div>
+    {% endif %}
     {% for group in book.library_groups %}
     <div class="lib-group-row is-pending">
         <div class="lib-group-title">{{ group.label }}</div>
