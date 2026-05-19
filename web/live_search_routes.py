@@ -26,14 +26,7 @@ def _attach_summary_urls(payload: dict, query: str) -> dict:
         if not needs_hydration:
             item.pop("summary_url", None)
             continue
-        params = {"title": item.get("title") or ""}
-        if item.get("author"):
-            params["author"] = item.get("author") or ""
-        if item.get("publisher"):
-            params["publisher"] = item.get("publisher") or ""
-        if item.get("live_detail_key"):
-            params["key"] = item.get("live_detail_key") or ""
-        item["summary_url"] = f"/api/live_book_summary?{urlencode(params)}"
+        item.pop("summary_url", None)
         set_cached_live_detail(item.get("live_detail_key"), item)
     return payload
 
@@ -183,6 +176,22 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
     return copy.deepcopy(best)
 
 
+def _detail_hydrate_url(cache_key: str, target: dict, fallback: dict | None = None) -> str:
+    params = {}
+    if cache_key:
+        params["key"] = cache_key
+    title = (target.get("title") or "").strip() or ((fallback or {}).get("title") or "")
+    author = (target.get("author") or "").strip() or ((fallback or {}).get("author") or "")
+    publisher = (target.get("publisher") or "").strip() or ((fallback or {}).get("publisher") or "")
+    if title:
+        params["title"] = title
+    if author:
+        params["author"] = author
+    if publisher:
+        params["publisher"] = publisher
+    return f"/api/live_book_detail?{urlencode(params)}" if params.get("title") else ""
+
+
 @live_search_bp.route("/api/live_book_summary")
 def api_live_book_summary():
     cache_key = (request.args.get("key") or "").strip()
@@ -215,6 +224,39 @@ def api_live_book_summary():
         return jsonify({"error": "실시간 요약 조회 중 오류가 발생했습니다."}), 502
 
 
+@live_search_bp.route("/api/live_book_detail")
+def api_live_book_detail():
+    cache_key = (request.args.get("key") or "").strip()
+    fallback = get_cached_live_detail(cache_key)
+    target = {
+        "title": (request.args.get("title") or "").strip() or ((fallback or {}).get("title") or ""),
+        "author": (request.args.get("author") or "").strip() or ((fallback or {}).get("author") or ""),
+        "publisher": (request.args.get("publisher") or "").strip() or ((fallback or {}).get("publisher") or ""),
+    }
+    if not target["title"]:
+        return jsonify({"error": "도서 정보가 부족합니다."}), 400
+
+    try:
+        book = _find_complete_live_book(target, fallback)
+        if not book:
+            return jsonify({"error": "실시간 상세 정보를 찾지 못했습니다."}), 404
+        book["counts_partial"] = False
+        if cache_key:
+            set_cached_live_detail(cache_key, book)
+        decorated = _decorate_live_book(book)
+        return jsonify(
+            {
+                "groups_html": render_template("partials/live_library_groups.html", book=decorated),
+                "counts": decorated.get("counts") or {},
+                "live_detail_key": decorated.get("live_detail_key") or cache_key,
+            }
+        )
+    except Exception as exc:
+        print(f"[live_book_detail error] {exc}")
+        print(traceback.format_exc())
+        return jsonify({"error": "실시간 상세 조회 중 오류가 발생했습니다."}), 502
+
+
 @live_search_bp.route("/live_book")
 def live_book_page():
     cache_key = (request.args.get("key") or "").strip()
@@ -226,21 +268,14 @@ def live_book_page():
 
     cached_book = get_cached_live_detail(cache_key)
     if cached_book:
+        detail_hydrate_url = ""
         if cached_book.get("counts_partial"):
-            detail_target = {
-                "title": target["title"] or cached_book.get("title") or "",
-                "author": target["author"] or cached_book.get("author") or "",
-                "publisher": target["publisher"] or cached_book.get("publisher") or "",
-            }
-            try:
-                cached_book = _find_complete_live_book(detail_target, cached_book) or cached_book
-            except Exception as exc:
-                print(f"[live_book hydrate error] {exc}")
-                print(traceback.format_exc())
+            detail_hydrate_url = _detail_hydrate_url(cache_key, target, cached_book)
         return render_template(
             "live_book.html",
             book=_decorate_live_book(cached_book),
             error=None,
+            detail_hydrate_url=detail_hydrate_url,
             show_topbar=False,
             topbar_desc="",
             active_tab="search",
@@ -251,6 +286,7 @@ def live_book_page():
             "live_book.html",
             book=None,
             error="도서 정보가 부족합니다. 다시 검색해주세요.",
+            detail_hydrate_url="",
             show_topbar=False,
             topbar_desc="",
             active_tab="search",
@@ -264,6 +300,7 @@ def live_book_page():
             "live_book.html",
             book=best,
             error=None if best else "실시간 상세 정보를 찾지 못했습니다. 다시 검색해주세요.",
+            detail_hydrate_url="",
             show_topbar=False,
             topbar_desc="",
             active_tab="search",
@@ -275,6 +312,7 @@ def live_book_page():
             "live_book.html",
             book=None,
             error="실시간 상세 조회 중 오류가 발생했습니다.",
+            detail_hydrate_url="",
             show_topbar=False,
             topbar_desc="",
             active_tab="search",

@@ -83,39 +83,15 @@
                 <div class="detail-section-head">
                     <div class="detail-section-title">소장 도서관</div>
                 </div>
-                <div class="detail-section-sub">실시간으로 조회한 결과입니다.</div>
-
-                <div class="lib-groups">
-                    {% for group in book.library_groups %}
-                    <div class="lib-group-row is-pending">
-                        <div class="lib-group-title">{{ group.label }}</div>
-                        <div class="lib-grid" data-lib-group>
-                            {% for lib in group.libraries %}
-                            <a class="lib-card status-unknown"
-                               href="{{ lib.detail_url or '#' }}"
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               data-live-status="1"
-                               data-status-kind="{{ lib.status_kind }}"
-                               data-service-type="{{ lib.service_type }}"
-                               data-library-code="{{ lib.code }}"
-                               data-brcd="{{ lib.brcd }}"
-                               data-goods-id="{{ lib.goods_id }}"
-                               data-content-id="{{ lib.content_id }}"
-                               data-ctts="{{ lib.ctts_dvsn_code }}"
-                               data-ctgr="{{ lib.ctgr_id }}"
-                               data-sntn="{{ lib.sntn_auth_code }}"
-                               data-product-cd="{{ lib.product_cd }}"
-                               data-category-id="{{ lib.category_id }}">
-                                <span class="lib-badge-name">{{ lib.short or lib.name }}</span>
-                                <span class="lib-status is-loading" data-status-text aria-label="조회 중..."></span>
-                            </a>
-                            {% endfor %}
-                        </div>
-                        <div class="lib-loading" aria-hidden="true"><span class="lib-spinner"></span></div>
-                    </div>
-                    {% endfor %}
+                <div class="detail-section-sub" data-detail-status-note>
+                    {% if detail_hydrate_url %}
+                        먼저 확인된 도서관을 표시하고 있습니다. 전체 보유처를 확인 중입니다.
+                    {% else %}
+                        실시간으로 조회한 결과입니다.
+                    {% endif %}
                 </div>
+
+                {% include "partials/live_library_groups.html" %}
             </div>
         </section>
     </div>
@@ -127,6 +103,7 @@
 <script>
     (function () {
         const BOOK_TITLE = {{ book.title|tojson }};
+        const DETAIL_HYDRATE_URL = {{ (detail_hydrate_url or "")|tojson }};
         const TEXT = {
             available: "대출가능",
             reservable: "예약",
@@ -275,9 +252,10 @@
             if (groupRow) groupRow.classList.remove("is-pending");
         }
 
-        function init() {
-            const cards = Array.from(document.querySelectorAll("[data-live-status]"));
-            document.querySelectorAll("[data-lib-group]").forEach((group) => {
+        function initStatuses(root) {
+            const scope = root || document;
+            const cards = Array.from(scope.querySelectorAll("[data-live-status]"));
+            scope.querySelectorAll("[data-lib-group]").forEach((group) => {
                 group.dataset.pendingCount = String(group.querySelectorAll("[data-live-status]").length);
             });
             cards.forEach((card) => {
@@ -285,7 +263,32 @@
             });
         }
 
-        init();
+        async function hydrateFullDetail() {
+            if (!DETAIL_HYDRATE_URL) return false;
+            const note = document.querySelector("[data-detail-status-note]");
+            try {
+                const res = await fetch(DETAIL_HYDRATE_URL);
+                if (!res.ok) throw new Error("detail_fetch_failed");
+                const data = await res.json();
+                if (!data || !data.groups_html) throw new Error("detail_missing");
+                const current = document.querySelector("[data-live-library-groups]");
+                if (!current) throw new Error("detail_container_missing");
+                current.outerHTML = data.groups_html;
+                if (note) note.textContent = "전체 보유처 확인이 완료되었습니다.";
+                return true;
+            } catch (err) {
+                if (note) note.textContent = "먼저 확인된 도서관을 표시하고 있습니다.";
+                return false;
+            }
+        }
+
+        if (DETAIL_HYDRATE_URL) {
+            hydrateFullDetail().finally(() => {
+                initStatuses(document);
+            });
+        } else {
+            initStatuses(document);
+        }
     })();
 </script>
 {% endif %}
