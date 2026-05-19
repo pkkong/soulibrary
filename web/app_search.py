@@ -4,6 +4,7 @@ import re
 import json
 import secrets
 import traceback
+import random
 from urllib.parse import urlencode
 
 from db import get_db, using_postgres
@@ -707,9 +708,10 @@ if "기타" not in PROVIDER_LABEL_TO_PLATFORMS:
 
 @app.route('/')
 def index():
+    seo_badges = random.sample(SEO_BOOKS, min(5, len(SEO_BOOKS)))
     return render_template(
         "index.html",
-        seo_books=SEO_BOOKS,
+        seo_books=seo_badges,
         show_topbar=False,
         topbar_desc="",
         active_tab="home",

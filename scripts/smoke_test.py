@@ -23,6 +23,7 @@ from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
 from live_search.connectors.bookers import BookersConnector  # noqa: E402
 from live_search.models import LiveSearchResult  # noqa: E402
 from live_search.normalizer import merge_live_results  # noqa: E402
+from live_search.service import _result_matches_query  # noqa: E402
 
 
 def assert_response(client, path, expected_status=200):
@@ -217,6 +218,59 @@ def main():
     )
     if len(merged_project_hail_mary) != 1 or merged_project_hail_mary[0]["counts"]["total"] != 2:
         raise AssertionError(f"project hail mary author alias did not merge: {merged_project_hail_mary}")
+
+    merged_unscripted = merge_live_results(
+        [
+            LiveSearchResult(
+                title="언스크립티드(Unscripted)(부의 추월차선 완결판)",
+                author="엠제이 드마코",
+                publisher="토트",
+                library_code="gangnam",
+                library_name="강남구 전자도서관",
+                platform="Kyobo_New",
+            ),
+            LiveSearchResult(
+                title="언스크립티드",
+                author="엠제이 드마코",
+                publisher="토트",
+                library_code="gangbuk",
+                library_name="강북구 전자도서관",
+                platform="Kyobo_New",
+            ),
+            LiveSearchResult(
+                title="언스크립티드 : 부의 추월차선 완결판",
+                author="엠제이 드마코",
+                publisher="토트출판사",
+                library_code="yes24_jongno",
+                library_name="종로구립도서관",
+                platform="YES24",
+            ),
+        ]
+    )
+    if len(merged_unscripted) != 1 or merged_unscripted[0]["counts"]["total"] != 3:
+        raise AssertionError(f"unscripted title variants did not merge: {merged_unscripted}")
+
+    volume_split = merge_live_results(
+        [
+            LiveSearchResult(title="테스트 소설(1)", author="테스터", library_code="a", library_name="A"),
+            LiveSearchResult(title="테스트 소설(2)", author="테스터", library_code="b", library_name="B"),
+        ]
+    )
+    if len(volume_split) != 2:
+        raise AssertionError(f"volume markers should stay separate: {volume_split}")
+
+    if not _result_matches_query(
+        "언스크립티드",
+        "title_author",
+        LiveSearchResult(title="언스크립티드", author="엠제이 드마코"),
+    ):
+        raise AssertionError("query filter rejected a matching title")
+    if _result_matches_query(
+        "언스크립티드",
+        "title_author",
+        LiveSearchResult(title="A Select Collection of Old English Plays", author="NULL", publisher="iGB"),
+    ):
+        raise AssertionError("query filter accepted an unrelated result")
 
     subscription_merge = merge_live_results(
         [

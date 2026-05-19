@@ -276,6 +276,7 @@ function fetchSearch(query, refine) {
     if (selectedLibraries.size > 0) {
         params.set("libraries", [...selectedLibraries].join(","));
     }
+    syncSearchPageUrl(query, refine);
     fetch(`${SEARCH_API_ENDPOINT}?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
@@ -301,7 +302,23 @@ function fetchSearch(query, refine) {
             loader.style.display = "none";
             showResultsMessage(MSG_ERROR, "error");
             console.error(err);
-        });
+            });
+}
+
+function syncSearchPageUrl(query, refine) {
+    if (!window.history || typeof window.history.replaceState !== "function") return;
+    const cleanQuery = String(query || "").trim();
+    const params = new URLSearchParams();
+    if (cleanQuery) params.set("q", cleanQuery);
+    if (selectedField && selectedField !== "title_author") params.set("field", selectedField);
+    if (refine) params.set("refine", refine);
+    if (selectedProviders.size > 0) params.set("providers", [...selectedProviders].join(","));
+    if (selectedLibraries.size > 0) params.set("libraries", [...selectedLibraries].join(","));
+    const nextUrl = params.toString() ? `/search?${params.toString()}` : "/search";
+    window.history.replaceState({}, "", nextUrl);
+    if (window.SoulibPageLoading && typeof window.SoulibPageLoading.syncReportLinks === "function") {
+        window.SoulibPageLoading.syncReportLinks();
+    }
 }
 
 function search() {

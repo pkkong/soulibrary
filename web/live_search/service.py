@@ -141,6 +141,26 @@ def _item_matches_refine(item: dict, refine: str) -> bool:
     return all(token in haystack for token in tokens)
 
 
+def _result_matches_query(query: str, field: str, result) -> bool:
+    query_key = normalize_text(query)
+    if not query_key:
+        return True
+    item = result.as_dict() if hasattr(result, "as_dict") else dict(result)
+    tokens = [normalize_text(part) for part in str(query or "").split() if normalize_text(part)]
+    if not tokens:
+        tokens = [query_key]
+    if field == "title":
+        fields = [item.get("title") or ""]
+    elif field == "author":
+        fields = [item.get("author") or ""]
+    elif field == "publisher":
+        fields = [item.get("publisher") or ""]
+    else:
+        fields = [item.get("title") or "", item.get("author") or "", item.get("publisher") or ""]
+    haystack = normalize_text(" ".join(fields))
+    return query_key in haystack or all(token in haystack for token in tokens)
+
+
 def _detail_cache_key(item: dict) -> str:
     libraries = []
     for lib in item.get("libraries") or []:
@@ -281,7 +301,7 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
             code, platform = futures[future]
             try:
                 for result in future.result():
-                    if _provider_allows_result(provider_labels, result):
+                    if _provider_allows_result(provider_labels, result) and _result_matches_query(query, field, result):
                         results.append(result)
             except Exception as exc:
                 errors.append({"library_code": code, "platform": platform, "error": str(exc)})

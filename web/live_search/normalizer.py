@@ -9,6 +9,31 @@ def normalize_text(value: str) -> str:
     return text
 
 
+_BRACKET_RE = re.compile(r"(\([^)]*\)|\[[^\]]*\])")
+_VOLUME_MARKER_RE = re.compile(r"^(상|중|하|전|후|[0-9]+|[0-9]+권|[ivxlcdm]+)$", re.IGNORECASE)
+
+
+def _strip_descriptive_bracket(match: re.Match) -> str:
+    value = match.group(0)
+    inner = value[1:-1].strip()
+    compact = normalize_text(inner)
+    if not compact or _VOLUME_MARKER_RE.match(compact):
+        return value
+    if re.search(r"[A-Za-z]", inner) or len(compact) >= 4:
+        return " "
+    return value
+
+
+def normalize_title_for_group(value: str) -> str:
+    text = str(value or "")
+    text = _BRACKET_RE.sub(_strip_descriptive_bracket, text)
+    left, separator, _right = text.partition(":")
+    if not separator:
+        left, separator, _right = text.partition("：")
+    title = left if separator and len(normalize_text(left)) >= 3 else text
+    return normalize_text(title) or normalize_text(value)
+
+
 def normalize_author(value: str) -> str:
     text = str(value or "")
     text = re.split(r"[/,;|]", text, maxsplit=1)[0]
@@ -37,7 +62,7 @@ def _author_display_quality(value: str) -> int:
 
 
 def result_group_key(item: dict) -> str:
-    title = normalize_text(item.get("title"))
+    title = normalize_title_for_group(item.get("title"))
     author = normalize_author(item.get("author"))
     if title and author:
         return f"meta:{title}|{author}"
