@@ -21,7 +21,7 @@ from utils.normalize import (
 )
 from utils.providers import provider_from_platforms, platform_to_provider_label
 from data_quality_admin import data_quality_bp
-from live_search_routes import live_search_bp
+from live_search_routes import _decorate_live_book, _find_complete_live_book, live_search_bp
 from report_routes import report_bp
 from live_search.service import live_search as run_live_search
 from status_api_routes import (
@@ -746,15 +746,21 @@ def seo_book_page(slug):
         "author": seo_book.get("author") or "",
         "publisher": seo_book.get("publisher") or "",
     }
-    book = {
-        **target,
-        "image_url": "",
-        "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
-        "libraries": [],
-        "library_groups": [],
-        "counts_partial": True,
-    }
-    detail_hydrate_url = _seo_book_live_detail_url(seo_book)
+    book = _find_complete_live_book(target)
+    if book:
+        book = _decorate_live_book(book)
+        detail_hydrate_url = ""
+    else:
+        book = {
+            **target,
+            "image_url": "",
+            "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
+            "libraries": [],
+            "library_groups": [],
+            "counts_partial": True,
+        }
+        detail_hydrate_url = _seo_book_live_detail_url(seo_book)
+    book.update(target)
     meta_title = f"{seo_book['title']} 전자도서관 검색 - 서울 전자도서관 통합검색"
     return render_template(
         "live_book.html",
