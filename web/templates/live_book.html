@@ -85,13 +85,7 @@
                 <div class="detail-section-head">
                     <div class="detail-section-title">소장 도서관</div>
                 </div>
-                <div class="detail-section-sub" data-detail-status-note>
-                    {% if detail_hydrate_url %}
-                        먼저 확인된 도서관을 표시하고 있습니다. 전체 보유처를 확인 중입니다.
-                    {% else %}
-                        실시간으로 조회한 결과입니다.
-                    {% endif %}
-                </div>
+                <div class="sr-only" data-detail-status-note aria-live="polite"></div>
 
                 {% include "partials/live_library_groups.html" %}
             </div>
@@ -297,10 +291,10 @@
                 const current = document.querySelector("[data-live-library-groups]");
                 if (!current) throw new Error("detail_container_missing");
                 current.outerHTML = data.groups_html;
-                if (note) note.textContent = "실시간으로 조회한 결과입니다.";
+                if (note) note.textContent = "";
                 return true;
             } catch (err) {
-                if (note) note.textContent = "먼저 확인된 도서관을 표시하고 있습니다.";
+                if (note) note.textContent = "";
                 return false;
             }
         }
