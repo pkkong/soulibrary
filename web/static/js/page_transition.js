@@ -92,16 +92,6 @@
         return document.activeElement === input;
     }
 
-    function focusSearchPageInput() {
-        const input = document.getElementById("query");
-        if (!input) return false;
-        input.scrollIntoView({ block: "center", inline: "nearest" });
-        focusInput(input);
-        window.setTimeout(() => focusInput(input), 60);
-        window.setTimeout(() => focusInput(input), 180);
-        return true;
-    }
-
     function closeQuickSearch() {
         const overlay = document.getElementById(QUICK_SEARCH_ID);
         if (overlay) overlay.hidden = true;
@@ -178,10 +168,6 @@
         if (link.hasAttribute("download")) return;
         if (isSearchNavLink(link)) {
             event.preventDefault();
-            if (window.location.pathname === SEARCH_PATH) {
-                focusSearchPageInput();
-                return;
-            }
             openQuickSearch();
             return;
         }
@@ -204,7 +190,6 @@
 
     window.SoulibPageLoading = {
         closeQuickSearch,
-        focusSearchPageInput,
         hide,
         isDetailUrl,
         navigate,
