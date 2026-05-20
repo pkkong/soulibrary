@@ -43,6 +43,7 @@ def normalize_author(value: str) -> str:
     normalized = normalize_text(text)
     author_aliases = {
         "andyweir": "앤디위어",
+        "freidamcfadden": "프리다맥파든",
     }
     return author_aliases.get(normalized, normalized)
 
