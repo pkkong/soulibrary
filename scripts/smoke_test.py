@@ -262,6 +262,45 @@ def main():
     if len(merged_unscripted) != 1 or merged_unscripted[0]["counts"]["total"] != 3:
         raise AssertionError(f"unscripted title variants did not merge: {merged_unscripted}")
 
+    merged_housemaid = merge_live_results(
+        [
+            LiveSearchResult(
+                title="하우스메이드 2",
+                author="프라다 맥파든",
+                publisher="북플라자",
+                library_code="gangnam",
+                library_name="강남구 전자도서관",
+                platform="Kyobo_New",
+            ),
+            LiveSearchResult(
+                title="하우스메이드 2 - 하우스메이드의 비밀",
+                author="프리다 맥파든 지음, 황성연 옮김",
+                publisher="북플라자",
+                library_code="yes24_jongno",
+                library_name="종로구립도서관",
+                platform="YES24",
+            ),
+            LiveSearchResult(
+                title="하우스메이드 3 - 하우스메이드의 집",
+                author="프리다 맥파든 지음, 정미정 옮김",
+                publisher="북플라자",
+                library_code="gangbuk",
+                library_name="강북구 전자도서관",
+                platform="Kyobo_New",
+            ),
+            LiveSearchResult(
+                title="하우스메이드 3",
+                author="프리다 맥파든",
+                publisher="북플라자",
+                library_code="sen",
+                library_name="서울시교육청",
+                platform="SeoulEducation",
+            ),
+        ]
+    )
+    if len(merged_housemaid) != 2:
+        raise AssertionError(f"housemaid series variants did not merge by volume: {merged_housemaid}")
+
     volume_split = merge_live_results(
         [
             LiveSearchResult(title="테스트 소설(1)", author="테스터", library_code="a", library_name="A"),

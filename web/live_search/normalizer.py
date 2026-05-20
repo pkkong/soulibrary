@@ -30,6 +30,8 @@ def normalize_title_for_group(value: str) -> str:
     left, separator, _right = text.partition(":")
     if not separator:
         left, separator, _right = text.partition("：")
+    if not separator:
+        left, separator, _right = text.partition(" - ")
     title = left if separator and len(normalize_text(left)) >= 3 else text
     return normalize_text(title) or normalize_text(value)
 
@@ -44,8 +46,24 @@ def normalize_author(value: str) -> str:
     author_aliases = {
         "andyweir": "앤디위어",
         "freidamcfadden": "프리다맥파든",
+        "프라다맥파든": "프리다맥파든",
+        "프리다맥파든김은영": "프리다맥파든",
+        "프리다맥파든정미정": "프리다맥파든",
+        "프리다맥파든황성연": "프리다맥파든",
     }
     return author_aliases.get(normalized, normalized)
+
+
+def clean_author_display(value: str) -> str:
+    text = str(value or "").strip()
+    text = re.split(r"[/,;|]", text, maxsplit=1)[0]
+    text = re.sub(r"\([^)]*\)", "", text)
+    text = re.sub(r"\[[^\]]*\]", "", text)
+    text = re.sub(r"(지은이|지음|저자|저|글쓴이|글|옮긴이|옮김|역자|역)", "", text)
+    text = " ".join(text.split())
+    if normalize_author(text) == "프리다맥파든":
+        return "프리다 맥파든"
+    return text
 
 
 def _author_display_quality(value: str) -> int:
@@ -92,13 +110,14 @@ def merge_live_results(results):
         title = (item.get("title") or "").strip()
         if not title:
             continue
+        author_display = clean_author_display(item.get("author")) or item.get("author") or ""
         key = result_group_key(item)
         entry = grouped.get(key)
         if not entry:
             entry = {
                 "book_id": None,
                 "title": title,
-                "author": item.get("author") or "",
+                "author": author_display,
                 "publisher": item.get("publisher") or "",
                 "image_url": item.get("image_url") or "",
                 "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
@@ -111,9 +130,9 @@ def merge_live_results(results):
             entry["image_url"] = item.get("image_url") or ""
         if item.get("author") and (
             not entry.get("author")
-            or _author_display_quality(item.get("author")) > _author_display_quality(entry.get("author"))
+            or _author_display_quality(author_display) > _author_display_quality(entry.get("author"))
         ):
-            entry["author"] = item.get("author") or ""
+            entry["author"] = author_display
         if not entry.get("publisher") and item.get("publisher"):
             entry["publisher"] = item.get("publisher") or ""
 
