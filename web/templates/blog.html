@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}블로그 - 서울시 전자도서 통합검색{% endblock %}
+{% block body_class %}page-blog{% endblock %}
+
+{% block content %}
+<div class="blog-shell">
+    <section class="blog-head" aria-labelledby="blog-title">
+        <p class="blog-kicker">Soulib Blog</p>
+        <h1 id="blog-title">블로그</h1>
+        <p>전자도서관 이용 방법과 Soulib 사용 팁을 정리합니다.</p>
+    </section>
+
+    <section class="blog-list" aria-label="블로그 글 목록">
+        {% for post in posts %}
+        <a class="blog-card" href="/blog/{{ post.slug }}">
+            <span class="blog-card-meta">
+                <span>{{ post.category }}</span>
+                {% if post.date_label %}<time datetime="{{ post.date }}">{{ post.date_label }}</time>{% endif %}
+            </span>
+            <strong>{{ post.title }}</strong>
+            {% if post.description %}<small>{{ post.description }}</small>{% endif %}
+        </a>
+        {% else %}
+        <div class="blog-empty">아직 등록된 글이 없습니다.</div>
+        {% endfor %}
+    </section>
+</div>
+{% endblock %}

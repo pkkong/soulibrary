@@ -10,8 +10,10 @@ from urllib.parse import urlencode
 from db import get_db, using_postgres
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, abort, url_for, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
+from blog_comments import create_blog_comment, get_blog_comments
+from blog_posts import get_blog_post, get_blog_posts
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
-from seo_books import SEO_BOOKS, SEO_BOOK_BY_SLUG
+from seo_books import get_seo_book_by_slug, get_seo_books
 from utils.normalize import (
     normalize_title,
     normalize_author,
@@ -21,7 +23,7 @@ from utils.normalize import (
 )
 from utils.providers import provider_from_platforms, platform_to_provider_label
 from data_quality_admin import data_quality_bp
-from live_search_routes import _decorate_live_book, _find_complete_live_book, live_search_bp
+from live_search_routes import live_search_bp
 from report_routes import report_bp
 from live_search.service import live_search as run_live_search
 from status_api_routes import (
@@ -708,7 +710,8 @@ if "기타" not in PROVIDER_LABEL_TO_PLATFORMS:
 
 @app.route('/')
 def index():
-    seo_badges = random.sample(SEO_BOOKS, min(5, len(SEO_BOOKS)))
+    seo_pool = get_seo_books()
+    seo_badges = random.sample(seo_pool, min(5, len(seo_pool)))
     return render_template(
         "index.html",
         seo_books=seo_badges,
@@ -734,9 +737,93 @@ def search_page():
     )
 
 
+@app.route("/blog")
+def blog_page():
+    return render_template(
+        "blog.html",
+        posts=get_blog_posts(),
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="blog",
+    )
+
+
+def _blog_post_response(post, comment_error="", saved_comment=None, status_code=200):
+    comments = []
+    comments_unavailable = False
+    comments_notice = ""
+    try:
+        comments = get_blog_comments(post["slug"])
+    except Exception as exc:
+        comments_unavailable = True
+        comments_notice = "댓글 목록을 잠시 불러오지 못했습니다."
+        print(f"[blog comment warning] list unavailable for {post['slug']}: {exc}")
+
+    if saved_comment:
+        saved_id = saved_comment.get("id")
+        comments = [
+            saved_comment,
+            *[comment for comment in comments if comment.get("id") != saved_id],
+        ]
+
+    return render_template(
+        "blog_post.html",
+        post=post,
+        comments=comments,
+        comments_unavailable=comments_unavailable,
+        comments_notice=comments_notice,
+        comment_error=comment_error,
+        saved_comment=saved_comment,
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="blog",
+        canonical_url=_public_url(f"/blog/{post['slug']}"),
+        meta_title=f"{post['title']} - Soulib 블로그",
+        meta_description=post.get("description") or "",
+        og_title=f"{post['title']} - Soulib 블로그",
+        og_description=post.get("description") or "",
+    ), status_code
+
+
+@app.route("/blog/<slug>", methods=["GET", "POST"])
+def blog_post_page(slug):
+    post = get_blog_post(slug)
+    if not post:
+        abort(404)
+    if request.method == "POST":
+        if (request.form.get("website") or "").strip():
+            return redirect(url_for("blog_post_page", slug=post["slug"]))
+        author = request.form.get("author") or ""
+        message = request.form.get("message") or ""
+        try:
+            comment = create_blog_comment(
+                post["slug"],
+                post["title"],
+                author,
+                message,
+                request.headers.get("User-Agent") or "",
+            )
+            return _blog_post_response(post, saved_comment=comment, status_code=201)
+        except ValueError as exc:
+            return _blog_post_response(post, comment_error=str(exc), status_code=400)
+        except Exception as exc:
+            print(f"[blog comment error] create failed for {post['slug']}: {exc}")
+            return _blog_post_response(
+                post,
+                comment_error="댓글을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.",
+                status_code=500,
+            )
+    return _blog_post_response(post)
+
+
+@app.route("/discover")
+def discover_page():
+    return redirect(url_for("blog_page"), code=301)
+
+
 @app.route("/books/<slug>")
 def seo_book_page(slug):
-    seo_book = SEO_BOOK_BY_SLUG.get(slug)
+    seo_book = get_seo_book_by_slug(slug)
     if not seo_book:
         abort(404)
 
@@ -881,8 +968,9 @@ def sitemap_index():
 def sitemap_static():
     base = _sitemap_base_url()
     today = time.strftime("%Y-%m-%d")
-    urls = [f"{base}/", f"{base}/search", f"{base}/reports"]
-    urls.extend(f"{base}/books/{book['slug']}" for book in SEO_BOOKS)
+    urls = [f"{base}/", f"{base}/search", f"{base}/blog", f"{base}/reports"]
+    urls.extend(f"{base}/blog/{post['slug']}" for post in get_blog_posts())
+    urls.extend(f"{base}/books/{book['slug']}" for book in get_seo_books())
     parts = ['<?xml version="1.0" encoding="UTF-8"?>']
     parts.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
     for url in urls:

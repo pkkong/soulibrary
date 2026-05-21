@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, render_template, request
 
 from live_search.normalizer import normalize_text
 from live_search.service import get_cached_live_detail, live_search, set_cached_live_detail
+from seo_books import record_search_results
 
 
 live_search_bp = Blueprint("live_search", __name__)
@@ -57,6 +58,10 @@ def api_live_search():
             refine=(request.args.get("refine") or "").strip(),
         )
         payload = _attach_summary_urls(payload, query)
+        try:
+            record_search_results(query, payload)
+        except Exception as exc:
+            print(f"[seo capture warning] {exc}")
         return jsonify(payload)
     except Exception as exc:
         print(f"[live_search error] {exc}")

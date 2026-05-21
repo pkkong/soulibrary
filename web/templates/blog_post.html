@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} - Soulib 블로그{% endblock %}
+{% block body_class %}page-blog{% endblock %}
+
+{% block content %}
+<article class="blog-shell blog-post">
+    <header class="blog-post-head">
+        <a class="blog-back" href="/blog">블로그</a>
+        <p class="blog-card-meta">
+            <span>{{ post.category }}</span>
+            {% if post.date_label %}<time datetime="{{ post.date }}">{{ post.date_label }}</time>{% endif %}
+        </p>
+        <h1>{{ post.title }}</h1>
+        {% if post.description %}<p>{{ post.description }}</p>{% endif %}
+    </header>
+
+    <div class="blog-body">
+        {{ post.html|safe }}
+    </div>
+
+    <section class="blog-comments" aria-labelledby="blog-comments-title">
+        <div class="blog-comments-head">
+            <h2 id="blog-comments-title">댓글</h2>
+            <span>{{ comments|length }}개</span>
+        </div>
+
+        {% if saved_comment %}
+        <div class="blog-comment-alert success">댓글이 등록되었습니다.</div>
+        {% elif comment_error %}
+        <div class="blog-comment-alert error">{{ comment_error }}</div>
+        {% endif %}
+
+        <form class="blog-comment-form" method="post" action="/blog/{{ post.slug }}">
+            <label>
+                <span>이름</span>
+                <input type="text" name="author" maxlength="40" placeholder="선택 입력">
+            </label>
+            <label>
+                <span>댓글</span>
+                <textarea name="message" maxlength="700" required placeholder="이 글에 대한 의견을 남겨주세요."></textarea>
+            </label>
+            <label class="report-honeypot" aria-hidden="true">
+                <span>website</span>
+                <input type="text" name="website" tabindex="-1" autocomplete="off">
+            </label>
+            <button type="submit">등록</button>
+        </form>
+
+        {% if comments_notice %}
+        <div class="blog-comment-empty">{{ comments_notice }}</div>
+        {% endif %}
+
+        {% if comments %}
+        <div class="blog-comment-list">
+            {% for comment in comments %}
+            <article class="blog-comment">
+                <div>
+                    <strong>{{ comment.author }}</strong>
+                    {% if comment.created_at %}
+                    <time>{{ comment.created_at.strftime("%Y-%m-%d %H:%M") }}</time>
+                    {% endif %}
+                </div>
+                <p>{{ comment.message }}</p>
+            </article>
+            {% endfor %}
+        </div>
+        {% elif not comments_notice %}
+        <div class="blog-comment-empty">아직 댓글이 없습니다.</div>
+        {% endif %}
+    </section>
+</article>
+{% endblock %}

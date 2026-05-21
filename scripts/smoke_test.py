@@ -17,7 +17,9 @@ os.environ.setdefault("SHARED_SHELVES_FILE", str(ROOT_DIR / "data" / "_tmp_smoke
 
 import app_search  # noqa: E402
 from app_search import app  # noqa: E402
+import blog_comments  # noqa: E402
 import report_routes  # noqa: E402
+import seo_books  # noqa: E402
 import status_api_routes  # noqa: E402
 import live_search_routes  # noqa: E402
 from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
@@ -48,6 +50,91 @@ def main():
     if "search-page" not in search.get_data(as_text=True):
         raise AssertionError("search page did not render expected markup")
 
+    blog = assert_response(client, "/blog")
+    blog_body = blog.get_data(as_text=True)
+    if "blog-shell" not in blog_body or "Soulib 이용 가이드" not in blog_body:
+        raise AssertionError("blog page did not render expected markup")
+
+    blog_post = assert_response(client, "/blog/soulib-guide")
+    if "blog-body" not in blog_post.get_data(as_text=True) or "blog-comment-form" not in blog_post.get_data(as_text=True):
+        raise AssertionError("blog post page did not render expected markup")
+
+    original_blog_get = blog_comments.requests.get
+    original_blog_post = blog_comments.requests.post
+    original_app_blog_get = app_search.get_blog_comments
+    original_app_blog_create = app_search.create_blog_comment
+
+    class FakeBlogCommentsResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {
+                    "number": 301,
+                    "title": "[블로그댓글] soulib-guide - 좋은 글입니다.",
+                    "body": "## 이름\n테스터\n\n## 댓글 내용\n좋은 글입니다.",
+                    "html_url": "https://github.com/pkkong/library_crawler/issues/301",
+                    "created_at": "2026-05-14T08:17:00Z",
+                }
+            ]
+
+    class FakeBlogCreateResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "number": 302,
+                "title": "[블로그댓글] soulib-guide - 댓글 테스트입니다.",
+                "body": "## 이름\n독자\n\n## 댓글 내용\n댓글 테스트입니다.",
+                "html_url": "https://github.com/pkkong/library_crawler/issues/302",
+                "created_at": "2026-05-14T08:18:00Z",
+            }
+
+    def fake_blog_get(url, headers=None, params=None, timeout=None):
+        if not url.endswith("/issues"):
+            raise AssertionError(f"unexpected blog comment list url: {url}")
+        return FakeBlogCommentsResponse()
+
+    def fake_blog_post(url, headers=None, json=None, timeout=None):
+        if not url.endswith("/issues"):
+            raise AssertionError(f"unexpected blog comment create url: {url}")
+        if not json or "[블로그댓글] soulib-guide" not in json.get("title", ""):
+            raise AssertionError(f"unexpected blog comment payload: {json}")
+        return FakeBlogCreateResponse()
+
+    original_comment_env = {
+        "GITHUB_ISSUE_TOKEN": os.environ.get("GITHUB_ISSUE_TOKEN"),
+        "GITHUB_ISSUE_REPO": os.environ.get("GITHUB_ISSUE_REPO"),
+    }
+    os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
+    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
+    blog_comments.requests.get = fake_blog_get
+    blog_comments.requests.post = fake_blog_post
+    app_search.get_blog_comments = blog_comments.get_blog_comments
+    app_search.create_blog_comment = blog_comments.create_blog_comment
+    try:
+        blog_with_comments = assert_response(client, "/blog/soulib-guide")
+        if "좋은 글입니다." not in blog_with_comments.get_data(as_text=True):
+            raise AssertionError("blog comments did not render from GitHub issues")
+        comment_submit = client.post(
+            "/blog/soulib-guide",
+            data={"author": "독자", "message": "댓글 테스트입니다.", "website": ""},
+        )
+        if comment_submit.status_code != 201 or "댓글이 등록되었습니다" not in comment_submit.get_data(as_text=True):
+            raise AssertionError(f"blog comment submission failed: {comment_submit.status_code}")
+    finally:
+        blog_comments.requests.get = original_blog_get
+        blog_comments.requests.post = original_blog_post
+        app_search.get_blog_comments = original_app_blog_get
+        app_search.create_blog_comment = original_app_blog_create
+        for name, value in original_comment_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
     my_shelf = assert_response(client, "/my-shelf")
     if "shelf-shell" not in my_shelf.get_data(as_text=True):
         raise AssertionError("my shelf page did not render expected markup")
@@ -73,16 +160,77 @@ def main():
     if "shared-shelf-shell" not in shared_page.get_data(as_text=True):
         raise AssertionError("shared shelf page did not render expected markup")
 
-    original_find_complete_live_book = app_search._find_complete_live_book
-    app_search._find_complete_live_book = lambda *args, **kwargs: (_ for _ in ()).throw(
-        AssertionError("SEO book pages must not block on live detail lookup")
-    )
+    original_find_complete_live_book = live_search_routes._find_complete_live_book
+    seo_live_calls = []
+
+    def blocked_seo_live_lookup(*args, **kwargs):
+        seo_live_calls.append((args, kwargs))
+        raise AssertionError("SEO book pages must not block on live detail lookup")
+
+    live_search_routes._find_complete_live_book = blocked_seo_live_lookup
     try:
         seo_page = assert_response(client, "/books/project-hail-mary")
     finally:
-        app_search._find_complete_live_book = original_find_complete_live_book
+        live_search_routes._find_complete_live_book = original_find_complete_live_book
+    if seo_live_calls:
+        raise AssertionError("SEO book page called live detail lookup during server render")
     if "/api/live_book_detail?" not in seo_page.get_data(as_text=True):
         raise AssertionError("SEO book page did not include async detail hydration")
+
+    original_seo_env = {
+        "SEO_AUTO_CAPTURE": os.environ.get("SEO_AUTO_CAPTURE"),
+        "SEO_DYNAMIC_BOOKS": os.environ.get("SEO_DYNAMIC_BOOKS"),
+        "SEO_AUTO_PUBLISH": os.environ.get("SEO_AUTO_PUBLISH"),
+        "SEO_BOOKS_PATH": os.environ.get("SEO_BOOKS_PATH"),
+    }
+    seo_tmp = ROOT_DIR / "data" / "_tmp_smoke_seo_books.json"
+    seo_tmp.unlink(missing_ok=True)
+    for env_name in ("SEO_AUTO_CAPTURE", "SEO_DYNAMIC_BOOKS", "SEO_AUTO_PUBLISH"):
+        os.environ.pop(env_name, None)
+    os.environ["SEO_BOOKS_PATH"] = str(seo_tmp)
+    try:
+        recorded = seo_books.record_search_results(
+            "자동 SEO 테스트",
+            {
+                "items": [
+                    {
+                        "title": "자동 SEO 테스트",
+                        "author": "테스터",
+                        "publisher": "테스트출판",
+                        "counts": {"total": 99},
+                    }
+                ]
+            },
+        )
+        if recorded != 0 or seo_tmp.exists():
+            raise AssertionError("SEO auto capture should be disabled by default")
+
+        os.environ["SEO_AUTO_CAPTURE"] = "1"
+        os.environ.pop("SEO_AUTO_PUBLISH", None)
+        recorded = seo_books.record_search_results(
+            "자동 SEO 테스트",
+            {
+                "items": [
+                    {
+                        "title": "자동 SEO 테스트",
+                        "author": "테스터",
+                        "publisher": "테스트출판",
+                        "counts": {"total": 99},
+                    }
+                ]
+            },
+        )
+        if recorded != 1:
+            raise AssertionError("SEO explicit capture did not store candidate")
+        if any(book.get("slug") == "자동-seo-테스트" for book in seo_books.get_seo_books()):
+            raise AssertionError("SEO captured candidates should not publish by default")
+    finally:
+        seo_tmp.unlink(missing_ok=True)
+        for name, value in original_seo_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
     empty_search = assert_response(client, "/api/search")
     payload = empty_search.get_json()

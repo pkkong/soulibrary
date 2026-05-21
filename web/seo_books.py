@@ -1,10 +1,19 @@
+import json
+import os
 import re
+import threading
+import time
 
 
 CUSTOM_SLUGS = {
     "프로젝트 헤일메리": "project-hail-mary",
     "불편한 편의점": "bulpyeonhan-pyeonuijeom",
 }
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_AUTO_BOOKS_PATH = os.path.join(ROOT_DIR, "data", "seo_books_auto.json")
+STORE_VERSION = 1
+_STORE_LOCK = threading.Lock()
 
 
 _SEO_BOOK_ROWS = [
@@ -139,5 +148,234 @@ def _build_books(rows):
     return books
 
 
-SEO_BOOKS = _build_books(_SEO_BOOK_ROWS)
+STATIC_SEO_BOOKS = _build_books(_SEO_BOOK_ROWS)
+
+
+def _store_path():
+    return os.environ.get("SEO_BOOKS_PATH") or DEFAULT_AUTO_BOOKS_PATH
+
+
+def _env_enabled(name, default="0"):
+    value = os.environ.get(name, default)
+    return str(value).strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+def _clean_text(value, limit=240):
+    value = re.sub(r"\s+", " ", str(value or "")).strip()
+    return value[:limit]
+
+
+def _book_key(book):
+    title = re.sub(r"\s+", "", (book.get("title") or "").lower())
+    author = re.sub(r"\s+", "", (book.get("author") or "").lower())
+    return f"{title}|{author}"
+
+
+def _valid_title(title):
+    if not title or len(title) < 2 or len(title) > 80:
+        return False
+    if "?" in title or "\ufffd" in title:
+        return False
+    return bool(re.search(r"[0-9A-Za-z가-힣]", title))
+
+
+def _library_count(item):
+    counts = item.get("counts") or {}
+    try:
+        count = int(counts.get("total") or 0)
+    except Exception:
+        count = 0
+    if count <= 0:
+        count = len(item.get("libraries") or [])
+    return count
+
+
+def _auto_capture_enabled():
+    return _env_enabled("SEO_AUTO_CAPTURE", "0")
+
+
+def _auto_publish_enabled():
+    return _env_enabled("SEO_AUTO_PUBLISH", "0")
+
+
+def _dynamic_books_enabled():
+    return _env_enabled("SEO_DYNAMIC_BOOKS", "0")
+
+
+def _capture_limit():
+    try:
+        return max(1, min(int(os.environ.get("SEO_CAPTURE_LIMIT", "10")), 20))
+    except ValueError:
+        return 10
+
+
+def _min_library_count():
+    try:
+        return max(1, int(os.environ.get("SEO_MIN_LIBRARY_COUNT", "3")))
+    except ValueError:
+        return 3
+
+
+def _empty_store():
+    return {"version": STORE_VERSION, "books": []}
+
+
+def _read_store():
+    path = _store_path()
+    if not os.path.exists(path):
+        return _empty_store()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return _empty_store()
+    if isinstance(data, list):
+        return {"version": STORE_VERSION, "books": data}
+    if not isinstance(data, dict):
+        return _empty_store()
+    books = data.get("books")
+    if not isinstance(books, list):
+        data["books"] = []
+    data["version"] = STORE_VERSION
+    return data
+
+
+def _write_store(store):
+    path = _store_path()
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def _published_dynamic_books():
+    if not _dynamic_books_enabled():
+        return []
+    store = _read_store()
+    return [
+        _book(
+            book.get("slug") or _slugify(book.get("title") or ""),
+            _clean_text(book.get("title"), 160),
+            _clean_text(book.get("author"), 160),
+            _clean_text(book.get("publisher"), 160),
+        )
+        for book in store.get("books", [])
+        if book.get("status") == "published" and _valid_title(_clean_text(book.get("title"), 160))
+    ]
+
+
+def get_seo_books():
+    books = []
+    seen = set()
+    for book in [*STATIC_SEO_BOOKS, *_published_dynamic_books()]:
+        key = _book_key(book)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        books.append(book)
+    return books
+
+
+def get_seo_book_by_slug(slug):
+    slug = (slug or "").strip()
+    for book in get_seo_books():
+        if book.get("slug") == slug:
+            return book
+    return None
+
+
+def record_search_results(query, payload):
+    if not _auto_capture_enabled():
+        return 0
+    query = _clean_text(query, 120)
+    items = (payload or {}).get("items") or []
+    if not query or not items:
+        return 0
+
+    now = int(time.time())
+    min_libraries = _min_library_count()
+    limit = _capture_limit()
+
+    with _STORE_LOCK:
+        store = _read_store()
+        dynamic_books = store.setdefault("books", [])
+        static_keys = {_book_key(book) for book in STATIC_SEO_BOOKS}
+        by_key = {_book_key(book): book for book in dynamic_books if isinstance(book, dict)}
+        slug_to_key = {
+            book.get("slug"): _book_key(book)
+            for book in [*STATIC_SEO_BOOKS, *dynamic_books]
+            if isinstance(book, dict) and book.get("slug")
+        }
+
+        changed = 0
+        captured = 0
+        for item in items:
+            if captured >= limit:
+                break
+            if not isinstance(item, dict):
+                continue
+
+            title = _clean_text(item.get("title"), 160)
+            author = _clean_text(item.get("author"), 160)
+            publisher = _clean_text(item.get("publisher"), 160)
+            if not _valid_title(title):
+                continue
+
+            library_count = _library_count(item)
+            if library_count < min_libraries:
+                continue
+
+            key = _book_key({"title": title, "author": author})
+            if key in static_keys:
+                captured += 1
+                continue
+
+            existing = by_key.get(key)
+            if existing:
+                existing["last_seen"] = now
+                existing["search_count"] = int(existing.get("search_count") or 0) + 1
+                existing["library_count"] = max(int(existing.get("library_count") or 0), library_count)
+                if query and query not in existing.setdefault("source_queries", []):
+                    existing["source_queries"] = (existing["source_queries"] + [query])[-10:]
+                if _auto_publish_enabled() and existing.get("status") != "published":
+                    existing["status"] = "published"
+                changed += 1
+                captured += 1
+                continue
+
+            base_slug = CUSTOM_SLUGS.get(title) or _slugify(title)
+            slug = base_slug
+            suffix = 2
+            while slug in slug_to_key and slug_to_key[slug] != key:
+                slug = f"{base_slug}-{suffix}"
+                suffix += 1
+            slug_to_key[slug] = key
+
+            book = {
+                "slug": slug,
+                "title": title,
+                "author": author,
+                "publisher": publisher,
+                "status": "published" if _auto_publish_enabled() else "candidate",
+                "library_count": library_count,
+                "search_count": 1,
+                "first_seen": now,
+                "last_seen": now,
+                "source_queries": [query],
+            }
+            dynamic_books.append(book)
+            by_key[key] = book
+            changed += 1
+            captured += 1
+
+        if changed:
+            _write_store(store)
+        return changed
+
+
+SEO_BOOKS = get_seo_books()
 SEO_BOOK_BY_SLUG = {book["slug"]: book for book in SEO_BOOKS}
