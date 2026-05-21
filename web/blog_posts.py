@@ -56,6 +56,16 @@ def _render_image(line):
     return f'<figure class="blog-figure"><img src="{safe_url}" alt="{safe_alt}" loading="lazy">{caption}</figure>'
 
 
+def _render_heading(level, text):
+    anchor = ""
+    match = re.search(r"\s+\{#([0-9A-Za-z_-]+)\}$", text)
+    if match:
+        anchor = match.group(1)
+        text = text[: match.start()].rstrip()
+    attr = f' id="{html.escape(anchor, quote=True)}"' if anchor else ""
+    return f"<h{level}{attr}>{_inline(text)}</h{level}>"
+
+
 def _render_body(body):
     blocks = []
     list_items = []
@@ -79,10 +89,10 @@ def _render_body(body):
             continue
         if line.startswith("### "):
             flush_list()
-            blocks.append(f"<h3>{_inline(line[4:])}</h3>")
+            blocks.append(_render_heading(3, line[4:]))
         elif line.startswith("## "):
             flush_list()
-            blocks.append(f"<h2>{_inline(line[3:])}</h2>")
+            blocks.append(_render_heading(2, line[3:]))
         elif line.startswith("- "):
             list_items.append(_inline(line[2:]))
         else:

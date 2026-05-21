@@ -739,12 +739,19 @@ def search_page():
 
 @app.route("/blog")
 def blog_page():
+    posts = get_blog_posts()
+    guide_post = get_blog_post("soulib-guide")
+    more_posts = [post for post in posts if not guide_post or post["slug"] != guide_post["slug"]]
     return render_template(
         "blog.html",
-        posts=get_blog_posts(),
+        guide_post=guide_post,
+        posts=more_posts,
         show_topbar=False,
         topbar_desc="",
         active_tab="blog",
+        canonical_url=_public_url("/blog"),
+        meta_title="Soulib 사용법 - 서울시 전자도서 통합검색",
+        meta_description="Soulib에서 전자책을 검색하고, 도서관별 보유 현황과 내 서재 기능을 이용하는 방법입니다.",
     )
 
 

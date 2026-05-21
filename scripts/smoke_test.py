@@ -53,8 +53,10 @@ def main():
 
     blog = assert_response(client, "/blog")
     blog_body = blog.get_data(as_text=True)
-    if "blog-shell" not in blog_body or "Soulib 이용 가이드" not in blog_body:
+    if "blog-guide-overview" not in blog_body or "Soulib 사용법" not in blog_body or "더 많은 글 보기" not in blog_body:
         raise AssertionError("blog page did not render expected markup")
+    if "/static/img/blog/soulib-guide/my-shelf.png" not in blog_body:
+        raise AssertionError("blog landing did not include shelf guide screenshot")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
     blog_post_body = blog_post.get_data(as_text=True)
