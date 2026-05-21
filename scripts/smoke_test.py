@@ -57,8 +57,11 @@ def main():
         raise AssertionError("blog page did not render expected markup")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
-    if "blog-body" not in blog_post.get_data(as_text=True) or "blog-comment-form" not in blog_post.get_data(as_text=True):
+    blog_post_body = blog_post.get_data(as_text=True)
+    if "blog-body" not in blog_post_body or "blog-comment-form" not in blog_post_body:
         raise AssertionError("blog post page did not render expected markup")
+    if "blog-figure" not in blog_post_body or "/static/img/blog/soulib-guide/home.png" not in blog_post_body:
+        raise AssertionError("blog post did not render guide screenshots")
 
     original_blog_get = blog_comments.requests.get
     original_blog_post = blog_comments.requests.post

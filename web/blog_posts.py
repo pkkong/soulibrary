@@ -42,6 +42,20 @@ def _inline(text):
     return re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, escaped)
 
 
+def _render_image(line):
+    match = re.fullmatch(r"!\[([^\]]*)\]\(([^)]+)\)", line)
+    if not match:
+        return None
+    alt = _clean(match.group(1))
+    url = _clean(match.group(2))
+    if not (url.startswith("/static/") or re.match(r"^https?://", url)):
+        return None
+    safe_alt = html.escape(alt, quote=True)
+    safe_url = html.escape(url, quote=True)
+    caption = f"<figcaption>{html.escape(alt)}</figcaption>" if alt else ""
+    return f'<figure class="blog-figure"><img src="{safe_url}" alt="{safe_alt}" loading="lazy">{caption}</figure>'
+
+
 def _render_body(body):
     blocks = []
     list_items = []
@@ -57,6 +71,11 @@ def _render_body(body):
         line = raw_line.strip()
         if not line:
             flush_list()
+            continue
+        image_html = _render_image(line)
+        if image_html:
+            flush_list()
+            blocks.append(image_html)
             continue
         if line.startswith("### "):
             flush_list()

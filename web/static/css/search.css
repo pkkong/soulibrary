@@ -1748,6 +1748,7 @@ body.has-topbar .search-top {
     line-height: 1.2;
     font-weight: 760;
     letter-spacing: 0;
+    overflow-wrap: anywhere;
 }
 
 .blog-head p:last-child,
@@ -1886,6 +1887,30 @@ body.has-topbar .search-top {
 .blog-body a {
     color: #007aff;
     text-decoration: none;
+}
+
+.blog-figure {
+    margin: 18px auto 24px;
+    width: min(100%, 330px);
+    max-width: 100%;
+}
+
+.blog-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid #e5e5ea;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+}
+
+.blog-figure figcaption {
+    margin-top: 9px;
+    color: #6e6e73;
+    font-size: 13px;
+    line-height: 1.45;
+    text-align: center;
 }
 
 .blog-comments {
