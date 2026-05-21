@@ -6,10 +6,51 @@ from datetime import datetime
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BLOG_DIR = os.path.join(ROOT_DIR, "content", "blog")
+BLOG_CATEGORIES = [
+    {
+        "slug": "guide",
+        "title": "사용법",
+        "description": "Soulib 기능을 처음부터 차근차근 익힙니다.",
+    },
+    {
+        "slug": "library",
+        "title": "전자도서관 팁",
+        "description": "도서관 가입, 대출 상태, 전자책 앱 이용법을 정리합니다.",
+    },
+    {
+        "slug": "recommendations",
+        "title": "책 추천",
+        "description": "신간, 베스트셀러, 주제별 추천 목록을 준비합니다.",
+    },
+    {
+        "slug": "updates",
+        "title": "서비스 소식",
+        "description": "Soulib 개선 사항과 새 기능을 안내합니다.",
+    },
+]
+CATEGORY_ALIASES = {
+    "Soulib 이용 가이드": "guide",
+    "가이드": "guide",
+    "전자도서관 이용 팁": "library",
+    "전자도서관 팁": "library",
+    "책 추천": "recommendations",
+    "서비스 소식": "updates",
+}
 
 
 def _clean(value):
     return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _category_for(meta):
+    category = _clean(meta.get("category")) or "가이드"
+    category_slug = re.sub(r"[^0-9A-Za-z_-]", "", _clean(meta.get("category_slug")))
+    if not category_slug:
+        category_slug = CATEGORY_ALIASES.get(category, "")
+    if not category_slug:
+        category_slug = "guide"
+    category_title = next((item["title"] for item in BLOG_CATEGORIES if item["slug"] == category_slug), category)
+    return category_slug, category_title
 
 
 def _parse_frontmatter(text):
@@ -117,11 +158,13 @@ def _load_post(path):
         meta, body = _parse_frontmatter(f.read())
     slug = os.path.splitext(os.path.basename(path))[0]
     title = _clean(meta.get("title")) or slug
+    category_slug, category_title = _category_for(meta)
     return {
         "slug": slug,
         "title": title,
         "description": _clean(meta.get("description")),
-        "category": _clean(meta.get("category")) or "가이드",
+        "category": category_title,
+        "category_slug": category_slug,
         "date": _clean(meta.get("date")),
         "date_label": _display_date(meta.get("date")),
         "html": _render_body(body),
@@ -150,3 +193,22 @@ def get_blog_post(slug):
         if post["slug"] == slug:
             return post
     return None
+
+
+def get_blog_categories(posts=None):
+    posts = posts if posts is not None else get_blog_posts()
+    counts = {}
+    latest = {}
+    for post in posts:
+        slug = post.get("category_slug") or "guide"
+        counts[slug] = counts.get(slug, 0) + 1
+        if slug not in latest:
+            latest[slug] = post
+    return [
+        {
+            **category,
+            "count": counts.get(category["slug"], 0),
+            "latest": latest.get(category["slug"]),
+        }
+        for category in BLOG_CATEGORIES
+    ]

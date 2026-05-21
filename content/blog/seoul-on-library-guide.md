@@ -2,6 +2,7 @@
 title: 서울 전자도서관을 처음 이용할 때 준비할 것
 description: 전자책을 빌리기 전에 회원 가입, 도서관 인증, 앱 설치에서 확인해야 할 점을 정리했습니다.
 category: 전자도서관 이용 팁
+category_slug: library
 date: 2026-05-21
 ---
 

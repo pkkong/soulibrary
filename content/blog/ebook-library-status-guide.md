@@ -2,6 +2,7 @@
 title: 전자책 대출 상태가 다르게 보일 때 확인할 것
 description: 대출가능, 예약, 구독형, 상태 정보 없음이 각각 어떤 의미인지 정리했습니다.
 category: 전자도서관 이용 팁
+category_slug: library
 date: 2026-05-21
 ---
 

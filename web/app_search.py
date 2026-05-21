@@ -11,7 +11,7 @@ from db import get_db, using_postgres
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, abort, url_for, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
 from blog_comments import create_blog_comment, get_blog_comments
-from blog_posts import get_blog_post, get_blog_posts
+from blog_posts import get_blog_categories, get_blog_post, get_blog_posts
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
 from seo_books import get_seo_book_by_slug, get_seo_books
 from utils.normalize import (
@@ -741,17 +741,17 @@ def search_page():
 def blog_page():
     posts = get_blog_posts()
     guide_post = get_blog_post("soulib-guide")
-    more_posts = [post for post in posts if not guide_post or post["slug"] != guide_post["slug"]]
     return render_template(
         "blog.html",
         guide_post=guide_post,
-        posts=more_posts,
+        posts=posts,
+        categories=get_blog_categories(posts),
         show_topbar=False,
         topbar_desc="",
         active_tab="blog",
         canonical_url=_public_url("/blog"),
-        meta_title="Soulib 사용법 - 서울시 전자도서 통합검색",
-        meta_description="Soulib에서 전자책을 검색하고, 도서관별 보유 현황과 내 서재 기능을 이용하는 방법입니다.",
+        meta_title="Soulib 블로그 - 전자책 검색과 도서관 이용 가이드",
+        meta_description="Soulib 사용법, 전자도서관 이용 팁, 책 추천과 서비스 소식을 정리합니다.",
     )
 
 

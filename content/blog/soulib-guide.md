@@ -2,6 +2,7 @@
 title: Soulib 사용법
 description: Soulib에서 전자책을 검색하고, 도서관별 보유 현황과 내 서재 기능을 이용하는 방법입니다.
 category: Soulib 이용 가이드
+category_slug: guide
 date: 2026-05-21
 ---
 
