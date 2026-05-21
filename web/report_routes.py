@@ -12,8 +12,8 @@ MAX_CONTACT_LEN = 120
 MAX_PAGE_URL_LEN = 500
 DEFAULT_GITHUB_REPO = "pkkong/library_crawler"
 REPORT_TITLE_PREFIX = "[오류신고]"
-REPORT_STORE_ERROR = "GitHub Issues 저장소 연결에 실패했습니다. GITHUB_ISSUE_TOKEN을 확인해주세요."
-REPORT_SAVE_ERROR = "신고를 저장하지 못했습니다. GitHub Issues 연결 상태를 확인해주세요."
+REPORT_STORE_ERROR = "최근 접수 목록을 잠시 불러오지 못했습니다."
+REPORT_SAVE_ERROR = "신고를 접수하지 못했습니다. 잠시 후 다시 시도해주세요."
 KST = timezone(timedelta(hours=9), "Asia/Seoul")
 
 
@@ -76,7 +76,7 @@ def _github_error_detail(exc: Exception) -> str:
 
 
 def _report_store_error(exc: Exception) -> str:
-    return f"{REPORT_STORE_ERROR} ({_github_error_detail(exc)})"
+    return REPORT_STORE_ERROR
 
 
 def _default_report_form(page_url: str = "") -> dict:
@@ -266,7 +266,7 @@ def _render_reports_page(
 
     reports = _prepend_recent_report(reports, saved_report)
     saved_report = reports[0] if saved_report and reports else None
-    reports_count_label = "확인 중" if reports_loading else ("확인 필요" if reports_unavailable else f"{len(reports)}건")
+    reports_count_label = "확인 중" if reports_loading else ("일시 지연" if reports_unavailable else f"{len(reports)}건")
 
     return render_template(
         "reports.html",
@@ -377,7 +377,7 @@ def reports_page():
                 print(f"[report error] github issue creation failed: {detail} raw={exc}")
                 return _render_reports_page(
                     form,
-                    f"{REPORT_SAVE_ERROR} ({detail})",
+                    REPORT_SAVE_ERROR,
                     saved=False,
                     status_code=500,
                 )
@@ -405,7 +405,7 @@ def api_recent_reports():
         reports_unavailable=reports_unavailable,
         reports_notice=reports_notice,
     )
-    count_label = "확인 필요" if reports_unavailable else f"{len(reports)}건"
+    count_label = "일시 지연" if reports_unavailable else f"{len(reports)}건"
     return jsonify({
         "html": html,
         "count_label": count_label,

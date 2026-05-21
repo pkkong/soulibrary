@@ -37,7 +37,9 @@
         {% endfor %}
     </div>
 {% elif reports_unavailable %}
-    <div class="report-empty">최근 접수 목록을 불러오지 못했습니다.</div>
+    {% if not reports_notice %}
+        <div class="report-empty">최근 접수 목록을 잠시 불러오지 못했습니다.</div>
+    {% endif %}
 {% elif not reports_loading %}
     <div class="report-empty">아직 접수된 신고가 없습니다.</div>
 {% endif %}

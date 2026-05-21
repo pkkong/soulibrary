@@ -866,8 +866,11 @@ def main():
     if missing_recent.status_code != 503:
         raise AssertionError(f"missing report store API returned {missing_recent.status_code}, expected 503")
     missing_recent_payload = missing_recent.get_json()
-    if "운영 서버에 GITHUB_ISSUE_TOKEN 환경변수가 없습니다" not in (missing_recent_payload.get("html") or ""):
-        raise AssertionError("reports API did not show the missing token cause")
+    missing_recent_html = missing_recent_payload.get("html") or ""
+    if "최근 접수 목록을 잠시 불러오지 못했습니다" not in missing_recent_html:
+        raise AssertionError("reports API did not show the customer-facing unavailable message")
+    if "GitHub" in missing_recent_html or "GITHUB_ISSUE_TOKEN" in missing_recent_html:
+        raise AssertionError("reports API leaked internal report-store details")
 
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
     os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
