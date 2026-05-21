@@ -14,6 +14,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_AUTO_BOOKS_PATH = os.path.join(ROOT_DIR, "data", "seo_books_auto.json")
 STORE_VERSION = 1
 _STORE_LOCK = threading.Lock()
+DEFAULT_APPROVE_THRESHOLD = 70
+DEFAULT_PUBLISH_THRESHOLD = 85
 
 
 _SEO_BOOK_ROWS = [
@@ -190,12 +192,108 @@ def _library_count(item):
     return count
 
 
+def _stable_detail_present(item):
+    if item.get("live_detail_key") or item.get("live_detail_url"):
+        return True
+    for lib in item.get("libraries") or []:
+        if not isinstance(lib, dict):
+            continue
+        if lib.get("detail_url") or lib.get("brcd") or lib.get("content_id") or lib.get("isbn"):
+            return True
+    return False
+
+
+def _match_text(value):
+    return re.sub(r"[^0-9a-z가-힣]", "", str(value or "").lower())
+
+
+def _score_match(candidate, item):
+    title = _match_text(candidate.get("title"))
+    item_title = _match_text(item.get("title"))
+    author = _match_text(candidate.get("author"))
+    item_author = _match_text(item.get("author"))
+    publisher = _match_text(candidate.get("publisher"))
+    item_publisher = _match_text(item.get("publisher"))
+    score = 0
+    reasons = []
+
+    if not _valid_title(candidate.get("title")):
+        return -100, ["제목 형식이 안정적이지 않습니다."]
+
+    if title and item_title:
+        if title == item_title:
+            score += 45
+            reasons.append("제목 일치")
+        elif title in item_title or item_title in title:
+            score += 30
+            reasons.append("제목 유사")
+        else:
+            score -= 80
+            reasons.append("제목 불일치")
+
+    if author and item_author:
+        if author == item_author:
+            score += 25
+            reasons.append("저자 일치")
+        elif author in item_author or item_author in author:
+            score += 15
+            reasons.append("저자 유사")
+        else:
+            score -= 25
+            reasons.append("저자 불일치")
+    elif author or item_author:
+        score += 5
+        reasons.append("저자 정보 일부 확인")
+
+    if publisher and item_publisher:
+        if publisher == item_publisher:
+            score += 15
+            reasons.append("출판사 일치")
+        elif publisher in item_publisher or item_publisher in publisher:
+            score += 8
+            reasons.append("출판사 유사")
+    elif publisher or item_publisher:
+        score += 4
+        reasons.append("출판사 정보 일부 확인")
+
+    library_count = _library_count(item)
+    if library_count >= 10:
+        score += 12
+        reasons.append("보유 도서관 10곳 이상")
+    elif library_count >= _min_library_count():
+        score += 8
+        reasons.append("보유 도서관 기준 충족")
+    else:
+        score -= 20
+        reasons.append("보유 도서관 기준 미달")
+
+    if item.get("image_url"):
+        score += 5
+        reasons.append("표지 확인")
+    if _stable_detail_present(item):
+        score += 5
+        reasons.append("상세 식별자 확인")
+
+    return score, reasons
+
+
+def _best_validation_match(candidate, items):
+    best = None
+    best_score = -999
+    best_reasons = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        score, reasons = _score_match(candidate, item)
+        if score > best_score:
+            best = item
+            best_score = score
+            best_reasons = reasons
+    return best, best_score, best_reasons
+
+
 def _auto_capture_enabled():
     return _env_enabled("SEO_AUTO_CAPTURE", "0")
-
-
-def _auto_publish_enabled():
-    return _env_enabled("SEO_AUTO_PUBLISH", "0")
 
 
 def _dynamic_books_enabled():
@@ -341,8 +439,6 @@ def record_search_results(query, payload):
                 existing["library_count"] = max(int(existing.get("library_count") or 0), library_count)
                 if query and query not in existing.setdefault("source_queries", []):
                     existing["source_queries"] = (existing["source_queries"] + [query])[-10:]
-                if _auto_publish_enabled() and existing.get("status") != "published":
-                    existing["status"] = "published"
                 changed += 1
                 captured += 1
                 continue
@@ -360,12 +456,13 @@ def record_search_results(query, payload):
                 "title": title,
                 "author": author,
                 "publisher": publisher,
-                "status": "published" if _auto_publish_enabled() else "candidate",
+                "status": "candidate",
                 "library_count": library_count,
                 "search_count": 1,
                 "first_seen": now,
                 "last_seen": now,
                 "source_queries": [query],
+                "validation": {"score": 0, "reasons": []},
             }
             dynamic_books.append(book)
             by_key[key] = book
@@ -375,6 +472,104 @@ def record_search_results(query, payload):
         if changed:
             _write_store(store)
         return changed
+
+
+def review_seo_candidates(
+    search_func,
+    limit=50,
+    auto_publish=False,
+    approve_threshold=DEFAULT_APPROVE_THRESHOLD,
+    publish_threshold=DEFAULT_PUBLISH_THRESHOLD,
+    dry_run=False,
+):
+    now = int(time.time())
+    with _STORE_LOCK:
+        store = _read_store()
+        candidates = [
+            dict(book)
+            for book in store.get("books", [])
+            if isinstance(book, dict) and book.get("status") in {"candidate", "approved", "stale"}
+        ][: max(1, int(limit or 50))]
+
+    summary = {
+        "checked": 0,
+        "approved": 0,
+        "published": 0,
+        "rejected": 0,
+        "unchanged": 0,
+        "errors": 0,
+    }
+    updates = {}
+
+    for candidate in candidates:
+        key = _book_key(candidate)
+        if not key:
+            continue
+        summary["checked"] += 1
+        updated = dict(candidate)
+        try:
+            payload = search_func(
+                query=candidate.get("title") or "",
+                field="title",
+                providers_raw="",
+                libraries_raw="",
+                limit=20,
+                offset=0,
+            )
+            best, score, reasons = _best_validation_match(candidate, (payload or {}).get("items") or [])
+            if not best:
+                reasons = ["검증 가능한 검색 결과가 없습니다."]
+            updated["validated_at"] = now
+            updated["validation"] = {
+                "score": score,
+                "reasons": reasons,
+                "matched_title": (best or {}).get("title") or "",
+                "matched_author": (best or {}).get("author") or "",
+            }
+            if best:
+                updated["library_count"] = max(int(updated.get("library_count") or 0), _library_count(best))
+                if best.get("image_url"):
+                    updated["image_url"] = best.get("image_url")
+                if best.get("live_detail_url"):
+                    updated["live_detail_url"] = best.get("live_detail_url")
+                if best.get("live_detail_key"):
+                    updated["live_detail_key"] = best.get("live_detail_key")
+
+            if score >= publish_threshold and auto_publish:
+                updated["status"] = "published"
+                updated["published_at"] = updated.get("published_at") or now
+                summary["published"] += 1
+            elif score >= approve_threshold:
+                updated["status"] = "approved"
+                summary["approved"] += 1
+            else:
+                updated["status"] = "rejected"
+                summary["rejected"] += 1
+        except Exception as exc:
+            updated["validated_at"] = now
+            updated["validation"] = {
+                "score": 0,
+                "reasons": [f"검증 중 오류: {exc}"],
+            }
+            summary["errors"] += 1
+        updates[key] = updated
+
+    if not dry_run and updates:
+        with _STORE_LOCK:
+            store = _read_store()
+            changed = False
+            for idx, book in enumerate(store.get("books", [])):
+                key = _book_key(book)
+                if key in updates:
+                    store["books"][idx] = updates[key]
+                    changed = True
+            if changed:
+                _write_store(store)
+    elif dry_run:
+        summary["dry_run"] = True
+
+    summary["unchanged"] = max(0, summary["checked"] - summary["approved"] - summary["published"] - summary["rejected"] - summary["errors"])
+    return summary
 
 
 SEO_BOOKS = get_seo_books()

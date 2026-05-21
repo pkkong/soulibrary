@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -222,8 +223,101 @@ def main():
         )
         if recorded != 1:
             raise AssertionError("SEO explicit capture did not store candidate")
+        os.environ["SEO_AUTO_PUBLISH"] = "1"
+        recorded_again = seo_books.record_search_results(
+            "자동 SEO 테스트",
+            {
+                "items": [
+                    {
+                        "title": "자동 SEO 테스트",
+                        "author": "테스터",
+                        "publisher": "테스트출판",
+                        "counts": {"total": 99},
+                    }
+                ]
+            },
+        )
+        if recorded_again != 1:
+            raise AssertionError("SEO repeated capture did not update existing candidate")
+        with seo_tmp.open(encoding="utf-8") as f:
+            seo_store = json.load(f)
+        captured_book = next(book for book in seo_store["books"] if book["title"] == "자동 SEO 테스트")
+        if captured_book.get("status") != "candidate":
+            raise AssertionError("SEO search capture should never publish candidates directly")
         if any(book.get("slug") == "자동-seo-테스트" for book in seo_books.get_seo_books()):
             raise AssertionError("SEO captured candidates should not publish by default")
+
+        def matching_seo_search(query, field, providers_raw, libraries_raw, limit, offset):
+            if query != "자동 SEO 테스트" or field != "title":
+                raise AssertionError(f"unexpected SEO validation query: {query}/{field}")
+            return {
+                "items": [
+                    {
+                        "title": "자동 SEO 테스트",
+                        "author": "테스터",
+                        "publisher": "테스트출판",
+                        "counts": {"total": 12},
+                        "image_url": "https://example.com/cover.jpg",
+                        "live_detail_key": "smoke-seo-key",
+                    }
+                ]
+            }
+
+        review_summary = seo_books.review_seo_candidates(matching_seo_search, auto_publish=False)
+        if review_summary.get("approved") != 1:
+            raise AssertionError(f"SEO validation did not approve matching candidate: {review_summary}")
+        with seo_tmp.open(encoding="utf-8") as f:
+            seo_store = json.load(f)
+        approved_book = next(book for book in seo_store["books"] if book["title"] == "자동 SEO 테스트")
+        if approved_book.get("status") != "approved" or approved_book.get("validation", {}).get("score", 0) < 70:
+            raise AssertionError("SEO validation did not store approved review metadata")
+        os.environ["SEO_DYNAMIC_BOOKS"] = "1"
+        if any(book.get("slug") == "자동-seo-테스트" for book in seo_books.get_seo_books()):
+            raise AssertionError("SEO approved candidates should not render as published pages")
+
+        publish_summary = seo_books.review_seo_candidates(matching_seo_search, auto_publish=True)
+        if publish_summary.get("published") != 1:
+            raise AssertionError(f"SEO validation did not publish matching candidate: {publish_summary}")
+        if not any(book.get("slug") == "자동-seo-테스트" for book in seo_books.get_seo_books()):
+            raise AssertionError("SEO published dynamic book did not render when enabled")
+
+        os.environ.pop("SEO_AUTO_PUBLISH", None)
+        recorded_bad = seo_books.record_search_results(
+            "검증 실패 테스트",
+            {
+                "items": [
+                    {
+                        "title": "검증 실패 테스트",
+                        "author": "다른저자",
+                        "publisher": "다른출판",
+                        "counts": {"total": 99},
+                    }
+                ]
+            },
+        )
+        if recorded_bad != 1:
+            raise AssertionError("SEO bad candidate fixture was not captured")
+
+        def mismatched_seo_search(query, field, providers_raw, libraries_raw, limit, offset):
+            return {
+                "items": [
+                    {
+                        "title": "완전히 다른 책",
+                        "author": "불일치",
+                        "publisher": "불일치",
+                        "counts": {"total": 1},
+                    }
+                ]
+            }
+
+        reject_summary = seo_books.review_seo_candidates(mismatched_seo_search, auto_publish=True)
+        if reject_summary.get("rejected") != 1:
+            raise AssertionError(f"SEO validation did not reject mismatched candidate: {reject_summary}")
+        with seo_tmp.open(encoding="utf-8") as f:
+            seo_store = json.load(f)
+        rejected_book = next(book for book in seo_store["books"] if book["title"] == "검증 실패 테스트")
+        if rejected_book.get("status") != "rejected":
+            raise AssertionError("SEO mismatched candidate was not marked rejected")
     finally:
         seo_tmp.unlink(missing_ok=True)
         for name, value in original_seo_env.items():
