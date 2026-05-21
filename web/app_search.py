@@ -739,19 +739,46 @@ def search_page():
 
 @app.route("/blog")
 def blog_page():
-    posts = get_blog_posts()
+    all_posts = get_blog_posts()
     guide_post = get_blog_post("soulib-guide")
+    categories = get_blog_categories(all_posts)
+    category_slugs = {category["slug"] for category in categories}
+    active_category = re.sub(r"[^0-9A-Za-z_-]", "", request.args.get("category") or "")
+    if active_category not in category_slugs:
+        active_category = ""
+    active_category_title = next((category["title"] for category in categories if category["slug"] == active_category), "")
+    blog_query = " ".join((request.args.get("blog_q") or "").split())[:80]
+    query_norm = blog_query.casefold()
+    posts = []
+    for post in all_posts:
+        if active_category and post.get("category_slug") != active_category:
+            continue
+        haystack = " ".join(
+            [
+                post.get("title") or "",
+                post.get("description") or "",
+                post.get("category") or "",
+                re.sub(r"<[^>]+>", " ", post.get("html") or ""),
+            ]
+        ).casefold()
+        if query_norm and query_norm not in haystack:
+            continue
+        posts.append(post)
     return render_template(
         "blog.html",
         guide_post=guide_post,
         posts=posts,
-        categories=get_blog_categories(posts),
+        categories=categories,
+        blog_query=blog_query,
+        active_blog_category=active_category,
+        active_category_title=active_category_title,
+        all_posts_count=len(all_posts),
         show_topbar=False,
         topbar_desc="",
         active_tab="blog",
         canonical_url=_public_url("/blog"),
         meta_title="Soulib 블로그 - 전자책 검색과 도서관 이용 가이드",
-        meta_description="Soulib 사용법, 전자도서관 이용 팁, 책 추천과 서비스 소식을 정리합니다.",
+        meta_description="Soulib 사용법, 전자도서관 이용 팁, 책 추천을 정리합니다.",
     )
 
 
@@ -759,6 +786,8 @@ def _blog_post_response(post, comment_error="", saved_comment=None, status_code=
     comments = []
     comments_unavailable = False
     comments_notice = ""
+    blog_posts = get_blog_posts()
+    categories = get_blog_categories(blog_posts)
     try:
         comments = get_blog_comments(post["slug"])
     except Exception as exc:
@@ -776,6 +805,10 @@ def _blog_post_response(post, comment_error="", saved_comment=None, status_code=
     return render_template(
         "blog_post.html",
         post=post,
+        categories=categories,
+        blog_query="",
+        active_blog_category="",
+        active_category_title="",
         comments=comments,
         comments_unavailable=comments_unavailable,
         comments_notice=comments_notice,

@@ -5,10 +5,12 @@
 
 {% block content %}
 <main class="blog-shell blog-home">
+    {% include "partials/blog_nav.html" %}
+
     <section class="blog-home-hero" aria-labelledby="blog-title">
         <p class="blog-kicker">Soulib Blog</p>
-        <h1 id="blog-title">전자책을 더 잘 찾고 읽는 방법</h1>
-        <p>Soulib 사용법, 전자도서관 이용 팁, 책 추천과 서비스 소식을 한 곳에 정리합니다.</p>
+        <h1 id="blog-title"><span>전자책을 더 잘 찾고</span> <span>읽는 방법</span></h1>
+        <p>Soulib 사용법, 전자도서관 이용 팁, 책 추천을 한 곳에 정리합니다.</p>
     </section>
 
     {% if guide_post %}
@@ -40,9 +42,9 @@
             {% for category in categories %}
             {% set href = "/blog/" ~ category.latest.slug if category.latest else "" %}
             {% if href %}
-            <a class="blog-category-card" href="{{ href }}">
+            <a class="blog-category-card" id="category-{{ category.slug }}" href="/blog?category={{ category.slug }}">
             {% else %}
-            <div class="blog-category-card is-empty">
+            <div class="blog-category-card is-empty" id="category-{{ category.slug }}">
             {% endif %}
                 <div>
                     <strong>{{ category.title }}</strong>
@@ -58,11 +60,26 @@
         </div>
     </section>
 
-    <section class="blog-more" aria-labelledby="blog-more-title">
+    <section class="blog-more" id="blog-search" aria-labelledby="blog-more-title">
         <div class="blog-section-head">
             <p class="blog-kicker">Latest</p>
-            <h2 id="blog-more-title">최근 글</h2>
+            <h2 id="blog-more-title">
+                {% if blog_query %}검색 결과{% elif active_category_title %}{{ active_category_title }} 글{% else %}최근 글{% endif %}
+            </h2>
+            {% if blog_query %}
+            <p class="blog-section-note">"{{ blog_query }}"에 대한 글을 보여줍니다.</p>
+            {% elif active_category_title %}
+            <p class="blog-section-note"><a href="/blog">전체 글 보기</a></p>
+            {% endif %}
         </div>
+
+        <form class="blog-inline-search" action="/blog#blog-search" method="get" role="search">
+            {% if active_blog_category %}
+            <input type="hidden" name="category" value="{{ active_blog_category }}">
+            {% endif %}
+            <input type="search" name="blog_q" value="{{ blog_query|default('', true) }}" placeholder="블로그에서 검색" aria-label="블로그에서 검색">
+            <button type="submit">검색</button>
+        </form>
 
         <div class="blog-list" aria-label="블로그 글 목록">
             {% for post in posts %}
@@ -75,7 +92,7 @@
                 {% if post.description %}<small>{{ post.description }}</small>{% endif %}
             </a>
             {% else %}
-            <div class="blog-empty">곧 새로운 글을 추가하겠습니다.</div>
+            <div class="blog-empty">조건에 맞는 글이 없습니다.</div>
             {% endfor %}
         </div>
     </section>

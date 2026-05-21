@@ -1,0 +1,12 @@
+<nav class="blog-local-nav" aria-label="블로그 메뉴">
+    <div class="blog-local-head">
+        <a class="blog-local-brand" href="/blog">Soulib Blog</a>
+        <a class="blog-search-link{% if blog_query %} is-active{% endif %}" href="/blog#blog-search">검색</a>
+    </div>
+    <div class="blog-local-links" aria-label="블로그 카테고리">
+        <a class="{% if not active_blog_category %}is-active{% endif %}" href="/blog">전체</a>
+        {% for category in categories %}
+        <a class="{% if active_blog_category == category.slug %}is-active{% endif %}" href="/blog?category={{ category.slug }}">{{ category.title }}</a>
+        {% endfor %}
+    </div>
+</nav>

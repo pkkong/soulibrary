@@ -2,6 +2,12 @@ import html
 import os
 import re
 from datetime import datetime
+from functools import lru_cache
+
+try:
+    from PIL import Image
+except Exception:
+    Image = None
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,22 +16,17 @@ BLOG_CATEGORIES = [
     {
         "slug": "guide",
         "title": "사용법",
-        "description": "Soulib 기능을 처음부터 차근차근 익힙니다.",
+        "description": "Soulib 검색, 상세 화면, 내 서재 기능을 익힙니다.",
     },
     {
         "slug": "library",
         "title": "전자도서관 팁",
-        "description": "도서관 가입, 대출 상태, 전자책 앱 이용법을 정리합니다.",
+        "description": "서울온, 도서관 가입, 대출 상태, 전자책 앱 이용법을 정리합니다.",
     },
     {
         "slug": "recommendations",
         "title": "책 추천",
         "description": "신간, 베스트셀러, 주제별 추천 목록을 준비합니다.",
-    },
-    {
-        "slug": "updates",
-        "title": "서비스 소식",
-        "description": "Soulib 개선 사항과 새 기능을 안내합니다.",
     },
 ]
 CATEGORY_ALIASES = {
@@ -34,7 +35,7 @@ CATEGORY_ALIASES = {
     "전자도서관 이용 팁": "library",
     "전자도서관 팁": "library",
     "책 추천": "recommendations",
-    "서비스 소식": "updates",
+    "서비스 소식": "guide",
 }
 
 
@@ -83,6 +84,20 @@ def _inline(text):
     return re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, escaped)
 
 
+@lru_cache(maxsize=64)
+def _image_size(url):
+    if not Image or not url.startswith("/static/"):
+        return None, None
+    path = os.path.join(ROOT_DIR, "web", url.lstrip("/").replace("/", os.sep))
+    if not os.path.isfile(path):
+        return None, None
+    try:
+        with Image.open(path) as img:
+            return img.size
+    except Exception:
+        return None, None
+
+
 def _render_image(line):
     match = re.fullmatch(r"!\[([^\]]*)\]\(([^)]+)\)", line)
     if not match:
@@ -93,8 +108,10 @@ def _render_image(line):
         return None
     safe_alt = html.escape(alt, quote=True)
     safe_url = html.escape(url, quote=True)
+    width, height = _image_size(url)
+    size_attrs = f' width="{width}" height="{height}"' if width and height else ""
     caption = f"<figcaption>{html.escape(alt)}</figcaption>" if alt else ""
-    return f'<figure class="blog-figure"><img src="{safe_url}" alt="{safe_alt}" loading="lazy">{caption}</figure>'
+    return f'<figure class="blog-figure"><img src="{safe_url}" alt="{safe_alt}" loading="lazy"{size_attrs}>{caption}</figure>'
 
 
 def _render_heading(level, text):
