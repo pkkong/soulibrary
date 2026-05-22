@@ -744,9 +744,12 @@ def blog_page():
     categories = get_blog_categories(all_posts)
     category_slugs = {category["slug"] for category in categories}
     active_category = re.sub(r"[^0-9A-Za-z_-]", "", request.args.get("category") or "")
+    if active_category == "library":
+        active_category = "guide"
     if active_category not in category_slugs:
         active_category = ""
-    active_category_title = next((category["title"] for category in categories if category["slug"] == active_category), "")
+    active_category_info = next((category for category in categories if category["slug"] == active_category), None)
+    active_category_title = active_category_info["title"] if active_category_info else ""
     blog_query = " ".join((request.args.get("blog_q") or "").split())[:80]
     query_norm = blog_query.casefold()
     posts = []
@@ -772,13 +775,14 @@ def blog_page():
         blog_query=blog_query,
         active_blog_category=active_category,
         active_category_title=active_category_title,
+        active_category_info=active_category_info,
         all_posts_count=len(all_posts),
         show_topbar=False,
         topbar_desc="",
         active_tab="blog",
         canonical_url=_public_url("/blog"),
         meta_title="Soulib 블로그 - 전자책 검색과 도서관 이용 가이드",
-        meta_description="Soulib 사용법, 전자도서관 이용 팁, 책 추천을 정리합니다.",
+        meta_description="Soulib 이용 안내와 서울시 전자도서관에서 찾아볼 만한 책 추천을 정리합니다.",
     )
 
 
@@ -809,6 +813,7 @@ def _blog_post_response(post, comment_error="", saved_comment=None, status_code=
         blog_query="",
         active_blog_category="",
         active_category_title="",
+        active_category_info=None,
         comments=comments,
         comments_unavailable=comments_unavailable,
         comments_notice=comments_notice,

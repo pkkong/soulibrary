@@ -53,16 +53,19 @@ def main():
 
     blog = assert_response(client, "/blog")
     blog_body = blog.get_data(as_text=True)
-    if "blog-home-hero" not in blog_body or "카테고리" not in blog_body or "책 추천" not in blog_body:
+    if "blog-home-hero" not in blog_body or "주제별 보기" not in blog_body or "책 추천" not in blog_body:
         raise AssertionError("blog page did not render expected markup")
-    if "blog-local-nav" not in blog_body or "blog-inline-search" not in blog_body:
+    if "blog-local-nav" not in blog_body or "blog-local-search" not in blog_body or "blog-menu-dropdown" not in blog_body:
         raise AssertionError("blog page did not render local navigation and search")
     if "처음이라면 Soulib 사용법부터" not in blog_body:
         raise AssertionError("blog page did not render featured guide")
-    library_blog = assert_response(client, "/blog?category=library")
-    library_blog_body = library_blog.get_data(as_text=True)
-    if "서울 전자도서관을 처음 이용할 때 준비할 것" not in library_blog_body:
-        raise AssertionError("blog category filter did not render library posts")
+    guide_blog = assert_response(client, "/blog?category=guide")
+    guide_blog_body = guide_blog.get_data(as_text=True)
+    if "서울 전자도서관을 처음 이용할 때 준비할 것" not in guide_blog_body or "이용 안내" not in guide_blog_body:
+        raise AssertionError("blog category filter did not render guide posts")
+    legacy_library_blog = assert_response(client, "/blog?category=library")
+    if "서울 전자도서관을 처음 이용할 때 준비할 것" not in legacy_library_blog.get_data(as_text=True):
+        raise AssertionError("legacy blog library category did not map to guide posts")
     searched_blog = assert_response(client, f"/blog?blog_q={quote('서울온')}")
     if "서울 전자도서관을 처음 이용할 때 준비할 것" not in searched_blog.get_data(as_text=True):
         raise AssertionError("blog search did not render matching posts")

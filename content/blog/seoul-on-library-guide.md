@@ -1,8 +1,8 @@
 ---
 title: 서울 전자도서관을 처음 이용할 때 준비할 것
 description: 서울온 설치와 가입, 도서관 회원 인증, 전자책 앱 설치까지 처음 이용자가 실제로 따라 할 순서대로 정리했습니다.
-category: 전자도서관 이용 팁
-category_slug: library
+category: 이용 안내
+category_slug: guide
 date: 2026-05-21
 ---
 

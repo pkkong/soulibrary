@@ -4,12 +4,18 @@
 2. 아래 형식을 복사해서 작성합니다.
 3. 저장 후 `/blog`에서 자동으로 보이는지 확인합니다.
 
+현재 공개 카테고리는 두 개입니다.
+
+- `이용 안내` (`category_slug: guide`): Soulib 사용법, 서울온 준비, 전자책 앱 설치, 대출 상태, 오류 신고 등 이용 흐름 안내
+- `책 추천` (`category_slug: recommendations`): 신간, 베스트셀러, 주제별 추천
+
 예시:
 
 ---
 title: 글 제목
 description: 목록에 보이는 짧은 설명
-category: 가이드
+category: 이용 안내
+category_slug: guide
 date: 2026-05-21
 ---
 

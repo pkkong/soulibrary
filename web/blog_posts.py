@@ -15,13 +15,8 @@ BLOG_DIR = os.path.join(ROOT_DIR, "content", "blog")
 BLOG_CATEGORIES = [
     {
         "slug": "guide",
-        "title": "사용법",
-        "description": "Soulib 검색, 상세 화면, 내 서재 기능을 익힙니다.",
-    },
-    {
-        "slug": "library",
-        "title": "전자도서관 팁",
-        "description": "서울온, 도서관 가입, 대출 상태, 전자책 앱 이용법을 정리합니다.",
+        "title": "이용 안내",
+        "description": "Soulib 사용법, 서울온 준비, 전자책 앱과 대출 상태를 정리합니다.",
     },
     {
         "slug": "recommendations",
@@ -30,10 +25,12 @@ BLOG_CATEGORIES = [
     },
 ]
 CATEGORY_ALIASES = {
+    "이용 안내": "guide",
     "Soulib 이용 가이드": "guide",
     "가이드": "guide",
-    "전자도서관 이용 팁": "library",
-    "전자도서관 팁": "library",
+    "사용법": "guide",
+    "전자도서관 이용 팁": "guide",
+    "전자도서관 팁": "guide",
     "책 추천": "recommendations",
     "서비스 소식": "guide",
 }
@@ -44,10 +41,12 @@ def _clean(value):
 
 
 def _category_for(meta):
-    category = _clean(meta.get("category")) or "가이드"
+    category = _clean(meta.get("category")) or "이용 안내"
     category_slug = re.sub(r"[^0-9A-Za-z_-]", "", _clean(meta.get("category_slug")))
     if not category_slug:
         category_slug = CATEGORY_ALIASES.get(category, "")
+    if category_slug == "library":
+        category_slug = "guide"
     if not category_slug:
         category_slug = "guide"
     category_title = next((item["title"] for item in BLOG_CATEGORIES if item["slug"] == category_slug), category)
