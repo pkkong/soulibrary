@@ -123,6 +123,8 @@ def _render_image(line):
     figure_class = "blog-figure"
     if (width and height and height / max(width, 1) >= 1.6) or url.startswith("/static/img/blog/soulib-guide/"):
         figure_class += " blog-figure-tall"
+    if url.startswith("/static/img/blog/seoul-on/"):
+        figure_class += " blog-figure-wide"
     caption = f"<figcaption>{html.escape(alt)}</figcaption>" if alt else ""
     return f'<figure class="{figure_class}"><img src="{safe_url}" alt="{safe_alt}" loading="lazy"{size_attrs}>{caption}</figure>'
 

@@ -77,6 +77,8 @@ def main():
         raise AssertionError("blog page did not render starter guide links")
     if "blog-visual-strip" not in blog_body or "blog-card-thumb" not in blog_body:
         raise AssertionError("blog page did not render visual screenshots")
+    if "/static/img/blog/seoul-on/seoul-on-cover.svg" not in blog_body:
+        raise AssertionError("blog page did not render SeoulOn-specific visual")
     if blog_body.find("blog-more") > blog_body.find("blog-category-section"):
         raise AssertionError("blog article list should render before topic cards")
     guide_blog = assert_response(client, "/blog?category=guide")
@@ -87,8 +89,11 @@ def main():
     if "서울 전자도서관을 처음 이용할 때 준비할 것" not in legacy_library_blog.get_data(as_text=True):
         raise AssertionError("legacy blog library category did not map to guide posts")
     searched_blog = assert_response(client, f"/blog?blog_q={quote('서울온')}")
-    if "서울 전자도서관을 처음 이용할 때 준비할 것" not in searched_blog.get_data(as_text=True):
+    searched_blog_body = searched_blog.get_data(as_text=True)
+    if "서울 전자도서관을 처음 이용할 때 준비할 것" not in searched_blog_body:
         raise AssertionError("blog search did not render matching posts")
+    if "/static/img/blog/seoul-on/seoul-on-cover.svg" not in searched_blog_body:
+        raise AssertionError("SeoulOn search result did not render SeoulOn-specific visual")
     ebook_search_blog = assert_response(client, "/blog/ebook-search-guide")
     ebook_search_body = ebook_search_blog.get_data(as_text=True)
     if "전자도서관 검색과 전자책 통합검색을 빠르게 하는 방법" not in ebook_search_body:

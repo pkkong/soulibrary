@@ -2105,6 +2105,14 @@ body.has-topbar .search-top {
     object-position: top center;
 }
 
+.blog-card-thumb img[src$=".svg"],
+.blog-starter-thumb img[src$=".svg"],
+.blog-visual-strip img[src$=".svg"],
+.blog-post-cover img[src$=".svg"] {
+    object-fit: contain;
+    object-position: center;
+}
+
 .blog-card strong {
     color: #1d1d1f;
     font-size: 16px;
@@ -2696,6 +2704,10 @@ body.has-topbar .search-top {
     margin: 22px auto 28px;
     width: min(100%, 330px);
     max-width: 100%;
+}
+
+.blog-figure-wide {
+    width: min(100%, 680px);
 }
 
 .blog-figure img {

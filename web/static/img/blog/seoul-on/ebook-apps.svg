@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">전자도서관 앱 설치 안내</title>
+  <desc id="desc">교보, YES24, 북큐브, 부커스, 서울시교육청 See처럼 전자책 공급사별 앱이 다를 수 있음을 안내하는 이미지</desc>
+  <rect width="1200" height="760" fill="#f7f7f8"/>
+  <text x="92" y="126" fill="#111827" font-family="Arial, sans-serif" font-size="36" font-weight="850">책은 하나여도 읽는 앱은 다를 수 있습니다</text>
+  <text x="92" y="172" fill="#667085" font-family="Arial, sans-serif" font-size="19">Soulib 상세 화면에서 도서관과 공급사를 확인한 뒤 맞는 앱을 설치하세요.</text>
+  <g transform="translate(92 248)">
+    <rect width="190" height="190" rx="38" fill="#eef2ff" stroke="#d8e0ff"/>
+    <text x="44" y="96" fill="#3730a3" font-family="Arial, sans-serif" font-size="25" font-weight="850">교보</text>
+    <text x="40" y="128" fill="#475467" font-family="Arial, sans-serif" font-size="15">전자도서관</text>
+  </g>
+  <g transform="translate(312 248)">
+    <rect width="190" height="190" rx="38" fill="#fff1f2" stroke="#ffe4e6"/>
+    <text x="42" y="96" fill="#be123c" font-family="Arial, sans-serif" font-size="25" font-weight="850">YES24</text>
+    <text x="40" y="128" fill="#475467" font-family="Arial, sans-serif" font-size="15">전자도서관</text>
+  </g>
+  <g transform="translate(532 248)">
+    <rect width="190" height="190" rx="38" fill="#ecfdf3" stroke="#dcfae6"/>
+    <text x="45" y="96" fill="#047857" font-family="Arial, sans-serif" font-size="25" font-weight="850">북큐브</text>
+    <text x="48" y="128" fill="#475467" font-family="Arial, sans-serif" font-size="15">전자도서관</text>
+  </g>
+  <g transform="translate(752 248)">
+    <rect width="190" height="190" rx="38" fill="#fff7e8" stroke="#fedf89"/>
+    <text x="55" y="96" fill="#b54708" font-family="Arial, sans-serif" font-size="25" font-weight="850">부커스</text>
+    <text x="57" y="128" fill="#475467" font-family="Arial, sans-serif" font-size="15">구독형</text>
+  </g>
+  <g transform="translate(972 248)">
+    <rect width="136" height="190" rx="38" fill="#e6fffb" stroke="#bff3ec"/>
+    <text x="45" y="96" fill="#0f766e" font-family="Arial, sans-serif" font-size="25" font-weight="850">See</text>
+    <text x="31" y="128" fill="#475467" font-family="Arial, sans-serif" font-size="15">교육청</text>
+  </g>
+  <g transform="translate(142 520)">
+    <rect width="916" height="82" rx="28" fill="#ffffff" stroke="#e5e7eb"/>
+    <text x="38" y="36" fill="#111827" font-family="Arial, sans-serif" font-size="20" font-weight="800">순서</text>
+    <text x="102" y="36" fill="#475467" font-family="Arial, sans-serif" font-size="17">책 검색 → 상세 화면에서 공급사 확인 → 해당 앱 설치 → 도서관 계정으로 로그인</text>
+    <text x="102" y="62" fill="#667085" font-family="Arial, sans-serif" font-size="14">쇼핑몰 계정이 아니라 도서관·전자도서관 계정이 필요한 경우가 많습니다.</text>
+  </g>
+</svg>

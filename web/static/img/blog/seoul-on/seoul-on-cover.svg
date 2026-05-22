@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">서울온 앱 설치와 도서관 시설카드 준비 안내</title>
+  <desc id="desc">서울온 설치, 본인 인증, 도서관 시설카드 확인, 전자책 이용 준비 흐름을 보여주는 안내 이미지</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6f8fb"/>
+      <stop offset="1" stop-color="#eef7f1"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#0f172a" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="760" fill="url(#bg)"/>
+  <circle cx="1010" cy="86" r="92" fill="#ffffff" opacity="0.72"/>
+  <circle cx="1088" cy="640" r="170" fill="#dff6e8" opacity="0.55"/>
+  <g transform="translate(86 92)">
+    <rect x="0" y="0" width="482" height="576" rx="44" fill="#ffffff" filter="url(#shadow)"/>
+    <text x="44" y="76" fill="#111827" font-family="Arial, sans-serif" font-size="28" font-weight="800">서울온으로 먼저 준비</text>
+    <text x="44" y="118" fill="#667085" font-family="Arial, sans-serif" font-size="18">서울시 공식 앱에서 본인 인증과 시설카드를 확인합니다.</text>
+    <g transform="translate(44 168)">
+      <rect width="394" height="86" rx="24" fill="#f2f7ff"/>
+      <circle cx="42" cy="43" r="23" fill="#0a84ff"/>
+      <text x="36" y="51" fill="#ffffff" font-family="Arial, sans-serif" font-size="22" font-weight="800">1</text>
+      <text x="82" y="38" fill="#111827" font-family="Arial, sans-serif" font-size="20" font-weight="780">서울온 설치</text>
+      <text x="82" y="64" fill="#667085" font-family="Arial, sans-serif" font-size="15">App Store / Google Play</text>
+    </g>
+    <g transform="translate(44 276)">
+      <rect width="394" height="86" rx="24" fill="#f0fff6"/>
+      <circle cx="42" cy="43" r="23" fill="#18b66a"/>
+      <text x="36" y="51" fill="#ffffff" font-family="Arial, sans-serif" font-size="22" font-weight="800">2</text>
+      <text x="82" y="38" fill="#111827" font-family="Arial, sans-serif" font-size="20" font-weight="780">본인 인증</text>
+      <text x="82" y="64" fill="#667085" font-family="Arial, sans-serif" font-size="15">서울 거주/회원 정보 확인</text>
+    </g>
+    <g transform="translate(44 384)">
+      <rect width="394" height="86" rx="24" fill="#fff7e8"/>
+      <circle cx="42" cy="43" r="23" fill="#ff9f0a"/>
+      <text x="36" y="51" fill="#ffffff" font-family="Arial, sans-serif" font-size="22" font-weight="800">3</text>
+      <text x="82" y="38" fill="#111827" font-family="Arial, sans-serif" font-size="20" font-weight="780">도서관 시설카드</text>
+      <text x="82" y="64" fill="#667085" font-family="Arial, sans-serif" font-size="15">전자책 이용 전 권한 확인</text>
+    </g>
+  </g>
+  <g transform="translate(640 74)" filter="url(#shadow)">
+    <rect x="0" y="0" width="358" height="620" rx="50" fill="#111827"/>
+    <rect x="20" y="22" width="318" height="576" rx="38" fill="#ffffff"/>
+    <rect x="125" y="42" width="88" height="8" rx="4" fill="#d1d5db"/>
+    <text x="54" y="100" fill="#111827" font-family="Arial, sans-serif" font-size="28" font-weight="850">서울온</text>
+    <text x="54" y="130" fill="#667085" font-family="Arial, sans-serif" font-size="14">통합 시민카드와 시설카드</text>
+    <rect x="54" y="164" width="250" height="142" rx="28" fill="#111827"/>
+    <text x="82" y="214" fill="#ffffff" font-family="Arial, sans-serif" font-size="22" font-weight="760">통합 시민카드</text>
+    <text x="82" y="250" fill="#a7f3d0" font-family="Arial, sans-serif" font-size="16">도서관 · 문화 · 체육</text>
+    <rect x="78" y="274" width="110" height="10" rx="5" fill="#ffffff" opacity="0.72"/>
+    <g transform="translate(54 336)">
+      <rect width="250" height="62" rx="18" fill="#f2f4f7"/>
+      <circle cx="35" cy="31" r="17" fill="#18b66a"/>
+      <text x="66" y="27" fill="#111827" font-family="Arial, sans-serif" font-size="16" font-weight="760">시설카드</text>
+      <text x="66" y="48" fill="#667085" font-family="Arial, sans-serif" font-size="13">이용 도서관 확인</text>
+    </g>
+    <g transform="translate(54 416)">
+      <rect width="250" height="62" rx="18" fill="#f2f4f7"/>
+      <circle cx="35" cy="31" r="17" fill="#0a84ff"/>
+      <text x="66" y="27" fill="#111827" font-family="Arial, sans-serif" font-size="16" font-weight="760">전자책 이용</text>
+      <text x="66" y="48" fill="#667085" font-family="Arial, sans-serif" font-size="13">도서관별 로그인 확인</text>
+    </g>
+    <g transform="translate(54 506)">
+      <rect width="74" height="42" rx="14" fill="#eef2ff"/>
+      <text x="17" y="27" fill="#3730a3" font-family="Arial, sans-serif" font-size="14" font-weight="760">교보</text>
+      <rect x="88" width="76" height="42" rx="14" fill="#fff1f2"/>
+      <text x="104" y="27" fill="#be123c" font-family="Arial, sans-serif" font-size="14" font-weight="760">YES24</text>
+      <rect x="178" width="72" height="42" rx="14" fill="#ecfdf3"/>
+      <text x="193" y="27" fill="#047857" font-family="Arial, sans-serif" font-size="14" font-weight="760">북큐브</text>
+    </g>
+  </g>
+  <g transform="translate(912 154)">
+    <rect width="194" height="44" rx="22" fill="#ffffff"/>
+    <text x="25" y="29" fill="#111827" font-family="Arial, sans-serif" font-size="15" font-weight="760">공식 안내 먼저 확인</text>
+    <rect y="64" width="150" height="42" rx="21" fill="#111827"/>
+    <text x="28" y="91" fill="#ffffff" font-family="Arial, sans-serif" font-size="14" font-weight="760">App Store</text>
+    <rect y="122" width="174" height="42" rx="21" fill="#18b66a"/>
+    <text x="26" y="149" fill="#ffffff" font-family="Arial, sans-serif" font-size="14" font-weight="760">Google Play</text>
+  </g>
+</svg>
