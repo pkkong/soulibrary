@@ -49,6 +49,8 @@ def main():
         raise AssertionError("landing page did not render expected markup")
     if "전자도서관 검색" not in landing_body or "전자책 통합검색" not in landing_body:
         raise AssertionError("landing page did not render SEO search copy")
+    if "landing-seo-summary" in landing_body:
+        raise AssertionError("landing page should not render verbose SEO summary")
     if '"@type": "WebSite"' not in landing_body or "SearchAction" not in landing_body:
         raise AssertionError("landing page did not render site search structured data")
 
