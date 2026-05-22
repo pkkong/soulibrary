@@ -1,15 +1,15 @@
 ﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
-    {% set default_meta_description = "전자도서관 검색, 전자책 검색, 이북 검색을 한 번에. Soulib에서 서울 전자도서관의 보유 도서관과 대출 가능 여부를 실시간으로 확인하세요." %}
-    {% set default_og_title = "Soulib - 전자도서관 검색 · 전자책 통합검색" %}
+    {% set default_meta_description = "전자책 검색, 전자도서관 검색. 서울시 전자도서 통합검색에서 교보/YES24 등 공급사와 도서관 보유 현황을 한 번에 확인하세요." %}
+    {% set default_og_title = "서울시 전자도서 통합검색 | 도서관 보유 현황 한눈에" %}
     {% set page_meta_description = meta_description|default(default_meta_description, true) %}
     {% set page_og_title = og_title|default(default_og_title, true) %}
     {% set page_og_description = og_description|default(page_meta_description, true) %}
     {% set page_og_url = og_url|default("https://www.soulib.kr/", true) %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>{% block title %}{{ meta_title|default("Soulib - 전자도서관 검색 · 전자책 통합검색", true) }}{% endblock %}</title>
+    <title>{% block title %}{{ meta_title|default("서울시 전자도서 통합검색", true) }}{% endblock %}</title>
     <meta name="description" content="{{ page_meta_description }}">
     <meta name="keywords" content="전자도서관 검색, 전자책 검색, 전자책 통합검색, 이북 검색, 이북 통합검색, 서울 전자도서관, 교보 전자도서관, YES24 전자도서관, 북큐브 전자도서관">
     <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1">
@@ -17,7 +17,7 @@
     <meta property="og:description" content="{{ page_og_description }}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ page_og_url }}">
-    <meta property="og:site_name" content="Soulib">
+    <meta property="og:site_name" content="서울시 전자도서 통합검색">
     {% if canonical_url %}
     <link rel="canonical" href="{{ canonical_url }}">
     {% endif %}
@@ -48,8 +48,8 @@
     {
         "@context": "https://schema.org",
         "@type": "WebSite",
-        "name": "Soulib",
-        "alternateName": ["서울시 전자도서 통합검색", "전자도서관 검색", "전자책 통합검색", "이북 검색"],
+        "name": "서울시 전자도서 통합검색",
+        "alternateName": ["Soulib", "전자도서관 검색", "전자책 통합검색", "이북 검색"],
         "url": "https://www.soulib.kr/",
         "potentialAction": {
             "@type": "SearchAction",

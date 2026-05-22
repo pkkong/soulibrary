@@ -47,8 +47,12 @@ def main():
     landing_body = landing.get_data(as_text=True)
     if "landing-shell" not in landing_body:
         raise AssertionError("landing page did not render expected markup")
-    if "전자도서관 검색" not in landing_body or "전자책 통합검색" not in landing_body:
-        raise AssertionError("landing page did not render SEO search copy")
+    if "<title>서울시 전자도서 통합검색</title>" not in landing_body:
+        raise AssertionError("landing page title should keep the service name")
+    if "서울 전자도서관 통합검색" not in landing_body:
+        raise AssertionError("landing page should keep the original visible headline")
+    if "Soulib - 전자도서관 검색" in landing_body:
+        raise AssertionError("landing page should not replace the service name with SEO keywords")
     if "landing-seo-summary" in landing_body:
         raise AssertionError("landing page should not render verbose SEO summary")
     if '"@type": "WebSite"' not in landing_body or "SearchAction" not in landing_body:
@@ -58,8 +62,10 @@ def main():
     search_body = search.get_data(as_text=True)
     if "search-page" not in search_body:
         raise AssertionError("search page did not render expected markup")
-    if "전자도서관 검색 - 전자책 통합검색" not in search_body or "이북 검색" not in search_body:
-        raise AssertionError("search page did not render SEO metadata and helper copy")
+    if "<title>검색 - 서울시 전자도서 통합검색</title>" not in search_body:
+        raise AssertionError("search page title should keep the service name")
+    if "책 제목이나 저자를 검색하세요." not in search_body:
+        raise AssertionError("search page should keep the concise empty state")
 
     blog = assert_response(client, "/blog")
     blog_body = blog.get_data(as_text=True)

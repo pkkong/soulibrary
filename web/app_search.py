@@ -378,12 +378,12 @@ def _home_structured_data(canonical_url):
     return {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "Soulib",
+        "name": "서울시 전자도서 통합검색",
         "alternateName": "서울시 전자도서 통합검색",
         "url": canonical_url,
         "applicationCategory": "SearchApplication",
         "operatingSystem": "Web",
-        "description": "전자도서관 검색, 전자책 검색, 이북 검색을 한 번에 확인하는 서울 전자도서관 통합검색 서비스입니다.",
+        "description": "서울의 전자도서관 보유 현황과 대출 가능 여부를 한 번에 확인하는 전자책 통합검색 서비스입니다.",
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "KRW"},
     }
 
@@ -727,10 +727,10 @@ def index():
     seo_pool = get_seo_books()
     seo_badges = random.sample(seo_pool, min(5, len(seo_pool)))
     canonical_url = _public_url("/")
-    meta_title = "Soulib - 전자도서관 검색 · 전자책 통합검색"
+    meta_title = "서울시 전자도서 통합검색"
     meta_description = (
-        "전자도서관 검색, 전자책 검색, 이북 검색을 한 번에. "
-        "Soulib에서 서울 전자도서관의 보유 도서관과 대출 가능 여부를 실시간으로 확인하세요."
+        "전자책 검색, 전자도서관 검색. "
+        "서울시 전자도서 통합검색에서 서울 전자도서관의 보유 도서관과 대출 가능 여부를 확인하세요."
     )
     return render_template(
         "index.html",
@@ -754,7 +754,7 @@ def index():
 
 def search_page():
     canonical_url = _public_url("/search")
-    meta_title = "전자도서관 검색 - 전자책 통합검색 | Soulib"
+    meta_title = "검색 - 서울시 전자도서 통합검색"
     meta_description = (
         "책 제목이나 저자로 전자도서관 보유 현황을 실시간 검색하세요. "
         "교보, YES24, 북큐브, 부커스 등 서울 전자도서관의 전자책과 이북 대출 가능 여부를 확인합니다."

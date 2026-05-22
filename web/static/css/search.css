@@ -840,15 +840,6 @@ body.has-topbar .search-top {
     line-height: 1.45;
 }
 
-.search-empty-state small {
-    display: block;
-    margin-top: -4px;
-    color: #a1a1aa;
-    font-size: 13px;
-    line-height: 1.45;
-    font-weight: 500;
-}
-
 .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .result-message {
     display: flex;
