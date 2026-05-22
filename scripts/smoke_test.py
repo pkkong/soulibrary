@@ -733,6 +733,8 @@ def main():
     hydrated_body = hydrated_detail.get_data(as_text=True)
     if "은평" not in hydrated_body or "강남" in hydrated_body or "/api/live_book_detail" not in hydrated_body:
         raise AssertionError("live detail should render cached partial result before background hydration")
+    if 'data-live-status="1"' in hydrated_body or "도서관에서 확인" not in hydrated_body:
+        raise AssertionError("live detail should not request status when required identifiers are missing")
     if "강남" not in (hydrated_payload.get("groups_html") or "") or "은평" not in (hydrated_payload.get("groups_html") or ""):
         raise AssertionError(f"background live detail hydration did not return complete libraries: {hydrated_payload}")
     complete_cached_body = complete_cached_detail.get_data(as_text=True)
@@ -744,6 +746,8 @@ def main():
         raise AssertionError("uncached live detail should defer subscription library hydration")
     if 'data-service-type="Subscription"' not in (subscription_payload.get("groups_html") or ""):
         raise AssertionError("background live detail did not render subscription service_type")
+    if 'data-live-status="1"' in (subscription_payload.get("groups_html") or "") or "구독형" not in (subscription_payload.get("groups_html") or ""):
+        raise AssertionError("subscription libraries should render without live status polling")
 
     eunpyeong_session = FakeStatusSession(FakeStatusResponse(json_data={
         "data": {

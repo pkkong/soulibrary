@@ -118,6 +118,34 @@ def _status_kind(lib: dict) -> str:
     return ""
 
 
+STATUS_REQUIRED_FIELDS = {
+    "kyobo": ("code", "brcd"),
+    "dobong": ("brcd",),
+    "yes24": ("code", "goods_id"),
+    "bookcube": ("code", "content_id"),
+    "gangnam": ("content_id",),
+    "eunpyeong": ("content_id",),
+    "seoul": ("content_id",),
+    "sen": ("code", "content_id"),
+}
+
+
+def _status_supported(lib: dict) -> bool:
+    if lib.get("service_type") == "Subscription":
+        return False
+    kind = lib.get("status_kind") or _status_kind(lib)
+    required = STATUS_REQUIRED_FIELDS.get(kind)
+    return bool(required and all((lib.get(field) or "").strip() for field in required))
+
+
+def _status_label(lib: dict) -> str:
+    if lib.get("service_type") == "Subscription":
+        return "구독형"
+    if _status_supported(lib):
+        return ""
+    return "도서관에서 확인"
+
+
 def _group_label(lib: dict) -> str:
     kind = lib.get("status_kind") or _status_kind(lib)
     if kind in {"kyobo", "dobong"}:
@@ -141,11 +169,15 @@ def _decorate_live_book(book: dict | None):
     grouped = {}
     for lib in book.get("libraries") or []:
         lib["status_kind"] = _status_kind(lib)
+        lib["status_supported"] = _status_supported(lib)
+        lib["status_label"] = _status_label(lib)
         label = _group_label(lib)
         if label not in grouped:
-            grouped[label] = {"label": label, "libraries": []}
+            grouped[label] = {"label": label, "libraries": [], "pending_status_count": 0}
             groups.append(grouped[label])
         grouped[label]["libraries"].append(lib)
+        if lib["status_supported"]:
+            grouped[label]["pending_status_count"] += 1
     groups.sort(key=lambda group: GROUP_ORDER.get(group.get("label"), 99))
     book["library_groups"] = groups
     return book

@@ -15,7 +15,7 @@
     </div>
     {% endif %}
     {% for group in book.library_groups %}
-    <div class="lib-group-row is-pending">
+    <div class="lib-group-row{% if group.pending_status_count %} is-pending{% endif %}">
         <div class="lib-group-title">{{ group.label }}</div>
         <div class="lib-grid" data-lib-group>
             {% for lib in group.libraries %}
@@ -23,7 +23,9 @@
                href="{{ lib.detail_url or '#' }}"
                target="_blank"
                rel="noopener noreferrer"
+               {% if lib.status_supported %}
                data-live-status="1"
+               {% endif %}
                data-status-kind="{{ lib.status_kind }}"
                data-service-type="{{ lib.service_type }}"
                data-library-code="{{ lib.code }}"
@@ -36,7 +38,7 @@
                data-product-cd="{{ lib.product_cd }}"
                data-category-id="{{ lib.category_id }}">
                 <span class="lib-badge-name">{{ lib.short or lib.name }}</span>
-                <span class="lib-status is-loading" data-status-text aria-label="조회 중..."></span>
+                <span class="lib-status{% if lib.status_supported %} is-loading{% else %} is-muted{% endif %}" data-status-text{% if lib.status_supported %} aria-label="조회 중..."{% endif %}>{{ lib.status_label }}</span>
             </a>
             {% endfor %}
         </div>
