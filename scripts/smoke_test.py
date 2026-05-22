@@ -44,12 +44,20 @@ def main():
     client = app.test_client()
 
     landing = assert_response(client, "/")
-    if "landing-shell" not in landing.get_data(as_text=True):
+    landing_body = landing.get_data(as_text=True)
+    if "landing-shell" not in landing_body:
         raise AssertionError("landing page did not render expected markup")
+    if "전자도서관 검색" not in landing_body or "전자책 통합검색" not in landing_body:
+        raise AssertionError("landing page did not render SEO search copy")
+    if '"@type": "WebSite"' not in landing_body or "SearchAction" not in landing_body:
+        raise AssertionError("landing page did not render site search structured data")
 
     search = assert_response(client, "/search")
-    if "search-page" not in search.get_data(as_text=True):
+    search_body = search.get_data(as_text=True)
+    if "search-page" not in search_body:
         raise AssertionError("search page did not render expected markup")
+    if "전자도서관 검색 - 전자책 통합검색" not in search_body or "이북 검색" not in search_body:
+        raise AssertionError("search page did not render SEO metadata and helper copy")
 
     blog = assert_response(client, "/blog")
     blog_body = blog.get_data(as_text=True)
@@ -71,6 +79,12 @@ def main():
     searched_blog = assert_response(client, f"/blog?blog_q={quote('서울온')}")
     if "서울 전자도서관을 처음 이용할 때 준비할 것" not in searched_blog.get_data(as_text=True):
         raise AssertionError("blog search did not render matching posts")
+    ebook_search_blog = assert_response(client, "/blog/ebook-search-guide")
+    ebook_search_body = ebook_search_blog.get_data(as_text=True)
+    if "전자도서관 검색과 전자책 통합검색을 빠르게 하는 방법" not in ebook_search_body:
+        raise AssertionError("ebook search guide post did not render")
+    if "blog-highlight" not in ebook_search_body or "<strong>" not in ebook_search_body:
+        raise AssertionError("ebook search guide did not render emphasis markup")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
     blog_post_body = blog_post.get_data(as_text=True)

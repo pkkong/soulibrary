@@ -1,6 +1,6 @@
 ﻿{% extends "base.html" %}
 
-{% block title %}검색 - 서울시 전자도서 통합검색{% endblock %}
+{% block title %}{{ meta_title|default("전자도서관 검색 - 전자책 통합검색 | Soulib", true) }}{% endblock %}
 
 {% block body_class %}page-search{% endblock %}
 
@@ -52,7 +52,8 @@
                         <path d="M21 21l-4.3-4.3"></path>
                     </svg>
                 </div>
-                <p>책 제목이나 저자를 검색하세요.</p>
+                <p>전자도서관에서 찾을 책 제목이나 저자를 검색하세요.</p>
+                <small>전자책 검색, 이북 검색, 전자책 통합검색을 실시간으로 확인합니다.</small>
             </div>
             <div id="results" class="grid"></div>
             <button id="load-more" onclick="renderMore()">더 보기</button>

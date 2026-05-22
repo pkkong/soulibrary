@@ -1,22 +1,23 @@
 ﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
-    {% set default_meta_description = "전자책 검색, 전자도서관 검색. 서울시 전자도서 통합검색에서 교보/YES24 등 공급사와 도서관 보유 현황을 한 번에 확인하세요." %}
-    {% set default_og_title = "서울시 전자도서 통합검색 | 도서관 보유 현황 한눈에" %}
+    {% set default_meta_description = "전자도서관 검색, 전자책 검색, 이북 검색을 한 번에. Soulib에서 서울 전자도서관의 보유 도서관과 대출 가능 여부를 실시간으로 확인하세요." %}
+    {% set default_og_title = "Soulib - 전자도서관 검색 · 전자책 통합검색" %}
     {% set page_meta_description = meta_description|default(default_meta_description, true) %}
     {% set page_og_title = og_title|default(default_og_title, true) %}
     {% set page_og_description = og_description|default(page_meta_description, true) %}
     {% set page_og_url = og_url|default("https://www.soulib.kr/", true) %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>{% block title %}{{ meta_title|default("서울시 전자도서 통합검색", true) }}{% endblock %}</title>
+    <title>{% block title %}{{ meta_title|default("Soulib - 전자도서관 검색 · 전자책 통합검색", true) }}{% endblock %}</title>
     <meta name="description" content="{{ page_meta_description }}">
-    <meta name="keywords" content="전자책 검색, 전자도서관 검색, 서울 전자도서관, 전자책 통합검색, 교보 전자도서관, YES24 전자도서관">
+    <meta name="keywords" content="전자도서관 검색, 전자책 검색, 전자책 통합검색, 이북 검색, 이북 통합검색, 서울 전자도서관, 교보 전자도서관, YES24 전자도서관, 북큐브 전자도서관">
+    <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1">
     <meta property="og:title" content="{{ page_og_title }}">
     <meta property="og:description" content="{{ page_og_description }}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ page_og_url }}">
-    <meta property="og:site_name" content="서울시 전자도서 통합검색">
+    <meta property="og:site_name" content="Soulib">
     {% if canonical_url %}
     <link rel="canonical" href="{{ canonical_url }}">
     {% endif %}
@@ -31,7 +32,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png', v='20260512a') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico', v='20260512a') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.8/dist/web/static/pretendard.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css', v='20260522b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css', v='20260522c') }}">
     <meta name="google-site-verification" content="ufWk5RmswC8ZKqrvZg49uBbt6tEZDffAyp-0AG16l9k" />
     <meta name="naver-site-verification" content="f4cb296e8b2fe391bf2b6df997e7445491043c7f" />
     <!-- Google tag (gtag.js) -->
@@ -42,6 +43,20 @@
         gtag('js', new Date());
 
         gtag('config', 'G-WS1N5XY56P');
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Soulib",
+        "alternateName": ["서울시 전자도서 통합검색", "전자도서관 검색", "전자책 통합검색", "이북 검색"],
+        "url": "https://www.soulib.kr/",
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://www.soulib.kr/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+        }
+    }
     </script>
     {% if structured_data %}
     <script type="application/ld+json">{{ structured_data|tojson|safe }}</script>

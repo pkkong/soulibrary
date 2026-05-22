@@ -374,6 +374,20 @@ def _seo_book_structured_data(book, canonical_url):
     return data
 
 
+def _home_structured_data(canonical_url):
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Soulib",
+        "alternateName": "서울시 전자도서 통합검색",
+        "url": canonical_url,
+        "applicationCategory": "SearchApplication",
+        "operatingSystem": "Web",
+        "description": "전자도서관 검색, 전자책 검색, 이북 검색을 한 번에 확인하는 서울 전자도서관 통합검색 서비스입니다.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "KRW"},
+    }
+
+
 def _sitemap_stats():
     now = time.time()
     cached = SITEMAP_CACHE
@@ -712,12 +726,25 @@ if "기타" not in PROVIDER_LABEL_TO_PLATFORMS:
 def index():
     seo_pool = get_seo_books()
     seo_badges = random.sample(seo_pool, min(5, len(seo_pool)))
+    canonical_url = _public_url("/")
+    meta_title = "Soulib - 전자도서관 검색 · 전자책 통합검색"
+    meta_description = (
+        "전자도서관 검색, 전자책 검색, 이북 검색을 한 번에. "
+        "Soulib에서 서울 전자도서관의 보유 도서관과 대출 가능 여부를 실시간으로 확인하세요."
+    )
     return render_template(
         "index.html",
         seo_books=seo_badges,
         show_topbar=False,
         topbar_desc="",
         active_tab="home",
+        canonical_url=canonical_url,
+        meta_title=meta_title,
+        meta_description=meta_description,
+        og_title=meta_title,
+        og_description=meta_description,
+        og_url=canonical_url,
+        structured_data=_home_structured_data(canonical_url),
     )
 
 
@@ -726,6 +753,12 @@ def index():
 
 
 def search_page():
+    canonical_url = _public_url("/search")
+    meta_title = "전자도서관 검색 - 전자책 통합검색 | Soulib"
+    meta_description = (
+        "책 제목이나 저자로 전자도서관 보유 현황을 실시간 검색하세요. "
+        "교보, YES24, 북큐브, 부커스 등 서울 전자도서관의 전자책과 이북 대출 가능 여부를 확인합니다."
+    )
     return render_template(
         "search.html",
         library_count=len(LIBRARIES),
@@ -734,6 +767,12 @@ def search_page():
         show_topbar=False,
         topbar_desc="",
         active_tab="search",
+        canonical_url=canonical_url,
+        meta_title=meta_title,
+        meta_description=meta_description,
+        og_title=meta_title,
+        og_description=meta_description,
+        og_url=canonical_url,
     )
 
 
