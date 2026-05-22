@@ -1817,6 +1817,11 @@ body.has-topbar .search-top {
     box-shadow: 0 18px 48px rgba(17, 24, 39, 0.14);
 }
 
+.blog-nav-disclosure:not([open]) > .blog-local-search,
+.blog-nav-disclosure:not([open]) > .blog-menu-dropdown {
+    display: none;
+}
+
 .blog-menu-dropdown {
     display: grid;
     gap: 4px;
@@ -2576,6 +2581,10 @@ body.has-topbar .search-top {
     .blog-feature-steps {
         grid-template-columns: 1fr 1fr;
     }
+    .blog-feature-steps span {
+        min-height: 48px;
+        padding: 10px 12px;
+    }
     .blog-category-grid {
         grid-template-columns: 1fr;
     }
@@ -2602,6 +2611,13 @@ body.has-topbar .search-top {
 
 .blog-comments {
     margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid #f2f2f7;
+}
+
+.blog-related {
+    max-width: 720px;
+    margin: 34px auto 0;
     padding-top: 22px;
     border-top: 1px solid #f2f2f7;
 }

@@ -792,6 +792,18 @@ def _blog_post_response(post, comment_error="", saved_comment=None, status_code=
     comments_notice = ""
     blog_posts = get_blog_posts()
     categories = get_blog_categories(blog_posts)
+    related_posts = [
+        item
+        for item in blog_posts
+        if item.get("slug") != post.get("slug") and item.get("category_slug") == post.get("category_slug")
+    ][:2]
+    if len(related_posts) < 2:
+        related_posts.extend(
+            item
+            for item in blog_posts
+            if item.get("slug") != post.get("slug") and item not in related_posts
+        )
+    related_posts = related_posts[:2]
     try:
         comments = get_blog_comments(post["slug"])
     except Exception as exc:
@@ -814,6 +826,7 @@ def _blog_post_response(post, comment_error="", saved_comment=None, status_code=
         active_blog_category="",
         active_category_title="",
         active_category_info=None,
+        related_posts=related_posts,
         comments=comments,
         comments_unavailable=comments_unavailable,
         comments_notice=comments_notice,

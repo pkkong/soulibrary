@@ -9,7 +9,7 @@
 
     {% if active_category_info or blog_query %}
     <section class="blog-context-hero" aria-labelledby="blog-context-title">
-        <p class="blog-kicker">{% if blog_query %}Search{% else %}Category{% endif %}</p>
+        <p class="blog-kicker">{% if blog_query %}검색{% else %}주제{% endif %}</p>
         <h1 id="blog-context-title">
             {% if blog_query %}"{{ blog_query }}" 검색 결과{% else %}{{ active_category_info.title }}{% endif %}
         </h1>
@@ -24,14 +24,16 @@
         </p>
         <div class="blog-context-actions">
             <a href="/blog">전체 글 보기</a>
-            {% if active_category_info and active_category_info.latest %}
-            <a href="/blog/{{ active_category_info.latest.slug }}">먼저 읽을 글</a>
+            {% if active_category_info and active_category_info.slug == "guide" and guide_post %}
+            <a href="/blog/{{ guide_post.slug }}">처음 읽을 글</a>
+            {% elif active_category_info and active_category_info.latest %}
+            <a href="/blog/{{ active_category_info.latest.slug }}">처음 읽을 글</a>
             {% endif %}
         </div>
     </section>
     {% else %}
     <section class="blog-home-hero" aria-labelledby="blog-title">
-        <p class="blog-kicker">Soulib Blog</p>
+        <p class="blog-kicker">Soulib 블로그</p>
         <h1 id="blog-title"><span>전자책을 더 잘 찾고</span> <span>읽는 방법</span></h1>
         <p>Soulib 이용 안내와 서울시 전자도서관에서 찾아볼 만한 책 추천을 정리합니다.</p>
     </section>
@@ -59,14 +61,14 @@
 
     <section class="blog-more" aria-labelledby="blog-more-title">
         <div class="blog-section-head">
-            <p class="blog-kicker">Articles</p>
+            <p class="blog-kicker">글 목록</p>
             <h2 id="blog-more-title">
                 {% if blog_query %}검색 결과{% elif active_category_title %}{{ active_category_title }} 글{% else %}최근 글{% endif %}
             </h2>
             {% if blog_query %}
             <p class="blog-section-note">"{{ blog_query }}"에 대한 글을 보여줍니다.</p>
             {% elif active_category_title %}
-            <p class="blog-section-note"><a href="/blog">전체 글 보기</a></p>
+            <p class="blog-section-note">{{ active_category_info.count }}편의 글이 있습니다.</p>
             {% endif %}
         </div>
 
@@ -84,6 +86,8 @@
             <div class="blog-empty">
                 {% if active_category_info and active_category_info.slug == "recommendations" %}
                 책 추천 글을 준비 중입니다. 신간, 베스트셀러, 주제별 추천을 차례로 추가하겠습니다.
+                {% elif blog_query %}
+                아직 맞는 글이 없습니다. 서울온, 대출, 앱, 도서관처럼 더 짧은 단어로 다시 검색해보세요.
                 {% else %}
                 조건에 맞는 글이 없습니다.
                 {% endif %}
@@ -94,7 +98,7 @@
 
     <section class="blog-category-section" aria-labelledby="blog-category-title">
         <div class="blog-section-head">
-            <p class="blog-kicker">Topics</p>
+            <p class="blog-kicker">주제</p>
             <h2 id="blog-category-title">{% if active_category_info or blog_query %}다른 주제 보기{% else %}주제별 보기{% endif %}</h2>
         </div>
         <div class="blog-category-grid">

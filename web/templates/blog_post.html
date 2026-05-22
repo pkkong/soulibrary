@@ -8,7 +8,7 @@
     {% include "partials/blog_nav.html" %}
 
     <header class="blog-post-head">
-        <a class="blog-back" href="/blog">블로그</a>
+        <a class="blog-back" href="/blog">글 목록</a>
         <p class="blog-card-meta">
             <span>{{ post.category }}</span>
             {% if post.date_label %}<time datetime="{{ post.date }}">{{ post.date_label }}</time>{% endif %}
@@ -20,6 +20,26 @@
     <div class="blog-body">
         {{ post.html|safe }}
     </div>
+
+    {% if related_posts %}
+    <section class="blog-related" aria-labelledby="blog-related-title">
+        <div class="blog-comments-head">
+            <h2 id="blog-related-title">함께 읽기</h2>
+        </div>
+        <div class="blog-list">
+            {% for item in related_posts %}
+            <a class="blog-card" href="/blog/{{ item.slug }}">
+                <span class="blog-card-meta">
+                    <span>{{ item.category }}</span>
+                    {% if item.date_label %}<time datetime="{{ item.date }}">{{ item.date_label }}</time>{% endif %}
+                </span>
+                <strong>{{ item.title }}</strong>
+                {% if item.description %}<small>{{ item.description }}</small>{% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 
     <section class="blog-comments" aria-labelledby="blog-comments-title">
         <div class="blog-comments-head">

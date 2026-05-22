@@ -1,6 +1,6 @@
-<nav class="blog-local-nav" aria-label="블로그 메뉴">
+<nav class="blog-local-nav" aria-label="블로그 상단 메뉴">
     <div class="blog-local-head">
-        <a class="blog-local-brand" href="/blog">Soulib Blog</a>
+        <a class="blog-local-brand" href="/blog">Soulib 블로그</a>
         <div class="blog-local-actions">
             <details class="blog-nav-disclosure blog-search-panel"{% if blog_query %} open{% endif %}>
                 <summary class="blog-icon-button{% if blog_query %} is-active{% endif %}" aria-label="블로그 검색" title="검색">
@@ -15,7 +15,7 @@
                 </form>
             </details>
             <details class="blog-nav-disclosure blog-menu-panel">
-                <summary class="blog-icon-button{% if active_blog_category %} is-active{% endif %}" aria-label="블로그 메뉴" title="메뉴">
+                <summary class="blog-icon-button{% if active_blog_category %} is-active{% endif %}" aria-label="주제 메뉴" title="메뉴">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
                         <path d="M4 7h16"></path>
                         <path d="M4 12h16"></path>
@@ -27,7 +27,7 @@
                     {% for category in categories %}
                     <a class="{% if active_blog_category == category.slug %}is-active{% endif %}" href="/blog?category={{ category.slug }}">
                         <span>{{ category.title }}</span>
-                        <small>{{ category.count }}편{% if category.count == 0 %} · 준비 중{% endif %}</small>
+                        <small>{% if category.count %}{{ category.count }}편{% else %}준비 중{% endif %}</small>
                     </a>
                     {% endfor %}
                 </div>
@@ -43,6 +43,15 @@
     var panels = Array.prototype.slice.call(nav.querySelectorAll(".blog-nav-disclosure"));
 
     panels.forEach(function (panel) {
+        var summary = panel.querySelector("summary");
+        if (summary) {
+            summary.addEventListener("click", function () {
+                if (panel.open) return;
+                panels.forEach(function (other) {
+                    if (other !== panel) other.open = false;
+                });
+            });
+        }
         panel.addEventListener("toggle", function () {
             if (!panel.open) return;
             panels.forEach(function (other) {
