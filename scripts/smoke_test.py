@@ -73,8 +73,8 @@ def main():
         raise AssertionError("blog page did not render expected markup")
     if "blog-local-nav" not in blog_body or "blog-local-search" not in blog_body or "blog-menu-dropdown" not in blog_body:
         raise AssertionError("blog page did not render local navigation and search")
-    if "처음이라면 사용법부터" not in blog_body:
-        raise AssertionError("blog page did not render featured guide")
+    if "이 순서로 시작하세요" not in blog_body or "blog-starter-item" not in blog_body:
+        raise AssertionError("blog page did not render starter guide links")
     if blog_body.find("blog-more") > blog_body.find("blog-category-section"):
         raise AssertionError("blog article list should render before topic cards")
     guide_blog = assert_response(client, "/blog?category=guide")

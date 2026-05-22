@@ -4,7 +4,7 @@
 {% block body_class %}page-blog{% endblock %}
 
 {% block content %}
-<main class="blog-shell blog-home">
+<div class="blog-shell blog-home">
     {% include "partials/blog_nav.html" %}
 
     {% if active_category_info or blog_query %}
@@ -39,22 +39,22 @@
     </section>
     {% endif %}
 
-    {% if guide_post and not active_category_info and not blog_query %}
-    <section class="blog-feature" aria-labelledby="blog-feature-title">
-        <div>
-            <p class="blog-card-meta">
-                <span>{{ guide_post.category }}</span>
-                {% if guide_post.date_label %}<time datetime="{{ guide_post.date }}">{{ guide_post.date_label }}</time>{% endif %}
-            </p>
-            <h2 id="blog-feature-title">처음이라면 사용법부터</h2>
-            <p>{{ guide_post.description }}</p>
-            <a class="blog-feature-link" href="/blog/{{ guide_post.slug }}">가이드 읽기</a>
+    {% if starter_posts and not active_category_info and not blog_query %}
+    <section class="blog-starter" aria-labelledby="blog-starter-title">
+        <div class="blog-section-head">
+            <p class="blog-kicker">처음이라면</p>
+            <h2 id="blog-starter-title">이 순서로 시작하세요</h2>
         </div>
-        <div class="blog-feature-steps" aria-label="Soulib 사용 흐름">
-            <span>검색</span>
-            <span>보유처 확인</span>
-            <span>내 서재</span>
-            <span>오류 신고</span>
+        <div class="blog-starter-list">
+            {% for item in starter_posts %}
+            <a class="blog-starter-item" href="/blog/{{ item.slug }}">
+                <span>{{ loop.index }}</span>
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    {% if item.description %}<small>{{ item.description }}</small>{% endif %}
+                </div>
+            </a>
+            {% endfor %}
         </div>
     </section>
     {% endif %}
@@ -113,5 +113,5 @@
             {% endfor %}
         </div>
     </section>
-</main>
+</div>
 {% endblock %}

@@ -56,6 +56,17 @@
         return !!(link && link.classList && link.classList.contains("nav-item-search") && isSearchUrl(link.href));
     }
 
+    function isOnSearchPage() {
+        return window.location.pathname === SEARCH_PATH;
+    }
+
+    function focusSearchPageInput() {
+        const input = document.getElementById("query");
+        if (!input) return false;
+        closeQuickSearch();
+        return focusInput(input);
+    }
+
     function syncReportLinks() {
         document.querySelectorAll('a[href="/reports"], a.nav-item-report').forEach(link => {
             if (isReportUrl(link.href)) {
@@ -168,6 +179,9 @@
         if (link.hasAttribute("download")) return;
         if (isSearchNavLink(link)) {
             event.preventDefault();
+            if (isOnSearchPage() && focusSearchPageInput()) {
+                return;
+            }
             openQuickSearch();
             return;
         }

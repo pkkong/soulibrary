@@ -609,13 +609,21 @@ function openFilterSheet(type) {
     renderSheetOptions(currentSheet);
 
     // temp selection applies only on confirm
-    document.getElementById("sheet-overlay").classList.add("show");
-    document.getElementById("filter-sheet").classList.add("show");
+    const overlay = document.getElementById("sheet-overlay");
+    const sheet = document.getElementById("filter-sheet");
+    overlay.classList.add("show");
+    sheet.classList.add("show");
+    sheet.setAttribute("aria-hidden", "false");
+    sheet.removeAttribute("inert");
 }
 
 function closeSheet() {
-    document.getElementById("sheet-overlay").classList.remove("show");
-    document.getElementById("filter-sheet").classList.remove("show");
+    const overlay = document.getElementById("sheet-overlay");
+    const sheet = document.getElementById("filter-sheet");
+    overlay.classList.remove("show");
+    sheet.classList.remove("show");
+    sheet.setAttribute("aria-hidden", "true");
+    sheet.setAttribute("inert", "");
     currentSheet = null;
 }
 

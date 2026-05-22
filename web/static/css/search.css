@@ -418,9 +418,9 @@ body.has-topbar .app-main {
 }
 
 .landing-search button {
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
     border: 0;
     border-radius: 999px;
     background: #1d1d1f;
@@ -747,16 +747,23 @@ body.has-topbar .search-top {
 
 .filter-sheet {
     position: fixed;
-    left: 0; right: 0; bottom: -100%;
+    left: 0; right: 0; bottom: 0;
     background: var(--panel);
     border-radius: 24px 24px 0 0;
     box-shadow: 0 -18px 40px rgba(0,0,0,0.16);
     padding: 16px;
     z-index: 200;
-    transition: bottom 0.2s ease;
+    transition: transform 0.2s ease, visibility 0.2s ease;
+    transform: translateY(105%);
+    visibility: hidden;
+    pointer-events: none;
     max-height: 70vh;
 }
-.filter-sheet.show { bottom: 0; }
+.filter-sheet.show {
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+}
 .sheet-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
 .sheet-body { display:flex; gap:10px; min-height: 42vh; }
 .sheet-left {
@@ -1784,9 +1791,9 @@ body.has-topbar .search-top {
 }
 
 .blog-icon-button {
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2029,7 +2036,7 @@ body.has-topbar .search-top {
 
 .blog-card {
     min-width: 0;
-    min-height: 96px;
+    min-height: 88px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -2099,15 +2106,15 @@ body.has-topbar .search-top {
 
 .blog-home-hero {
     min-width: 0;
-    padding: 32px 0 24px;
+    padding: 24px 0 20px;
     border-bottom: 1px solid #f2f2f7;
 }
 
 .blog-home-hero h1 {
-    max-width: 760px;
+    max-width: 720px;
     margin: 0;
     color: #1d1d1f;
-    font-size: 42px;
+    font-size: 38px;
     line-height: 1.1;
     font-weight: 780;
     letter-spacing: 0;
@@ -2119,10 +2126,10 @@ body.has-topbar .search-top {
 }
 
 .blog-home-hero p:last-child {
-    max-width: 680px;
+    max-width: 620px;
     margin: 12px 0 0;
     color: #6e6e73;
-    font-size: 18px;
+    font-size: 17px;
     line-height: 1.55;
     font-weight: 450;
     overflow-wrap: anywhere;
@@ -2240,7 +2247,7 @@ body.has-topbar .search-top {
     min-height: 58px;
     display: flex;
     align-items: center;
-    border-radius: 16px;
+    border-radius: 14px;
     background: #f2f2f7;
     color: #1d1d1f;
     padding: 12px;
@@ -2250,8 +2257,72 @@ body.has-topbar .search-top {
     overflow-wrap: anywhere;
 }
 
+.blog-starter {
+    margin-top: 18px;
+    padding: 18px 0 20px;
+    border-bottom: 1px solid #f2f2f7;
+}
+
+.blog-starter-list {
+    display: grid;
+    gap: 8px;
+}
+
+.blog-starter-item {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    border: 1px solid #f2f2f7;
+    border-radius: 14px;
+    background: #ffffff;
+    color: #1d1d1f;
+    padding: 12px;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.blog-starter-item:hover,
+.blog-starter-item:active {
+    background: #fbfbfd;
+    border-color: #e5e5ea;
+}
+
+.blog-starter-item > span {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #f2f2f7;
+    color: #1d1d1f;
+    font-size: 13px;
+    font-weight: 760;
+}
+
+.blog-starter-item strong {
+    display: block;
+    color: #1d1d1f;
+    font-size: 15px;
+    line-height: 1.32;
+    font-weight: 740;
+    overflow-wrap: anywhere;
+}
+
+.blog-starter-item small {
+    display: block;
+    margin-top: 3px;
+    color: #6e6e73;
+    font-size: 13px;
+    line-height: 1.42;
+    font-weight: 520;
+    overflow-wrap: anywhere;
+}
+
 .blog-category-section {
-    margin-top: 34px;
+    margin-top: 28px;
 }
 
 .blog-section-head {
@@ -2526,6 +2597,16 @@ body.has-topbar .search-top {
     box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
 }
 
+.blog-figure-tall {
+    width: min(100%, 320px);
+}
+
+.blog-figure-tall img {
+    height: min(560px, 68svh);
+    object-fit: cover;
+    object-position: top center;
+}
+
 .blog-figure figcaption {
     margin-top: 9px;
     color: #6e6e73;
@@ -2536,9 +2617,7 @@ body.has-topbar .search-top {
 
 .blog-more {
     max-width: none;
-    margin: 44px 0 0;
-    padding-top: 26px;
-    border-top: 1px solid #f2f2f7;
+    margin: 28px 0 0;
 }
 
 .blog-more-head {
@@ -2567,10 +2646,10 @@ body.has-topbar .search-top {
         margin-right: -4px;
     }
     .blog-home-hero {
-        padding-top: 22px;
+        padding-top: 18px;
     }
     .blog-home-hero h1 {
-        font-size: 36px;
+        font-size: 32px;
         max-width: 360px;
     }
     .blog-home-hero h1 span {
@@ -2600,6 +2679,18 @@ body.has-topbar .search-top {
         min-height: 48px;
         padding: 10px 12px;
     }
+    .blog-starter {
+        padding-top: 16px;
+    }
+    .blog-starter-item {
+        grid-template-columns: 30px minmax(0, 1fr);
+        gap: 10px;
+        padding: 11px 12px;
+    }
+    .blog-starter-item > span {
+        width: 30px;
+        height: 30px;
+    }
     .blog-category-grid {
         grid-template-columns: 1fr;
     }
@@ -2621,6 +2712,15 @@ body.has-topbar .search-top {
     }
     .blog-guide-overview {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .blog-figure {
+        margin: 18px auto 22px;
+    }
+    .blog-figure-tall {
+        width: min(100%, 300px);
+    }
+    .blog-figure-tall img {
+        height: min(500px, 64svh);
     }
 }
 
@@ -3193,9 +3293,9 @@ body.has-topbar .search-top {
 .shelf-icon-button,
 .shelf-remove-button,
 .shelf-danger-lite {
-    width: 34px;
-    min-width: 34px;
-    min-height: 34px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
     border: 0;
     border-radius: 999px;
     padding: 0;
@@ -3220,9 +3320,9 @@ body.has-topbar .search-top {
 
 .shelf-remove-button {
     justify-self: center;
-    width: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
 }
 
 .shelf-remove-button:hover,
@@ -3324,7 +3424,7 @@ body.has-topbar .search-top {
     width: 100%;
     max-width: var(--app-shell-w);
     margin: 0 auto;
-    padding: calc(18px + env(safe-area-inset-top)) 16px 24px;
+    padding: calc(18px + env(safe-area-inset-top)) 16px calc(42px + env(safe-area-inset-bottom));
 }
 
 .reports-head {

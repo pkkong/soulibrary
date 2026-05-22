@@ -4,7 +4,6 @@ import re
 import json
 import secrets
 import traceback
-import random
 from urllib.parse import urlencode
 
 from db import get_db, using_postgres
@@ -724,8 +723,6 @@ if "기타" not in PROVIDER_LABEL_TO_PLATFORMS:
 
 @app.route('/')
 def index():
-    seo_pool = get_seo_books()
-    seo_badges = random.sample(seo_pool, min(5, len(seo_pool)))
     canonical_url = _public_url("/")
     meta_title = "서울시 전자도서 통합검색"
     meta_description = (
@@ -734,7 +731,6 @@ def index():
     )
     return render_template(
         "index.html",
-        seo_books=seo_badges,
         show_topbar=False,
         topbar_desc="",
         active_tab="home",
@@ -780,6 +776,15 @@ def search_page():
 def blog_page():
     all_posts = get_blog_posts()
     guide_post = get_blog_post("soulib-guide")
+    starter_posts = [
+        post
+        for post in [
+            get_blog_post("seoul-on-library-guide"),
+            get_blog_post("soulib-guide"),
+            get_blog_post("ebook-library-status-guide"),
+        ]
+        if post
+    ]
     categories = get_blog_categories(all_posts)
     category_slugs = {category["slug"] for category in categories}
     active_category = re.sub(r"[^0-9A-Za-z_-]", "", request.args.get("category") or "")
@@ -809,6 +814,7 @@ def blog_page():
     return render_template(
         "blog.html",
         guide_post=guide_post,
+        starter_posts=starter_posts,
         posts=posts,
         categories=categories,
         blog_query=blog_query,
