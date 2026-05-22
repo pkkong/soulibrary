@@ -80,7 +80,11 @@ def _inline(text):
             return label
         return f'<a href="{url}" target="_blank" rel="noopener">{label}</a>'
 
-    return re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, escaped)
+    rendered = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", replace_link, escaped)
+    rendered = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", rendered)
+    rendered = re.sub(r"__(.+?)__", r"<strong>\1</strong>", rendered)
+    rendered = re.sub(r"==(.+?)==", r'<mark class="blog-highlight">\1</mark>', rendered)
+    return rendered
 
 
 @lru_cache(maxsize=64)

@@ -2495,6 +2495,20 @@ body.has-topbar .search-top {
     text-decoration: none;
 }
 
+.blog-body strong {
+    color: #111827;
+    font-weight: 760;
+}
+
+.blog-body mark.blog-highlight {
+    color: inherit;
+    background: linear-gradient(transparent 48%, rgba(255, 214, 10, 0.34) 48%);
+    border-radius: 4px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    padding: 0 2px;
+}
+
 .blog-figure {
     margin: 22px auto 28px;
     width: min(100%, 330px);
