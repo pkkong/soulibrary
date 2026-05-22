@@ -100,7 +100,7 @@ def main():
         raise AssertionError("blog post page did not render expected markup")
     if "함께 읽기" not in blog_post_body or blog_post_body.find("blog-related") > blog_post_body.find("blog-comments"):
         raise AssertionError("blog post page should render related posts before comments")
-    if "blog-figure" not in blog_post_body or "/static/img/blog/soulib-guide/home.png" not in blog_post_body:
+    if "blog-figure-tall" not in blog_post_body or "/static/img/blog/soulib-guide/home.png" not in blog_post_body:
         raise AssertionError("blog post did not render guide screenshots")
 
     original_blog_get = blog_comments.requests.get
