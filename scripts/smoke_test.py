@@ -75,6 +75,8 @@ def main():
         raise AssertionError("blog page did not render local navigation and search")
     if "이 순서로 시작하세요" not in blog_body or "blog-starter-item" not in blog_body:
         raise AssertionError("blog page did not render starter guide links")
+    if "blog-visual-strip" not in blog_body or "blog-card-thumb" not in blog_body:
+        raise AssertionError("blog page did not render visual screenshots")
     if blog_body.find("blog-more") > blog_body.find("blog-category-section"):
         raise AssertionError("blog article list should render before topic cards")
     guide_blog = assert_response(client, "/blog?category=guide")
@@ -93,11 +95,15 @@ def main():
         raise AssertionError("ebook search guide post did not render")
     if "blog-highlight" not in ebook_search_body or "<strong>" not in ebook_search_body:
         raise AssertionError("ebook search guide did not render emphasis markup")
+    if "/static/img/blog/soulib-guide/search-project-hail-mary.png" not in ebook_search_body:
+        raise AssertionError("ebook search guide did not render search screenshot")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
     blog_post_body = blog_post.get_data(as_text=True)
     if "blog-body" not in blog_post_body or "blog-comment-form" not in blog_post_body:
         raise AssertionError("blog post page did not render expected markup")
+    if "blog-post-cover" not in blog_post_body:
+        raise AssertionError("blog post page did not render cover image")
     if "함께 읽기" not in blog_post_body or blog_post_body.find("blog-related") > blog_post_body.find("blog-comments"):
         raise AssertionError("blog post page should render related posts before comments")
     if "blog-figure-tall" not in blog_post_body or "/static/img/blog/soulib-guide/home.png" not in blog_post_body:

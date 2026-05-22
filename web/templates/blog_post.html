@@ -17,6 +17,12 @@
         {% if post.description %}<p>{{ post.description }}</p>{% endif %}
     </header>
 
+    {% if post.image %}
+    <figure class="blog-post-cover">
+        <img src="{{ post.image }}" alt="{{ post.image_alt }}" loading="eager">
+    </figure>
+    {% endif %}
+
     <div class="blog-body">
         {{ post.html|safe }}
     </div>

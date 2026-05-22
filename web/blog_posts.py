@@ -53,6 +53,13 @@ def _category_for(meta):
     return category_slug, category_title
 
 
+def _safe_image(value):
+    url = _clean(value)
+    if url.startswith("/static/") or re.match(r"^https?://", url):
+        return url
+    return ""
+
+
 def _parse_frontmatter(text):
     if not text.startswith("---\n"):
         return {}, text
@@ -186,6 +193,8 @@ def _load_post(path):
         "slug": slug,
         "title": title,
         "description": _clean(meta.get("description")),
+        "image": _safe_image(meta.get("image")),
+        "image_alt": _clean(meta.get("image_alt")) or title,
         "category": category_title,
         "category_slug": category_slug,
         "date": _clean(meta.get("date")),

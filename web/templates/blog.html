@@ -34,8 +34,25 @@
     {% else %}
     <section class="blog-home-hero" aria-labelledby="blog-title">
         <p class="blog-kicker">Soulib 블로그</p>
-        <h1 id="blog-title"><span>전자책을 더 잘 찾고</span> <span>읽는 방법</span></h1>
-        <p>Soulib 이용 안내와 서울시 전자도서관에서 찾아볼 만한 책 추천을 정리합니다.</p>
+        <h1 id="blog-title"><span>서울 전자책을</span> <span>더 쉽게 찾는 법</span></h1>
+        <p>검색부터 서울온 준비, 내 서재까지 실제 화면과 함께 정리합니다.</p>
+    </section>
+    {% endif %}
+
+    {% if not active_category_info and not blog_query %}
+    <section class="blog-visual-strip" aria-label="Soulib 주요 화면">
+        <figure>
+            <img src="{{ url_for('static', filename='img/blog/soulib-guide/home.png') }}" alt="Soulib 홈 검색 화면" loading="lazy">
+            <figcaption>홈 검색</figcaption>
+        </figure>
+        <figure>
+            <img src="{{ url_for('static', filename='img/blog/soulib-guide/detail-project-hail-mary.png') }}" alt="도서관별 보유 현황 상세 화면" loading="lazy">
+            <figcaption>보유처 확인</figcaption>
+        </figure>
+        <figure>
+            <img src="{{ url_for('static', filename='img/blog/soulib-guide/my-shelf.png') }}" alt="내 서재 화면" loading="lazy">
+            <figcaption>내 서재</figcaption>
+        </figure>
     </section>
     {% endif %}
 
@@ -48,8 +65,15 @@
         <div class="blog-starter-list">
             {% for item in starter_posts %}
             <a class="blog-starter-item" href="/blog/{{ item.slug }}">
-                <span>{{ loop.index }}</span>
+                {% if item.image %}
+                <span class="blog-starter-thumb">
+                    <img src="{{ item.image }}" alt="" loading="lazy">
+                </span>
+                {% else %}
+                <span class="blog-starter-number">{{ loop.index }}</span>
+                {% endif %}
                 <div>
+                    <span class="blog-starter-order">{{ loop.index }}</span>
                     <strong>{{ item.title }}</strong>
                     {% if item.description %}<small>{{ item.description }}</small>{% endif %}
                 </div>
@@ -74,13 +98,20 @@
 
         <div class="blog-list" aria-label="블로그 글 목록">
             {% for post in posts %}
-            <a class="blog-card" href="/blog/{{ post.slug }}">
-                <span class="blog-card-meta">
-                    <span>{{ post.category }}</span>
-                    {% if post.date_label %}<time datetime="{{ post.date }}">{{ post.date_label }}</time>{% endif %}
+            <a class="blog-card{% if post.image %} has-thumb{% endif %}" href="/blog/{{ post.slug }}">
+                {% if post.image %}
+                <span class="blog-card-thumb">
+                    <img src="{{ post.image }}" alt="" loading="lazy">
                 </span>
-                <strong>{{ post.title }}</strong>
-                {% if post.description %}<small>{{ post.description }}</small>{% endif %}
+                {% endif %}
+                <span class="blog-card-copy">
+                    <span class="blog-card-meta">
+                        <span>{{ post.category }}</span>
+                        {% if post.date_label %}<time datetime="{{ post.date }}">{{ post.date_label }}</time>{% endif %}
+                    </span>
+                    <strong>{{ post.title }}</strong>
+                    {% if post.description %}<small>{{ post.description }}</small>{% endif %}
+                </span>
             </a>
             {% else %}
             <div class="blog-empty">
