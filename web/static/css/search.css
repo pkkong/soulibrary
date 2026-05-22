@@ -1771,7 +1771,7 @@ body.has-topbar .search-top {
 }
 
 .blog-nav-disclosure {
-    position: relative;
+    position: static;
 }
 
 .blog-nav-disclosure > summary {
@@ -2088,7 +2088,7 @@ body.has-topbar .search-top {
 }
 
 .blog-home {
-    max-width: 980px;
+    max-width: 860px;
 }
 
 .blog-home-hero {
@@ -2515,8 +2515,8 @@ body.has-topbar .search-top {
 }
 
 .blog-more {
-    max-width: 720px;
-    margin: 44px auto 0;
+    max-width: none;
+    margin: 44px 0 0;
     padding-top: 26px;
     border-top: 1px solid #f2f2f7;
 }

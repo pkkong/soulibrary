@@ -44,7 +44,7 @@
                 <span>{{ guide_post.category }}</span>
                 {% if guide_post.date_label %}<time datetime="{{ guide_post.date }}">{{ guide_post.date_label }}</time>{% endif %}
             </p>
-            <h2 id="blog-feature-title">처음이라면 Soulib 사용법부터</h2>
+            <h2 id="blog-feature-title">처음이라면 사용법부터</h2>
             <p>{{ guide_post.description }}</p>
             <a class="blog-feature-link" href="/blog/{{ guide_post.slug }}">가이드 읽기</a>
         </div>
@@ -57,27 +57,9 @@
     </section>
     {% endif %}
 
-    <section class="blog-category-section" aria-labelledby="blog-category-title">
-        <div class="blog-section-head">
-            <p class="blog-kicker">Topics</p>
-            <h2 id="blog-category-title">주제별 보기</h2>
-        </div>
-        <div class="blog-category-grid">
-            {% for category in categories %}
-            <a class="blog-category-card{% if category.count == 0 %} is-empty{% endif %}" id="category-{{ category.slug }}" href="/blog?category={{ category.slug }}">
-                <div>
-                    <strong>{{ category.title }}</strong>
-                    <small>{{ category.description }}</small>
-                </div>
-                <span>{% if category.count %}{{ category.count }}편{% else %}준비 중{% endif %}</span>
-            </a>
-            {% endfor %}
-        </div>
-    </section>
-
     <section class="blog-more" aria-labelledby="blog-more-title">
         <div class="blog-section-head">
-            <p class="blog-kicker">Latest</p>
+            <p class="blog-kicker">Articles</p>
             <h2 id="blog-more-title">
                 {% if blog_query %}검색 결과{% elif active_category_title %}{{ active_category_title }} 글{% else %}최근 글{% endif %}
             </h2>
@@ -106,6 +88,24 @@
                 조건에 맞는 글이 없습니다.
                 {% endif %}
             </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="blog-category-section" aria-labelledby="blog-category-title">
+        <div class="blog-section-head">
+            <p class="blog-kicker">Topics</p>
+            <h2 id="blog-category-title">{% if active_category_info or blog_query %}다른 주제 보기{% else %}주제별 보기{% endif %}</h2>
+        </div>
+        <div class="blog-category-grid">
+            {% for category in categories %}
+            <a class="blog-category-card{% if category.count == 0 %} is-empty{% endif %}" id="category-{{ category.slug }}" href="/blog?category={{ category.slug }}">
+                <div>
+                    <strong>{{ category.title }}</strong>
+                    <small>{{ category.description }}</small>
+                </div>
+                <span>{% if category.count %}{{ category.count }}편{% else %}준비 중{% endif %}</span>
+            </a>
             {% endfor %}
         </div>
     </section>
