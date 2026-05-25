@@ -140,3 +140,15 @@ python scripts/smoke_test.py
 - Codespaces 네트워크에서 접근이 막힌 외부 서비스를 테스트해야 하는 경우
 
 그 외에는 Codespaces에서 작업합니다.
+
+## Mac mini로 이전
+
+개인 Mac mini에서 이어서 작업하려면 회사 노트북의 프로젝트 폴더를 복사하지 말고 GitHub에서 새로 clone합니다.
+
+자세한 절차는 [docs/MAC_MINI_MIGRATION.md](docs/MAC_MINI_MIGRATION.md)를 봅니다.
+
+Mac mini에서 프로젝트를 내려받은 뒤 아래를 실행하면 기본 개발환경을 자동으로 만듭니다.
+
+```bash
+bash scripts/setup_mac.sh
+```
