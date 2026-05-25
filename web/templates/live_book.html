@@ -109,7 +109,7 @@
         const TEXT = {
             available: "대출가능",
             reservable: "예약",
-            unknown: "상태 정보 없음",
+            checkLibrary: "도서관에서 확인",
             subscription: "구독형"
         };
 
@@ -214,7 +214,7 @@
             const holder = card.querySelector("[data-status-text]");
             if (card.dataset.serviceType === "Subscription") {
                 holder.textContent = TEXT.subscription;
-                holder.classList.remove("is-loading");
+                holder.classList.remove("is-loading", "is-muted", "is-error");
                 applyKind(card, "available", 0);
                 return;
             }
@@ -236,9 +236,9 @@
                 const kind = reserved > 0 ? "reservable" : (total > loaned ? "available" : "reservable");
                 applyKind(card, kind, reserved);
             } catch (err) {
-                holder.textContent = TEXT.unknown;
-                holder.classList.remove("is-loading");
-                holder.classList.add("is-error");
+                holder.textContent = TEXT.checkLibrary;
+                holder.classList.remove("is-loading", "is-error");
+                holder.classList.add("is-muted");
                 applyKind(card, "unknown", 0);
             }
         }

@@ -783,8 +783,13 @@ def main():
         raise AssertionError("uncached live detail should defer subscription library hydration")
     if 'data-service-type="Subscription"' not in (subscription_payload.get("groups_html") or ""):
         raise AssertionError("background live detail did not render subscription service_type")
-    if 'data-live-status="1"' in (subscription_payload.get("groups_html") or "") or "구독형" not in (subscription_payload.get("groups_html") or ""):
+    subscription_groups_html = subscription_payload.get("groups_html") or ""
+    if 'data-live-status="1"' in subscription_groups_html or "구독형" not in subscription_groups_html:
         raise AssertionError("subscription libraries should render without live status polling")
+    if "status-available" not in subscription_groups_html or "is-muted" in subscription_groups_html:
+        raise AssertionError("subscription libraries should render with available styling")
+    if "도서관에서 확인" not in subscription_detail.get_data(as_text=True):
+        raise AssertionError("live detail status failures should fall back to a library-check label")
 
     eunpyeong_session = FakeStatusSession(FakeStatusResponse(json_data={
         "data": {
