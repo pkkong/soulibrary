@@ -1,10 +1,11 @@
 import copy
+import re
 import traceback
 from urllib.parse import urlencode
 
 from flask import Blueprint, jsonify, render_template, request
 
-from live_search.normalizer import normalize_text
+from live_search.normalizer import normalize_author, normalize_text, normalize_title_for_group
 from live_search.service import get_cached_live_detail, live_search, set_cached_live_detail
 from seo_books import record_search_results
 
@@ -94,6 +95,86 @@ def _match_score(target: dict, item: dict) -> int:
         elif target_publisher in item_publisher or item_publisher in target_publisher:
             score += 10
     return score
+
+
+_BRACKETED_TITLE_RE = re.compile(r"(\([^)]*\)|\[[^\]]*\])")
+_LIVE_DETAIL_COMPLETE_KEY = "_live_detail_complete"
+
+
+def _collapse_spaces(value: str) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _title_family_key(book: dict) -> str:
+    return normalize_title_for_group(book.get("title"))
+
+
+def _author_key(book: dict) -> str:
+    return normalize_author(book.get("author"))
+
+
+def _authors_compatible(target: dict, item: dict) -> bool:
+    target_author = _author_key(target)
+    item_author = _author_key(item)
+    if not target_author or not item_author:
+        return False
+    if target_author == item_author:
+        return True
+    return (
+        min(len(target_author), len(item_author)) >= 3
+        and (target_author in item_author or item_author in target_author)
+    )
+
+
+def _same_book_family_with_author(target: dict, item: dict) -> bool:
+    target_title = _title_family_key(target)
+    item_title = _title_family_key(item)
+    return bool(target_title and item_title and target_title == item_title and _authors_compatible(target, item))
+
+
+def _publishers_compatible(target: dict, item: dict) -> bool:
+    target_publisher = normalize_text(target.get("publisher"))
+    item_publisher = normalize_text(item.get("publisher"))
+    if not target_publisher or not item_publisher:
+        return True
+    if target_publisher == item_publisher:
+        return True
+    return (
+        min(len(target_publisher), len(item_publisher)) >= 3
+        and (target_publisher in item_publisher or item_publisher in target_publisher)
+    )
+
+
+def _safe_loose_detail_match(target: dict, item: dict) -> bool:
+    if _match_score(target, item) < 70:
+        return False
+    if _author_key(target) and not _authors_compatible(target, item):
+        return False
+    return _publishers_compatible(target, item)
+
+
+def _add_title_candidate(candidates: list[str], value: str):
+    title = _collapse_spaces(value)
+    if title and title not in candidates:
+        candidates.append(title)
+
+
+def _title_search_candidates(title: str) -> list[str]:
+    candidates = []
+    _add_title_candidate(candidates, title)
+
+    family_key = normalize_title_for_group(title)
+    text = str(title or "").strip()
+    for separator in (":", "：", " - ", "-"):
+        left, found, _right = text.partition(separator)
+        if found and normalize_title_for_group(left) == family_key:
+            _add_title_candidate(candidates, left)
+
+    without_brackets = _collapse_spaces(_BRACKETED_TITLE_RE.sub(" ", text))
+    if without_brackets and normalize_title_for_group(without_brackets) == family_key:
+        _add_title_candidate(candidates, without_brackets)
+
+    return candidates
 
 
 def _status_kind(lib: dict) -> str:
@@ -192,25 +273,60 @@ def _library_count(book: dict | None) -> int:
         return len(book.get("libraries") or [])
 
 
+def _copy_live_book(book: dict | None, complete: bool):
+    if not book:
+        return None
+    copied = copy.deepcopy(book)
+    copied[_LIVE_DETAIL_COMPLETE_KEY] = bool(complete)
+    return copied
+
+
+def _is_complete_fallback(book: dict | None) -> bool:
+    return bool(book and not book.get("counts_partial"))
+
+
+def _pop_live_detail_complete(book: dict) -> bool:
+    if _LIVE_DETAIL_COMPLETE_KEY in book:
+        return bool(book.pop(_LIVE_DETAIL_COMPLETE_KEY))
+    return not bool(book.get("counts_partial"))
+
+
 def _find_complete_live_book(target: dict, fallback: dict | None = None):
     if not target.get("title"):
-        return copy.deepcopy(fallback) if fallback else None
-    payload = live_search(
-        query=target["title"],
-        field="title",
-        providers_raw="",
-        libraries_raw="",
-        limit=100,
-        offset=0,
+        return _copy_live_book(fallback, _is_complete_fallback(fallback))
+    items = []
+    for query in _title_search_candidates(target["title"]):
+        payload = live_search(
+            query=query,
+            field="title",
+            providers_raw="",
+            libraries_raw="",
+            limit=100,
+            offset=0,
+        )
+        items.extend(payload.get("items") or [])
+
+    family_matches = [(item, True) for item in items if _same_book_family_with_author(target, item)]
+    if fallback and _same_book_family_with_author(target, fallback):
+        family_matches.append((fallback, _is_complete_fallback(fallback)))
+    if family_matches:
+        best, complete = max(
+            family_matches,
+            key=lambda entry: (_library_count(entry[0]), int(entry[1]), _match_score(target, entry[0])),
+        )
+        return _copy_live_book(best, complete)
+
+    ranked = sorted(
+        [item for item in items if _safe_loose_detail_match(target, item)],
+        key=lambda item: _match_score(target, item),
+        reverse=True,
     )
-    items = payload.get("items") or []
-    ranked = sorted(items, key=lambda item: _match_score(target, item), reverse=True)
     best = ranked[0] if ranked else None
-    if not best or _match_score(target, best) < 70:
-        return copy.deepcopy(fallback) if fallback else None
-    if fallback and _library_count(fallback) > _library_count(best):
-        return copy.deepcopy(fallback)
-    return copy.deepcopy(best)
+    if not best:
+        return _copy_live_book(fallback, _is_complete_fallback(fallback))
+    if fallback and _library_count(fallback) > _library_count(best) and _same_book_family_with_author(target, fallback):
+        return _copy_live_book(fallback, _is_complete_fallback(fallback))
+    return _copy_live_book(best, True)
 
 
 def _detail_hydrate_url(cache_key: str, target: dict, fallback: dict | None = None) -> str:
@@ -292,7 +408,7 @@ def api_live_book_detail():
         book = _find_complete_live_book(target, fallback)
         if not book:
             return jsonify({"error": "실시간 상세 정보를 찾지 못했습니다."}), 404
-        book["counts_partial"] = False
+        book["counts_partial"] = not _pop_live_detail_complete(book)
         if cache_key:
             set_cached_live_detail(cache_key, book)
         decorated = _decorate_live_book(book)

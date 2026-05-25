@@ -26,7 +26,7 @@ import live_search_routes  # noqa: E402
 from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
 from live_search.connectors.bookers import BookersConnector  # noqa: E402
 from live_search.models import LiveSearchResult  # noqa: E402
-from live_search.normalizer import merge_live_results  # noqa: E402
+from live_search.normalizer import merge_live_results, normalize_author, normalize_title_for_group  # noqa: E402
 from live_search.service import _result_matches_query  # noqa: E402
 
 
@@ -605,6 +605,12 @@ def main():
     )
     if len(volume_split) != 2:
         raise AssertionError(f"volume markers should stay separate: {volume_split}")
+    if normalize_title_for_group("테스트 제목-부제") != normalize_title_for_group("테스트 제목"):
+        raise AssertionError("compact hyphen subtitle should normalize to the base title")
+    if normalize_title_for_group("COVID-19 시대") == normalize_title_for_group("COVID"):
+        raise AssertionError("technical hyphenated titles should not be cut as compact subtitles")
+    if normalize_author("홍길동·김철수") != normalize_author("홍길동"):
+        raise AssertionError("middle-dot author separator should keep the first author")
 
     if not _result_matches_query(
         "언스크립티드",
@@ -666,6 +672,8 @@ def main():
 
     original_live_search = live_search_routes.live_search
     original_cached_detail = live_search_routes.get_cached_live_detail
+    original_set_cached_detail = live_search_routes.set_cached_live_detail
+    cache_writes = {}
     partial_book = {
         "title": "프로젝트 헤일메리",
         "author": "앤디 위어",
@@ -714,15 +722,73 @@ def main():
             },
         ],
     }
+    long_title = "최소한의 삼국지 : 최태성의 삼국지 고전 특강"
+    base_title = "최소한의 삼국지"
+    long_title_book = {
+        "title": long_title,
+        "author": "최태성",
+        "publisher": "프런트페이지",
+        "counts": {"kyobo": 1, "yes24": 0, "other": 0, "total": 1},
+        "libraries": [
+            {"code": "eunpyeong", "name": "은평구립전자도서관", "short": "은평", "platform_code": "Eunpyeong"},
+        ],
+    }
+    base_title_book = {
+        "title": base_title,
+        "author": "최태성",
+        "publisher": "프런트페이지",
+        "counts": {"kyobo": 1, "yes24": 1, "other": 2, "total": 4},
+        "libraries": [
+            {"code": "eunpyeong", "name": "은평구립전자도서관", "short": "은평", "platform_code": "Eunpyeong"},
+            {"code": "dobong", "name": "도봉구 전자도서관", "short": "도봉", "platform_code": "Kyobo"},
+            {"code": "jongno", "name": "종로구립도서관", "short": "종로", "platform_code": "YES24"},
+            {"code": "gangnam", "name": "강남구 전자도서관", "short": "강남", "platform_code": "Gangnam"},
+        ],
+    }
+    wrong_author_base_title_book = {
+        "title": base_title,
+        "author": "다른 저자",
+        "publisher": "다른출판",
+        "counts": {"kyobo": 9, "yes24": 0, "other": 0, "total": 9},
+        "libraries": [
+            {"code": "wrong_author", "name": "오탐 도서관", "short": "오탐", "platform_code": "Kyobo_New"},
+        ],
+    }
+    failed_partial_title = "부분 결과 실패 : 부제"
+    failed_partial_base_title = "부분 결과 실패"
+    failed_partial_book = {
+        "title": failed_partial_title,
+        "author": "올바른 저자",
+        "publisher": "올바른출판",
+        "counts": {"kyobo": 1, "yes24": 0, "other": 0, "total": 1},
+        "counts_partial": True,
+        "libraries": [
+            {"code": "partial_only", "name": "부분 도서관", "short": "부분", "platform_code": "Kyobo_New"},
+        ],
+    }
+    wrong_failed_partial_book = {
+        "title": failed_partial_base_title,
+        "author": "다른 저자",
+        "publisher": "다른출판",
+        "counts": {"kyobo": 7, "yes24": 0, "other": 0, "total": 7},
+        "libraries": [
+            {"code": "wrong_failed", "name": "잘못된 도서관", "short": "오류", "platform_code": "Kyobo_New"},
+        ],
+    }
 
     def fake_cached_detail(key):
         if not key:
             return None
         if key == "complete-project":
             return complete_cached_book
+        if key == "failed-partial":
+            return failed_partial_book
         if key != "partial-project":
             raise AssertionError(f"unexpected detail key: {key}")
         return partial_book
+
+    def fake_set_cached_detail(key, item):
+        cache_writes[key] = dict(item)
 
     def fake_live_search(query, field, providers_raw="", libraries_raw="", limit=20, offset=0, refine=""):
         if query == "프로젝트" and field == "title_author":
@@ -731,10 +797,27 @@ def main():
             return {"total": 1, "items": [complete_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
         if query == "구독형 테스트" and field == "title":
             return {"total": 1, "items": [subscription_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
+        if query == long_title and field == "title":
+            return {"total": 1, "items": [long_title_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
+        if query == base_title and field == "title":
+            return {
+                "total": 2,
+                "items": [wrong_author_base_title_book, base_title_book],
+                "filters": {"providers": [], "libraries": []},
+                "meta": {},
+            }
+        if query in {failed_partial_title, failed_partial_base_title} and field == "title":
+            return {
+                "total": 1,
+                "items": [wrong_failed_partial_book],
+                "filters": {"providers": [], "libraries": []},
+                "meta": {},
+            }
         raise AssertionError(f"unexpected live search: {query} {field}")
 
     live_search_routes.get_cached_live_detail = fake_cached_detail
     live_search_routes.live_search = fake_live_search
+    live_search_routes.set_cached_live_detail = fake_set_cached_detail
     try:
         partial_search = assert_response(
             client,
@@ -764,9 +847,18 @@ def main():
             client,
             "/api/live_book_detail?title=%EA%B5%AC%EB%8F%85%ED%98%95+%ED%85%8C%EC%8A%A4%ED%8A%B8&author=%ED%85%8C%EC%8A%A4%ED%84%B0&publisher=%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%B6%9C%ED%8C%90",
         ).get_json()
+        long_title_payload = assert_response(
+            client,
+            f"/api/live_book_detail?title={quote(long_title)}&author={quote('최태성')}&publisher={quote('프런트페이지')}",
+        ).get_json()
+        failed_partial_payload = assert_response(
+            client,
+            f"/api/live_book_detail?key=failed-partial&title={quote(failed_partial_title)}&author={quote('올바른 저자')}&publisher={quote('올바른출판')}",
+        ).get_json()
     finally:
         live_search_routes.live_search = original_live_search
         live_search_routes.get_cached_live_detail = original_cached_detail
+        live_search_routes.set_cached_live_detail = original_set_cached_detail
     hydrated_body = hydrated_detail.get_data(as_text=True)
     if "은평" not in hydrated_body or "강남" in hydrated_body or "/api/live_book_detail" not in hydrated_body:
         raise AssertionError("live detail should render cached partial result before background hydration")
@@ -783,6 +875,19 @@ def main():
         raise AssertionError("uncached live detail should defer subscription library hydration")
     if 'data-service-type="Subscription"' not in (subscription_payload.get("groups_html") or ""):
         raise AssertionError("background live detail did not render subscription service_type")
+    selected_long_title_book = long_title_payload.get("book") or {}
+    long_title_groups_html = long_title_payload.get("groups_html") or ""
+    if selected_long_title_book.get("title") != base_title or selected_long_title_book.get("counts", {}).get("total") != 4:
+        raise AssertionError(f"long subtitle detail did not select richer base-title result: {long_title_payload}")
+    if "오탐 도서관" in long_title_groups_html or "강남" not in long_title_groups_html:
+        raise AssertionError(f"long subtitle detail did not filter by compatible author: {long_title_payload}")
+    failed_partial_book_payload = failed_partial_payload.get("book") or {}
+    if failed_partial_book_payload.get("title") != failed_partial_title:
+        raise AssertionError(f"failed detail hydration should fall back to the partial book: {failed_partial_payload}")
+    if cache_writes.get("failed-partial", {}).get("counts_partial") is not True:
+        raise AssertionError(f"failed detail hydration must not mark partial fallback complete: {cache_writes}")
+    if "잘못된 도서관" in (failed_partial_payload.get("groups_html") or ""):
+        raise AssertionError(f"failed detail hydration accepted a mismatched high-count result: {failed_partial_payload}")
     subscription_groups_html = subscription_payload.get("groups_html") or ""
     if 'data-live-status="1"' in subscription_groups_html or "구독형" not in subscription_groups_html:
         raise AssertionError("subscription libraries should render without live status polling")

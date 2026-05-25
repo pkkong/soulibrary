@@ -11,6 +11,7 @@ def normalize_text(value: str) -> str:
 
 _BRACKET_RE = re.compile(r"(\([^)]*\)|\[[^\]]*\])")
 _VOLUME_MARKER_RE = re.compile(r"^(상|중|하|전|후|[0-9]+|[0-9]+권|[ivxlcdm]+)$", re.IGNORECASE)
+_HANGUL_RE = re.compile(r"[가-힣]")
 
 
 def _strip_descriptive_bracket(match: re.Match) -> str:
@@ -24,6 +25,19 @@ def _strip_descriptive_bracket(match: re.Match) -> str:
     return value
 
 
+def _compact_hyphen_subtitle_left(text: str) -> str:
+    if text.count("-") != 1:
+        return ""
+    left, right = [part.strip() for part in text.split("-", 1)]
+    if not left or not right:
+        return ""
+    if len(normalize_text(left)) < 3:
+        return ""
+    if not (_HANGUL_RE.search(left) and _HANGUL_RE.search(right)):
+        return ""
+    return left
+
+
 def normalize_title_for_group(value: str) -> str:
     text = str(value or "")
     text = _BRACKET_RE.sub(_strip_descriptive_bracket, text)
@@ -32,13 +46,16 @@ def normalize_title_for_group(value: str) -> str:
         left, separator, _right = text.partition("：")
     if not separator:
         left, separator, _right = text.partition(" - ")
+    if not separator:
+        left = _compact_hyphen_subtitle_left(text)
+        separator = "-" if left else ""
     title = left if separator and len(normalize_text(left)) >= 3 else text
     return normalize_text(title) or normalize_text(value)
 
 
 def normalize_author(value: str) -> str:
     text = str(value or "")
-    text = re.split(r"[/,;|]", text, maxsplit=1)[0]
+    text = re.split(r"[/,;|·]", text, maxsplit=1)[0]
     text = re.sub(r"\([^)]*\)", "", text)
     text = re.sub(r"\[[^\]]*\]", "", text)
     text = re.sub(r"(지은이|지음|저자|저|글쓴이|글|옮긴이|옮김|역자|역)", "", text)
@@ -56,7 +73,7 @@ def normalize_author(value: str) -> str:
 
 def clean_author_display(value: str) -> str:
     text = str(value or "").strip()
-    text = re.split(r"[/,;|]", text, maxsplit=1)[0]
+    text = re.split(r"[/,;|·]", text, maxsplit=1)[0]
     text = re.sub(r"\([^)]*\)", "", text)
     text = re.sub(r"\[[^\]]*\]", "", text)
     text = re.sub(r"(지은이|지음|저자|저|글쓴이|글|옮긴이|옮김|역자|역)", "", text)
