@@ -4,9 +4,11 @@ __pycache__/
 .pytest_cache/
 
 # Local virtual environments / editor state
+.DS_Store
 .env
 .env.*
 !.env.example
+.secrets/
 .venv/
 venv/
 .vscode/

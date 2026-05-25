@@ -1,4 +1,6 @@
 Flask
+google-api-python-client
+google-auth
 gunicorn>=25.1,<27
 lxml
 openpyxl

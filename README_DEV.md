@@ -83,6 +83,14 @@ DB_PASSWORD=
 
 공유 서재는 운영에서 `SHARED_SHELVES_STORAGE=auto`를 사용합니다. `DATABASE_URL` 또는 `DB_HOST` 계열 env가 실제로 주입되면 Cloudtype PostgreSQL에 저장하고, 연결값이 없으면 JSON 저장으로 fallback해 공유 링크 생성 자체는 막지 않습니다. 로컬 smoke test나 DB 없는 개발에서는 `SHARED_SHELVES_STORAGE=json`과 `SHARED_SHELVES_FILE`을 사용할 수 있습니다.
 
+Search Console 분석 자동화는 서비스 계정에 `soulib.kr` Search Console 속성 접근 권한을 부여한 뒤 사용합니다. 서비스 계정 JSON은 `.secrets/` 또는 GitHub/운영 secret에만 보관하고 Git에는 올리지 않습니다.
+
+```text
+GSC_SITE_URL=sc-domain:soulib.kr
+GSC_SERVICE_ACCOUNT_FILE=.secrets/search-console-service-account.json
+GSC_SERVICE_ACCOUNT_JSON=
+```
+
 ## 배포
 
 `main`에 push 또는 merge되면 GitHub Actions가 먼저 smoke test를 실행합니다. smoke test가 통과하면 공식 Cloudtype deploy action이 `.cloudtype/app.yaml` 설정으로 운영 서비스를 갱신합니다.
