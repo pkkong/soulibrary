@@ -88,7 +88,7 @@ Search Console 분석 자동화는 서비스 계정 또는 OAuth desktop client�
 서비스 계정을 쓸 때는 먼저 서비스 계정에 `soulib.kr` Search Console 속성 접근 권한을 부여합니다.
 
 ```text
-GSC_SITE_URL=sc-domain:soulib.kr
+GSC_SITE_URL=https://www.soulib.kr/
 GSC_SERVICE_ACCOUNT_FILE=.secrets/search-console-service-account.json
 GSC_SERVICE_ACCOUNT_JSON=
 ```
