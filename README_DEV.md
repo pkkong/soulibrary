@@ -83,12 +83,26 @@ DB_PASSWORD=
 
 공유 서재는 운영에서 `SHARED_SHELVES_STORAGE=auto`를 사용합니다. `DATABASE_URL` 또는 `DB_HOST` 계열 env가 실제로 주입되면 Cloudtype PostgreSQL에 저장하고, 연결값이 없으면 JSON 저장으로 fallback해 공유 링크 생성 자체는 막지 않습니다. 로컬 smoke test나 DB 없는 개발에서는 `SHARED_SHELVES_STORAGE=json`과 `SHARED_SHELVES_FILE`을 사용할 수 있습니다.
 
-Search Console 분석 자동화는 서비스 계정에 `soulib.kr` Search Console 속성 접근 권한을 부여한 뒤 사용합니다. 서비스 계정 JSON은 `.secrets/` 또는 GitHub/운영 secret에만 보관하고 Git에는 올리지 않습니다.
+Search Console 분석 자동화는 서비스 계정 또는 OAuth desktop client로 실행할 수 있습니다. credential과 token JSON은 `.secrets/` 또는 GitHub/운영 secret에만 보관하고 Git에는 올리지 않습니다.
+
+서비스 계정을 쓸 때는 먼저 서비스 계정에 `soulib.kr` Search Console 속성 접근 권한을 부여합니다.
 
 ```text
 GSC_SITE_URL=sc-domain:soulib.kr
 GSC_SERVICE_ACCOUNT_FILE=.secrets/search-console-service-account.json
 GSC_SERVICE_ACCOUNT_JSON=
+```
+
+Google Cloud org policy로 서비스 계정 키 생성이 막힌 환경에서는 OAuth desktop client JSON을 내려받은 뒤 최초 1회 브라우저 인증으로 token 파일을 만듭니다. token 내용은 출력하지 않습니다.
+
+```text
+GSC_OAUTH_CLIENT_FILE=.secrets/search-console-oauth-client.json
+GSC_OAUTH_TOKEN_FILE=.secrets/search-console-oauth-token.json
+```
+
+```bash
+python scripts/search_console_report.py --authorize
+python scripts/search_console_report.py
 ```
 
 ## 배포
