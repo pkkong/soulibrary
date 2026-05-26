@@ -131,8 +131,14 @@ def main():
         raise AssertionError("SF recommendation post did not render Soulib search cards")
     if "/search?q=%EB%A7%88%EC%85%98%20%EC%95%A4%EB%94%94%20%EC%9C%84%EC%96%B4&amp;field=title_author" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render internal search link")
-    if sf_rec_body.count("/static/img/blog/soulib-guide/") < 3:
-        raise AssertionError("SF recommendation post should include product screenshots")
+    if 'data-search-query="마션 앤디 위어"' not in sf_rec_body or "blog-search-card-cover" not in sf_rec_body:
+        raise AssertionError("SF recommendation post did not render cover-ready search cards")
+    if "blog_search_cards.js" not in sf_rec_body:
+        raise AssertionError("blog post page did not include search card cover hydration script")
+    bestseller_rec_blog = assert_response(client, "/blog/bestseller-waitlist-alternative-ebooks")
+    bestseller_rec_body = bestseller_rec_blog.get_data(as_text=True)
+    if "search-project-hail-mary" in bestseller_rec_body or "detail-project-hail-mary" in bestseller_rec_body:
+        raise AssertionError("unrelated recommendation posts must not reuse Project Hail Mary screenshots")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
     blog_post_body = blog_post.get_data(as_text=True)

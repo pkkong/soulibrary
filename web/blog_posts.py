@@ -143,15 +143,23 @@ def _render_soulib_search_card(line):
         return None
     href = f"/search?q={quote(query)}&field=title_author"
     safe_href = html.escape(href, quote=True)
+    safe_query = html.escape(query, quote=True)
     safe_title = html.escape(title)
+    safe_title_attr = html.escape(title, quote=True)
     safe_meta = html.escape(meta)
+    safe_meta_attr = html.escape(meta, quote=True)
     safe_note = html.escape(note)
     return (
-        f'<a class="blog-search-card" href="{safe_href}" aria-label="Soulib에서 {safe_title} 검색">'
+        f'<a class="blog-search-card" href="{safe_href}" data-search-query="{safe_query}" '
+        f'data-search-title="{safe_title_attr}" data-search-meta="{safe_meta_attr}" '
+        f'aria-label="Soulib에서 {safe_title} 검색">'
+        '<span class="blog-search-card-cover" aria-hidden="true"><span>표지</span></span>'
+        '<span class="blog-search-card-copy">'
         '<span class="blog-search-card-kicker">Soulib 검색</span>'
-        f'\n<strong>{safe_title}</strong>'
-        f'\n<span>{safe_meta}</span>'
-        f'\n<small>{safe_note}</small>'
+        f'<strong>{safe_title}</strong>'
+        f'<span class="blog-search-card-meta">{safe_meta}</span>'
+        f'<small class="blog-search-card-note">{safe_note}</small>'
+        '</span>'
         '</a>'
     )
 

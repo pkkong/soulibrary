@@ -57,6 +57,37 @@ def soulib_search_blocks(body: str) -> list[list[str]]:
     return [[part.strip() for part in match.split("|")] for match in SOULIB_SEARCH_BLOCK_RE.findall(body)]
 
 
+def soulib_search_entries(body: str) -> list[dict]:
+    entries = []
+    offset = 0
+    for index, line in enumerate(body.splitlines()):
+        match = SOULIB_SEARCH_BLOCK_RE.fullmatch(line.strip())
+        if match:
+            entries.append(
+                {
+                    "line": index,
+                    "offset": offset,
+                    "parts": [part.strip() for part in match.group(1).split("|")],
+                    "raw": line.strip(),
+                }
+            )
+        offset += len(line) + 1
+    return entries
+
+
+def max_consecutive_search_cards(body: str) -> int:
+    longest = 0
+    current = 0
+    for line in body.splitlines():
+        stripped = line.strip()
+        if SOULIB_SEARCH_BLOCK_RE.fullmatch(stripped):
+            current += 1
+            longest = max(longest, current)
+        elif stripped:
+            current = 0
+    return longest
+
+
 def static_path_exists(url: str) -> bool:
     if not url.startswith("/static/"):
         return False
@@ -78,6 +109,10 @@ def token_similarity(left: str, right: str) -> float:
     if not left_tokens or not right_tokens:
         return 0.0
     return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+
+
+def compact_text(text: str) -> str:
+    return re.sub(r"[^0-9a-z가-힣]", "", text.lower())
 
 
 def load_post(path: Path) -> tuple[dict[str, str], str]:
@@ -178,7 +213,8 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
     for line in malformed_search_blocks:
         errors.append(f"{label}: malformed Soulib search card syntax `{line}`")
 
-    search_blocks = soulib_search_blocks(body)
+    search_entries = soulib_search_entries(body)
+    search_blocks = [entry["parts"] for entry in search_entries]
     for parts in search_blocks:
         if len(parts) < 3 or not all(parts[:3]):
             errors.append(f"{label}: Soulib search cards need title, meta, and note fields")
@@ -187,6 +223,22 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
             errors.append(f"{label}: strict recommendation posts need at least 3 Soulib search cards")
         if not image_url and not images:
             errors.append(f"{label}: strict recommendation posts need a real visual asset")
+        if max_consecutive_search_cards(body) > 2:
+            errors.append(f"{label}: recommendation search cards must be placed near each book section, not grouped in a top card pile")
+        for entry in search_entries:
+            title = entry["parts"][0] if entry["parts"] else ""
+            if not title:
+                continue
+            start = max(0, entry["offset"] - 900)
+            end = min(len(body), entry["offset"] + 1100)
+            nearby = SOULIB_SEARCH_BLOCK_RE.sub("", body[start:end])
+            if compact_text(title) not in compact_text(nearby):
+                errors.append(f"{label}: search card `{title}` is not close enough to matching book discussion")
+        image_paths = [image_url, *[url for _alt, url in images]]
+        if path.name != "sf-ebook-starter-recommendations.md":
+            for url in image_paths:
+                if "project-hail-mary" in url:
+                    errors.append(f"{label}: unrelated recommendation posts must not reuse Project Hail Mary screenshots")
 
     if strict and any(word in body for word in ("모든 도서관", "무조건", "반드시 대출", "자동으로 대출")):
         errors.append(f"{label}: strict post contains risky absolute wording")
