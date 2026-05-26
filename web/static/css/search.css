@@ -3198,7 +3198,7 @@ body.has-topbar .search-top {
 }
 
 .shelf-view-switch button {
-    min-width: 36px;
+    min-width: 32px;
     min-height: 28px;
     border: 0;
     border-radius: 999px;
@@ -3208,9 +3208,17 @@ body.has-topbar .search-top {
     font-size: 12px;
     font-weight: 720;
     line-height: 1;
-    padding: 0 9px;
+    padding: 0 8px;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     -webkit-tap-highlight-color: transparent;
+}
+
+.shelf-view-switch button svg {
+    display: block;
+    fill: currentColor;
 }
 
 .shelf-view-switch button.is-active {
@@ -3584,11 +3592,6 @@ body.has-topbar .search-top {
 
 .page-my-shelf .shelf-items.is-card .shelf-book-publisher {
     display: none;
-}
-
-.page-my-shelf .shelf-items.is-grid-2 .shelf-book-holding {
-    display: block;
-    margin-top: 2px;
 }
 
 .page-my-shelf .shelf-items.is-card .shelf-remove-button {
