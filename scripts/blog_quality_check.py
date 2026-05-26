@@ -18,6 +18,7 @@ REQUIRED_FRONTMATTER = ("title", "description", "category", "category_slug", "da
 SUPPORTED_BODY_LINK_SCHEMES = ("http://", "https://")
 STRICT_MIN_BODY_CHARS = 3500
 BASELINE_MIN_BODY_CHARS = 900
+SOULIB_SEARCH_BLOCK_RE = re.compile(r"^\[\[soulib-search:([^\]]+)\]\]$", flags=re.MULTILINE)
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -50,6 +51,10 @@ def markdown_links(body: str) -> list[tuple[str, str]]:
 
 def markdown_images(body: str) -> list[tuple[str, str]]:
     return re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", body)
+
+
+def soulib_search_blocks(body: str) -> list[list[str]]:
+    return [[part.strip() for part in match.split("|")] for match in SOULIB_SEARCH_BLOCK_RE.findall(body)]
 
 
 def static_path_exists(url: str) -> bool:
@@ -164,6 +169,24 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
             errors.append(f"{label}: body image must be an existing /static/ asset, got `{url}`")
         if strict and len(alt.strip()) < 12:
             errors.append(f"{label}: strict body images need specific alt/caption text")
+
+    malformed_search_blocks = [
+        line.strip()
+        for line in body.splitlines()
+        if "[[soulib-search:" in line and not SOULIB_SEARCH_BLOCK_RE.fullmatch(line.strip())
+    ]
+    for line in malformed_search_blocks:
+        errors.append(f"{label}: malformed Soulib search card syntax `{line}`")
+
+    search_blocks = soulib_search_blocks(body)
+    for parts in search_blocks:
+        if len(parts) < 3 or not all(parts[:3]):
+            errors.append(f"{label}: Soulib search cards need title, meta, and note fields")
+    if strict and meta.get("category_slug") == "recommendations":
+        if len(search_blocks) < 3:
+            errors.append(f"{label}: strict recommendation posts need at least 3 Soulib search cards")
+        if not image_url and not images:
+            errors.append(f"{label}: strict recommendation posts need a real visual asset")
 
     if strict and any(word in body for word in ("모든 도서관", "무조건", "반드시 대출", "자동으로 대출")):
         errors.append(f"{label}: strict post contains risky absolute wording")

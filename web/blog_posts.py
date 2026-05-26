@@ -3,6 +3,7 @@ import os
 import re
 from datetime import datetime
 from functools import lru_cache
+from urllib.parse import quote
 
 try:
     from PIL import Image
@@ -129,6 +130,32 @@ def _render_image(line):
     return f'<figure class="{figure_class}"><img src="{safe_url}" alt="{safe_alt}" loading="lazy"{size_attrs}>{caption}</figure>'
 
 
+def _render_soulib_search_card(line):
+    match = re.fullmatch(r"\[\[soulib-search:([^\]]+)\]\]", line)
+    if not match:
+        return None
+    parts = [_clean(part) for part in match.group(1).split("|")]
+    if len(parts) < 3:
+        return None
+    title, meta, note = parts[:3]
+    query = parts[3] if len(parts) >= 4 and parts[3] else " ".join(part for part in (title, meta) if part)
+    if not title or not query:
+        return None
+    href = f"/search?q={quote(query)}&field=title_author"
+    safe_href = html.escape(href, quote=True)
+    safe_title = html.escape(title)
+    safe_meta = html.escape(meta)
+    safe_note = html.escape(note)
+    return (
+        f'<a class="blog-search-card" href="{safe_href}" aria-label="Soulib에서 {safe_title} 검색">'
+        '<span class="blog-search-card-kicker">Soulib 검색</span>'
+        f'\n<strong>{safe_title}</strong>'
+        f'\n<span>{safe_meta}</span>'
+        f'\n<small>{safe_note}</small>'
+        '</a>'
+    )
+
+
 def _render_heading(level, text):
     anchor = ""
     match = re.search(r"\s+\{#([0-9A-Za-z_-]+)\}$", text)
@@ -142,6 +169,7 @@ def _render_heading(level, text):
 def _render_body(body):
     blocks = []
     list_items = []
+    search_cards = []
 
     def flush_list():
         nonlocal list_items
@@ -150,28 +178,46 @@ def _render_body(body):
             blocks.append(f"<ul>{items}</ul>")
             list_items = []
 
+    def flush_search_cards():
+        nonlocal search_cards
+        if search_cards:
+            blocks.append(f'<div class="blog-search-grid">{"".join(search_cards)}</div>')
+            search_cards = []
+
     for raw_line in body.splitlines():
         line = raw_line.strip()
         if not line:
             flush_list()
+            flush_search_cards()
+            continue
+        search_card_html = _render_soulib_search_card(line)
+        if search_card_html:
+            flush_list()
+            search_cards.append(search_card_html)
             continue
         image_html = _render_image(line)
         if image_html:
             flush_list()
+            flush_search_cards()
             blocks.append(image_html)
             continue
         if line.startswith("### "):
             flush_list()
+            flush_search_cards()
             blocks.append(_render_heading(3, line[4:]))
         elif line.startswith("## "):
             flush_list()
+            flush_search_cards()
             blocks.append(_render_heading(2, line[3:]))
         elif line.startswith("- "):
+            flush_search_cards()
             list_items.append(_inline(line[2:]))
         else:
             flush_list()
+            flush_search_cards()
             blocks.append(f"<p>{_inline(line)}</p>")
     flush_list()
+    flush_search_cards()
     return "\n".join(blocks)
 
 

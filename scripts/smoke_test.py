@@ -125,6 +125,14 @@ def main():
         raise AssertionError("ebook search guide did not render emphasis markup")
     if "/static/img/blog/soulib-guide/search-project-hail-mary.png" not in ebook_search_body:
         raise AssertionError("ebook search guide did not render search screenshot")
+    sf_rec_blog = assert_response(client, "/blog/sf-ebook-starter-recommendations")
+    sf_rec_body = sf_rec_blog.get_data(as_text=True)
+    if "blog-search-card" not in sf_rec_body or "Soulib 검색" not in sf_rec_body:
+        raise AssertionError("SF recommendation post did not render Soulib search cards")
+    if "/search?q=%EB%A7%88%EC%85%98%20%EC%95%A4%EB%94%94%20%EC%9C%84%EC%96%B4&amp;field=title_author" not in sf_rec_body:
+        raise AssertionError("SF recommendation post did not render internal search link")
+    if sf_rec_body.count("/static/img/blog/soulib-guide/") < 3:
+        raise AssertionError("SF recommendation post should include product screenshots")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
     blog_post_body = blog_post.get_data(as_text=True)
