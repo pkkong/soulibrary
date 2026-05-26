@@ -79,7 +79,14 @@
                 <h2 id="shelf-list-title">담은 책</h2>
                 <p id="shelf-list-desc" class="shelf-active-desc"></p>
             </div>
-            <span id="shelf-count" class="shelf-muted">0권</span>
+            <div class="shelf-view-tools">
+                <span id="shelf-count" class="shelf-muted">0권</span>
+                <div class="shelf-view-switch" role="group" aria-label="서재 보기 방식">
+                    <button type="button" data-shelf-view="grid3" aria-label="3열 카드 보기" aria-pressed="true">3열</button>
+                    <button type="button" data-shelf-view="grid2" aria-label="2열 카드 보기" aria-pressed="false">2열</button>
+                    <button type="button" data-shelf-view="list" aria-label="목록 보기" aria-pressed="false">목록</button>
+                </div>
+            </div>
         </div>
         <div class="shelf-share-panel" id="shelf-share-panel" hidden>
             <label class="sr-only" for="shelf-share-url">공유 링크</label>
@@ -105,5 +112,5 @@
     </section>
 </div>
 <script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519i') }}"></script>
-<script src="{{ url_for('static', filename='js/my_shelf.js', v='20260519j') }}"></script>
+<script src="{{ url_for('static', filename='js/my_shelf.js', v='20260526a') }}"></script>
 {% endblock %}

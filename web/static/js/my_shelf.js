@@ -18,13 +18,19 @@ const shelfSharePanel = document.getElementById("shelf-share-panel");
 const shelfShareUrl = document.getElementById("shelf-share-url");
 const shelfCopyShare = document.getElementById("shelf-copy-share");
 const shelfShareStatus = document.getElementById("shelf-share-status");
+const shelfViewButtons = Array.from(document.querySelectorAll("[data-shelf-view]"));
 const shelf = window.SoulibShelf;
 const ACTIVE_LIST_KEY = "soulib.myShelf.activeList";
+const VIEW_MODE_KEY = "soulib.myShelf.viewMode";
+const VIEW_MODES = new Set(["grid3", "grid2", "list"]);
 const ICONS = {
     remove: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6 6 18"></path></svg>',
 };
 
 let activeListId = localStorage.getItem(ACTIVE_LIST_KEY) || "";
+let shelfViewMode = localStorage.getItem(VIEW_MODE_KEY) || "grid3";
+let manageOpen = false;
+if (!VIEW_MODES.has(shelfViewMode)) shelfViewMode = "grid3";
 
 function cleanText(value) {
     return String(value || "").trim();
@@ -82,9 +88,32 @@ function setCreateFormOpen(open) {
 
 function setManageOpen(open) {
     if (!shelfManageActions || !shelfManageToggle) return;
+    manageOpen = Boolean(open);
     shelfManageActions.hidden = !open;
     shelfManageToggle.setAttribute("aria-expanded", open ? "true" : "false");
     if (open) setCreateFormOpen(false);
+    updateShelfViewState();
+}
+
+function updateShelfViewState() {
+    const mode = VIEW_MODES.has(shelfViewMode) ? shelfViewMode : "grid3";
+    shelfItems.classList.toggle("is-card", mode !== "list");
+    shelfItems.classList.toggle("is-list", mode === "list");
+    shelfItems.classList.toggle("is-grid-2", mode === "grid2");
+    shelfItems.classList.toggle("is-grid-3", mode === "grid3");
+    shelfItems.classList.toggle("is-managing", manageOpen);
+    shelfViewButtons.forEach(button => {
+        const selected = button.getAttribute("data-shelf-view") === mode;
+        button.classList.toggle("is-active", selected);
+        button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+}
+
+function setShelfViewMode(mode) {
+    if (!VIEW_MODES.has(mode)) return;
+    shelfViewMode = mode;
+    localStorage.setItem(VIEW_MODE_KEY, shelfViewMode);
+    updateShelfViewState();
 }
 
 function renderListTabs(lists) {
@@ -120,6 +149,7 @@ function renderShelf() {
     shelfShare.disabled = books.length === 0;
     shelfDeleteList.disabled = lists.length <= 1;
     shelfDeleteList.hidden = lists.length <= 1;
+    updateShelfViewState();
     if (!books.length) {
         shelfSharePanel.hidden = true;
         shelfShareUrl.value = "";
@@ -130,6 +160,7 @@ function renderShelf() {
         const author = cleanText(book.author);
         const publisher = cleanText(book.publisher);
         const title = cleanText(book.title) || "제목 없음";
+        const holding = shelf.countLabel(book);
         return `
             <article class="shelf-item">
                 <a class="shelf-item-link" href="${escapeAttr(shelf.detailUrl(book))}" aria-label="${escapeAttr(`${title} 상세로 이동`)}">
@@ -139,6 +170,7 @@ function renderShelf() {
                         <div class="shelf-book-meta">
                             ${author ? `<span class="shelf-book-author">${escapeHtml(author)}</span>` : ""}
                             ${publisher ? `<span class="shelf-book-publisher">${escapeHtml(publisher)}</span>` : ""}
+                            <span class="shelf-book-holding">${escapeHtml(holding)}</span>
                         </div>
                     </div>
                 </a>
@@ -146,6 +178,7 @@ function renderShelf() {
             </article>
         `;
     }).join("");
+    updateShelfViewState();
 }
 
 async function copyShareUrl() {
@@ -209,6 +242,12 @@ shelfCreateToggle.addEventListener("click", () => {
 
 shelfManageToggle.addEventListener("click", () => {
     setManageOpen(shelfManageActions.hidden);
+});
+
+shelfViewButtons.forEach(button => {
+    button.addEventListener("click", () => {
+        setShelfViewMode(button.getAttribute("data-shelf-view"));
+    });
 });
 
 shelfCreateName.addEventListener("keydown", event => {

@@ -3180,6 +3180,44 @@ body.has-topbar .search-top {
     white-space: nowrap;
 }
 
+.shelf-view-tools {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 9px;
+}
+
+.shelf-view-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 999px;
+    background: #f2f2f7;
+}
+
+.shelf-view-switch button {
+    min-width: 36px;
+    min-height: 28px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #6e6e73;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 720;
+    line-height: 1;
+    padding: 0 9px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.shelf-view-switch button.is-active {
+    background: #ffffff;
+    color: #1d1d1f;
+}
+
 .shelf-create-form {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 44px;
@@ -3437,7 +3475,8 @@ body.has-topbar .search-top {
 }
 
 .shelf-book-author,
-.shelf-book-publisher {
+.shelf-book-publisher,
+.shelf-book-holding {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -3454,6 +3493,119 @@ body.has-topbar .search-top {
     color: #8e8e93;
     font-size: 12px;
     font-weight: 450;
+}
+
+.shelf-book-holding {
+    display: none;
+    color: #6e6e73;
+    font-size: 12px;
+    font-weight: 560;
+}
+
+.page-my-shelf .shelf-items.is-card {
+    display: grid;
+    align-items: start;
+    margin-top: 16px;
+}
+
+.page-my-shelf .shelf-items.is-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px 18px;
+}
+
+.page-my-shelf .shelf-items.is-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 26px 20px;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-item {
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+    transition: none;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-item:hover,
+.page-my-shelf .shelf-items.is-card .shelf-item:active {
+    border-color: transparent;
+    background: transparent;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-item-link {
+    display: block;
+    min-height: 0;
+    padding: 0;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-item-cover {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+    border: 0;
+    border-radius: 10px;
+    background: #f2f2f7;
+}
+
+.page-my-shelf .shelf-items.is-grid-2 .shelf-item-cover {
+    border-radius: 12px;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-book-main {
+    margin-top: 8px;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-book-main h3 {
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 720;
+}
+
+.page-my-shelf .shelf-items.is-grid-3 .shelf-book-main h3 {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-book-meta {
+    margin-top: 4px;
+    gap: 2px;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-book-author {
+    color: #6e6e73;
+    font-size: 12px;
+    font-weight: 540;
+}
+
+.page-my-shelf .shelf-items.is-grid-2 .shelf-book-author {
+    font-size: 13px;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-book-publisher {
+    display: none;
+}
+
+.page-my-shelf .shelf-items.is-grid-2 .shelf-book-holding {
+    display: block;
+    margin-top: 2px;
+}
+
+.page-my-shelf .shelf-items.is-card .shelf-remove-button {
+    display: none;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 30px;
+    min-width: 30px;
+    min-height: 30px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1d1d1f;
+}
+
+.page-my-shelf .shelf-items.is-card.is-managing .shelf-remove-button,
+.page-my-shelf .shelf-items.is-card .shelf-item:focus-within .shelf-remove-button {
+    display: inline-flex;
 }
 
 .shelf-icon-button,
@@ -3575,6 +3727,15 @@ body.has-topbar .search-top {
     padding-right: 9px;
 }
 
+@media (min-width: 560px) {
+    .page-my-shelf .shelf-items.is-grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 160px));
+    }
+    .page-my-shelf .shelf-items.is-grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 220px));
+    }
+}
+
 @media (max-width: 420px) {
     .shelf-item-link {
         grid-template-columns: 52px minmax(0, 1fr);
@@ -3583,6 +3744,12 @@ body.has-topbar .search-top {
     .shelf-item-cover {
         width: 52px;
         height: 74px;
+    }
+}
+
+@media (max-width: 360px) {
+    .page-my-shelf .shelf-items.is-grid-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
