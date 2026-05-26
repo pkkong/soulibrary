@@ -24,6 +24,7 @@ const MSG_NO_RESULTS = "검색 결과가 없습니다.";
 const MSG_ERROR = "검색 중 오류가 발생했습니다.";
 const MSG_ERROR_PREFIX = "오류: ";
 const CARD_SUMMARY_HYDRATE_LIMIT = 5;
+const MIN_COVER_SOURCE_WIDTH = 170;
 
 let currentResults = [];
 let filteredResults = [];
@@ -96,6 +97,66 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+}
+
+function coverCandidateUrls(book) {
+    const urls = [];
+    function addUrl(value) {
+        const url = String(value || "").trim();
+        if (!url || urls.includes(url)) return;
+        if (!/^https?:\/\//i.test(url) && !url.startsWith("//")) return;
+        urls.push(url.startsWith("//") ? `https:${url}` : url);
+    }
+    addUrl(book && book.image_url);
+    (Array.isArray(book && book.image_candidates) ? book.image_candidates : []).forEach(candidate => {
+        addUrl(typeof candidate === "string" ? candidate : candidate && (candidate.url || candidate.image_url));
+    });
+    return urls;
+}
+
+function coverImageHtml(book) {
+    const urls = coverCandidateUrls(book);
+    if (!urls.length) return `<div class="no-img">이미지 없음</div>`;
+    return `<img src="${escapeAttr(urls[0])}" data-cover-candidates="${escapeAttr(JSON.stringify(urls))}" data-cover-index="0" loading="lazy" alt="">`;
+}
+
+function nextCoverCandidate(img) {
+    let candidates = [];
+    try {
+        candidates = JSON.parse(img.getAttribute("data-cover-candidates") || "[]");
+    } catch (err) {
+        candidates = [];
+    }
+    const current = Number(img.getAttribute("data-cover-index") || 0);
+    const next = candidates[current + 1];
+    if (!next) return false;
+    img.setAttribute("data-cover-index", String(current + 1));
+    img.src = next;
+    return true;
+}
+
+function coverFallback(img) {
+    const parent = img.parentElement;
+    if (!parent) return;
+    parent.innerHTML = `<div class="no-img">이미지 없음</div>`;
+}
+
+function bindCoverUpgrades(scope) {
+    const root = scope || document;
+    root.querySelectorAll("img[data-cover-candidates]:not([data-cover-bound])").forEach(img => {
+        img.setAttribute("data-cover-bound", "1");
+        img.addEventListener("error", () => {
+            if (!nextCoverCandidate(img)) coverFallback(img);
+        });
+        img.addEventListener("load", () => {
+            if (img.naturalWidth > 0 && img.naturalWidth < MIN_COVER_SOURCE_WIDTH) {
+                nextCoverCandidate(img);
+            }
+        });
+        if (img.complete && img.naturalWidth > 0 && img.naturalWidth < MIN_COVER_SOURCE_WIDTH) {
+            nextCoverCandidate(img);
+        }
+    });
 }
 
 function liveDetailUrlForBook(book) {
@@ -356,9 +417,7 @@ function renderMore() {
         const author = String(book.author || "");
         const publisher = String(book.publisher || "");
         const ariaLabel = `${title || "도서"} 상세로 이동`;
-        const imgHtml = book.image_url
-            ? `<img src="${book.image_url}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'no-img\'>이미지 없음</div>'">`
-            : `<div class="no-img">이미지 없음</div>`;
+        const imgHtml = coverImageHtml(book);
 
     const html = `
         <div class="card js-book-card" role="link" tabindex="0" aria-label="${escapeAttr(ariaLabel)}" ${bookId ? `data-book-id="${bookId}"` : ""} ${liveDetailUrl ? `data-live-detail-url="${escapeAttr(liveDetailUrl)}"` : ""} ${book.summary_url ? `data-summary-url="${escapeAttr(book.summary_url)}"` : ""}>
@@ -377,6 +436,7 @@ function renderMore() {
     `;
         resultsDiv.insertAdjacentHTML('beforeend', html);
     });
+    bindCoverUpgrades(resultsDiv);
     syncShelfButtons();
     hydrateSearchCardSummaries();
     renderIndex += slice.length;

@@ -43,6 +43,29 @@ def main():
     shared_shelves_tmp.unlink(missing_ok=True)
     client = app.test_client()
 
+    cover_choice = merge_live_results(
+        [
+            LiveSearchResult(
+                title="표지 품질 테스트",
+                author="테스터",
+                platform="Bookcube",
+                image_url="https://cdn.example.com/thumb/cover_90.jpg",
+            ),
+            LiveSearchResult(
+                title="표지 품질 테스트",
+                author="테스터",
+                platform="SeoulLibrary",
+                image_url="https://cdn.example.com/cover_m_480.jpg",
+                image_candidates=[{"url": "https://cdn.example.com/cover_m_480.jpg", "hint": "medium"}],
+                identifiers={"content_id": "cover-smoke"},
+            ),
+        ]
+    )[0]
+    if cover_choice.get("image_url") != "https://cdn.example.com/cover_m_480.jpg":
+        raise AssertionError(f"cover representative did not prefer higher-quality candidate: {cover_choice}")
+    if not cover_choice.get("image_candidates"):
+        raise AssertionError("cover candidates were not preserved during live-result merge")
+
     landing = assert_response(client, "/")
     landing_body = landing.get_data(as_text=True)
     if "landing-shell" not in landing_body:

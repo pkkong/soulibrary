@@ -82,6 +82,10 @@ class SeoulLibraryConnector:
                     if not title or not content_id or content_id in seen:
                         continue
                     seen.add(content_id)
+                    image_candidates = [
+                        {"url": item.get("coverMSizeUrl") or "", "hint": "medium"},
+                        {"url": item.get("coverUrl") or "", "hint": "primary"},
+                    ]
                     results.append(
                         LiveSearchResult(
                             title=title,
@@ -92,7 +96,8 @@ class SeoulLibraryConnector:
                             library_short=config.get("short_name") or "",
                             platform=self.platform,
                             provider=item.get("ownerCode") or "서울도서관",
-                            image_url=item.get("coverUrl") or item.get("coverMSizeUrl") or "",
+                            image_url=item.get("coverMSizeUrl") or item.get("coverUrl") or "",
+                            image_candidates=image_candidates,
                             detail_url=f"https://elib.seoul.go.kr/contents/detail?no={content_id}",
                             isbn=item.get("isbn") or "",
                             service_type=config.get("service_type") or "",
@@ -181,6 +186,7 @@ class SenConnector:
             platform=self.platform,
             provider=item.get("ownerDesc") or "서울시교육청",
             image_url=item.get("coverUrl") or "",
+            image_candidates=[{"url": item.get("coverUrl") or "", "hint": "primary"}],
             detail_url=f"https://e-lib.sen.go.kr/contents/detail?no={content_id}&type=TY01" if content_id else "",
             isbn=(item.get("isbn") or "").strip(),
             service_type=config.get("service_type") or "",
@@ -199,6 +205,7 @@ class SenConnector:
             platform=self.platform,
             provider=item.get("ucm_publisher") or "서울시교육청",
             image_url=item.get("ucm_cover_url") or "",
+            image_candidates=[{"url": item.get("ucm_cover_url") or "", "hint": "primary"}],
             detail_url=f"https://e-lib.sen.go.kr/contents/detail?no={content_id}&type=TY02" if content_id else "",
             isbn=item.get("ucm_ebook_isbn") or item.get("isbn") or "",
             service_type=config.get("service_type") or "",

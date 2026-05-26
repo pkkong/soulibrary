@@ -23,6 +23,7 @@ const shelf = window.SoulibShelf;
 const ACTIVE_LIST_KEY = "soulib.myShelf.activeList";
 const VIEW_MODE_KEY = "soulib.myShelf.viewMode";
 const VIEW_MODES = new Set(["grid3", "grid2", "list"]);
+const MIN_COVER_SOURCE_WIDTH = 170;
 const ICONS = {
     remove: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12"></path><path d="M18 6 6 18"></path></svg>',
 };
@@ -49,14 +50,77 @@ function escapeAttr(value) {
     return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
+function coverCandidateUrls(book) {
+    const urls = [];
+    function addUrl(value) {
+        const url = cleanText(value);
+        if (!url || urls.includes(url)) return;
+        if (!/^https?:\/\//i.test(url) && !url.startsWith("//")) return;
+        urls.push(url.startsWith("//") ? `https:${url}` : url);
+    }
+    addUrl(book && book.image_url);
+    (Array.isArray(book && book.image_candidates) ? book.image_candidates : []).forEach(candidate => {
+        addUrl(typeof candidate === "string" ? candidate : candidate && (candidate.url || candidate.image_url));
+    });
+    return urls;
+}
+
 function coverHtml(book, className) {
-    const imageUrl = cleanText(book.image_url);
-    if (!imageUrl) return `<div class="${className} shelf-no-cover">표지 없음</div>`;
+    const urls = coverCandidateUrls(book);
+    if (!urls.length) return `<div class="${className} shelf-no-cover">표지 없음</div>`;
     return `
         <div class="${className}">
-            <img src="${escapeAttr(imageUrl)}" alt="" loading="lazy" onerror="this.remove(); this.parentElement.classList.add('shelf-no-cover'); this.parentElement.textContent='표지 없음';">
+            <img src="${escapeAttr(urls[0])}" alt="" loading="lazy" data-cover-candidates="${escapeAttr(JSON.stringify(urls))}" data-cover-index="0" data-shelf-cover-key="${escapeAttr(book.key)}">
         </div>
     `;
+}
+
+function nextCoverCandidate(img) {
+    let candidates = [];
+    try {
+        candidates = JSON.parse(img.getAttribute("data-cover-candidates") || "[]");
+    } catch (err) {
+        candidates = [];
+    }
+    const current = Number(img.getAttribute("data-cover-index") || 0);
+    const next = candidates[current + 1];
+    if (!next) return false;
+    img.setAttribute("data-cover-index", String(current + 1));
+    img.src = next;
+    return true;
+}
+
+function coverFallback(img) {
+    const parent = img.parentElement;
+    if (!parent) return;
+    img.remove();
+    parent.classList.add("shelf-no-cover");
+    parent.textContent = "표지 없음";
+}
+
+function persistLoadedCover(img) {
+    const index = Number(img.getAttribute("data-cover-index") || 0);
+    const key = img.getAttribute("data-shelf-cover-key") || "";
+    if (index > 0 && key && shelf && typeof shelf.updateCover === "function") {
+        shelf.updateCover(key, img.currentSrc || img.src);
+    }
+}
+
+function bindCoverUpgrades(scope) {
+    const root = scope || document;
+    root.querySelectorAll("img[data-cover-candidates]:not([data-cover-bound])").forEach(img => {
+        img.setAttribute("data-cover-bound", "1");
+        img.addEventListener("error", () => {
+            if (!nextCoverCandidate(img)) coverFallback(img);
+        });
+        img.addEventListener("load", () => {
+            if (img.naturalWidth > 0 && img.naturalWidth < MIN_COVER_SOURCE_WIDTH && nextCoverCandidate(img)) return;
+            persistLoadedCover(img);
+        });
+        if (img.complete && img.naturalWidth > 0 && img.naturalWidth < MIN_COVER_SOURCE_WIDTH) {
+            nextCoverCandidate(img);
+        }
+    });
 }
 
 function ensureActiveList() {
@@ -179,6 +243,7 @@ function renderShelf() {
         `;
     }).join("");
     updateShelfViewState();
+    bindCoverUpgrades(shelfItems);
 }
 
 async function copyShareUrl() {

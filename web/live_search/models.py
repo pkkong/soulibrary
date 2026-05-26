@@ -12,6 +12,7 @@ class LiveSearchResult:
     platform: str = ""
     provider: str = ""
     image_url: str = ""
+    image_candidates: list = field(default_factory=list)
     isbn: str = ""
     detail_url: str = ""
     service_type: str = ""
@@ -28,6 +29,7 @@ class LiveSearchResult:
             "platform": self.platform,
             "provider": self.provider,
             "image_url": self.image_url,
+            "image_candidates": list(self.image_candidates or []),
             "isbn": self.isbn,
             "detail_url": self.detail_url,
             "service_type": self.service_type,

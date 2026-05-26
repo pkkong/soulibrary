@@ -307,17 +307,33 @@ def _normalize_shared_book(raw):
     if not title:
         return None
     counts = raw.get("counts") if isinstance(raw.get("counts"), dict) else {}
+    image_candidates = raw.get("image_candidates") if isinstance(raw.get("image_candidates"), list) else []
     def _count_value(key):
         try:
             return max(0, int(counts.get(key) or 0))
         except Exception:
             return 0
+    def _cover_candidate(value):
+        if isinstance(value, str):
+            url = _clean_shared_text(value, 500)
+        elif isinstance(value, dict):
+            url = _clean_shared_text(value.get("url") or value.get("image_url"), 500)
+        else:
+            url = ""
+        if not url or not (url.startswith("http://") or url.startswith("https://") or url.startswith("//")):
+            return None
+        return {"url": f"https:{url}" if url.startswith("//") else url}
     return {
         "key": _clean_shared_text(raw.get("key"), 160),
         "title": title,
         "author": _clean_shared_text(raw.get("author"), 120),
         "publisher": _clean_shared_text(raw.get("publisher"), 120),
         "image_url": _clean_shared_text(raw.get("image_url"), 500),
+        "image_candidates": [
+            candidate
+            for candidate in (_cover_candidate(value) for value in image_candidates[:8])
+            if candidate
+        ],
         "live_detail_key": _clean_shared_text(raw.get("live_detail_key"), 80),
         "live_detail_url": _clean_shared_text(raw.get("live_detail_url"), 500),
         "book_id": raw.get("book_id") if isinstance(raw.get("book_id"), int) else None,

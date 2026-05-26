@@ -421,6 +421,7 @@ def api_live_book_detail():
                     "author": decorated.get("author") or "",
                     "publisher": decorated.get("publisher") or "",
                     "image_url": decorated.get("image_url") or "",
+                    "image_candidates": decorated.get("image_candidates") or [],
                     "counts": decorated.get("counts") or {},
                     "libraries": decorated.get("libraries") or [],
                     "live_detail_key": decorated.get("live_detail_key") or cache_key,

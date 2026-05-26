@@ -177,6 +177,22 @@
         return `도서관 ${total}곳${parts.length ? ` · ${parts.join(" · ")}` : ""}`;
     }
 
+    function normalizeCoverCandidates(book) {
+        const urls = [];
+        function addUrl(value) {
+            const url = cleanText(value);
+            if (!url || urls.includes(url)) return;
+            if (!/^https?:\/\//i.test(url) && !url.startsWith("//")) return;
+            urls.push(url.startsWith("//") ? `https:${url}` : url);
+        }
+        addUrl(book && book.image_url);
+        const candidates = Array.isArray(book && book.image_candidates) ? book.image_candidates : [];
+        candidates.forEach(candidate => {
+            addUrl(typeof candidate === "string" ? candidate : candidate && (candidate.url || candidate.image_url));
+        });
+        return urls.slice(0, 8).map(url => ({ url }));
+    }
+
     function toShelfBook(book) {
         const key = keyFor(book || {});
         return {
@@ -185,6 +201,7 @@
             author: cleanText(book && book.author),
             publisher: cleanText(book && book.publisher),
             image_url: cleanText(book && book.image_url),
+            image_candidates: normalizeCoverCandidates(book || {}),
             live_detail_key: cleanText(book && book.live_detail_key),
             live_detail_url: detailUrl(book || {}),
             book_id: (book && book.book_id) || null,
@@ -265,7 +282,14 @@
         const item = toShelfBook(book || {});
         if (!item.title) return null;
         const existing = state.books[item.key];
-        if (existing && existing.added_at) item.added_at = existing.added_at;
+        if (existing && existing.added_at) {
+            item.added_at = existing.added_at;
+            item.image_candidates = normalizeCoverCandidates({
+                image_url: item.image_url || existing.image_url,
+                image_candidates: [...(item.image_candidates || []), ...(existing.image_candidates || [])],
+            });
+            if (!item.image_url && existing.image_url) item.image_url = existing.image_url;
+        }
         const targetId = listId || state.lists[0].id;
         let list = state.lists.find(entry => entry.id === targetId);
         if (!list) list = state.lists[0];
@@ -298,6 +322,20 @@
         emitChanged("remove-all", { key });
     }
 
+    function updateCover(key, imageUrl) {
+        const cleanKey = cleanText(key);
+        const url = cleanText(imageUrl);
+        if (!cleanKey || !url) return false;
+        const state = loadState();
+        const book = state.books[cleanKey];
+        if (!book || book.image_url === url) return false;
+        book.image_url = url;
+        book.image_candidates = normalizeCoverCandidates(book);
+        book.updated_at = nowIso();
+        saveState(state);
+        return true;
+    }
+
     function booksForList(listId) {
         const state = loadState();
         const list = state.lists.find(item => item.id === listId) || state.lists[0];
@@ -326,5 +364,6 @@
         renameList,
         saveState,
         toShelfBook,
+        updateCover,
     };
 })();

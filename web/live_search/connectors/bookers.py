@@ -82,6 +82,7 @@ class BookersConnector:
             platform=self.platform,
             provider="부커스",
             image_url=item.get("ucm_cover_url") or "",
+            image_candidates=[{"url": item.get("ucm_cover_url") or "", "hint": "primary"}],
             detail_url=_detail_url(config, content_id),
             isbn=item.get("ucm_ebook_isbn") or item.get("isbn") or "",
             service_type=config.get("service_type") or "",

@@ -1,6 +1,8 @@
 import re
 from urllib.parse import urlencode
 
+from live_search.covers import best_cover_url, compact_cover_candidates, cover_candidates_for_item
+
 
 def normalize_text(value: str) -> str:
     text = str(value or "").lower()
@@ -130,21 +132,26 @@ def merge_live_results(results):
         author_display = clean_author_display(item.get("author")) or item.get("author") or ""
         key = result_group_key(item)
         entry = grouped.get(key)
+        item_candidates = cover_candidates_for_item(item)
         if not entry:
             entry = {
                 "book_id": None,
                 "title": title,
                 "author": author_display,
                 "publisher": item.get("publisher") or "",
-                "image_url": item.get("image_url") or "",
+                "image_url": best_cover_url(item_candidates, item.get("image_url") or ""),
+                "image_candidates": item_candidates,
                 "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
                 "libraries": [],
                 "_seen_library_codes": set(),
             }
             grouped[key] = entry
 
-        if not entry.get("image_url") and item.get("image_url"):
-            entry["image_url"] = item.get("image_url") or ""
+        if item_candidates:
+            entry["image_candidates"] = compact_cover_candidates(
+                (entry.get("image_candidates") or []) + item_candidates
+            )
+            entry["image_url"] = best_cover_url(entry.get("image_candidates") or [], entry.get("image_url") or "")
         if item.get("author") and (
             not entry.get("author")
             or _author_display_quality(author_display) > _author_display_quality(entry.get("author"))

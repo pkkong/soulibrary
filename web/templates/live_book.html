@@ -100,7 +100,7 @@
 
 {% block scripts %}
 {% if book %}
-<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260519i') }}"></script>
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260526a') }}"></script>
 <script src="{{ url_for('static', filename='js/shelf_picker.js', v='20260519i') }}"></script>
 <script>
     (function () {
@@ -368,6 +368,7 @@
             author: {{ (book.author or "")|tojson }},
             publisher: {{ (book.publisher or "")|tojson }},
             image_url: {{ (book.image_url or "")|tojson }},
+            image_candidates: {{ (book.image_candidates or [])|tojson }},
             live_detail_url: {{ request.full_path.rstrip("?")|tojson }},
             counts: {{ (book.counts or {})|tojson }},
             libraries: {{ (book.libraries or [])|tojson }}
@@ -381,6 +382,7 @@
         window.addEventListener("soulib:live-book-hydrated", (event) => {
             const next = event.detail || {};
             if (next.image_url) book.image_url = next.image_url;
+            if (next.image_candidates) book.image_candidates = next.image_candidates;
             if (next.counts) book.counts = next.counts;
             if (next.libraries) book.libraries = next.libraries;
             if (next.live_detail_url) book.live_detail_url = next.live_detail_url;
