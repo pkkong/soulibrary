@@ -181,7 +181,7 @@ def main():
         raise AssertionError("SF recommendation post did not render internal search link")
     if 'data-search-query="마션 앤디 위어"' not in sf_rec_body or "blog-search-card-cover" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render cover-ready search cards")
-    if "/static/img/blog/recommendations/sf-next-read.svg" not in sf_rec_body:
+    if "/static/img/blog/recommendations/sf-next-read/hero-cover-set.png" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render recommendation-specific cover")
     if "project-hail-mary-official-poster" in sf_rec_body or "blog-post-cover is-external" in sf_rec_body:
         raise AssertionError("recommendation posts should not use an external poster as the representative image")
@@ -192,10 +192,10 @@ def main():
     if "search-project-hail-mary" in bestseller_rec_body or "detail-project-hail-mary" in bestseller_rec_body:
         raise AssertionError("unrelated recommendation posts must not reuse Project Hail Mary screenshots")
     recommendation_covers = {
-        "/blog/bestseller-waitlist-alternative-ebooks": "/static/img/blog/recommendations/bestseller-alternatives.svg",
-        "/blog/commute-mystery-ebook-recommendations": "/static/img/blog/recommendations/commute-mystery.svg",
-        "/blog/ebook-business-starter-recommendations": "/static/img/blog/recommendations/business-starter.svg",
-        "/blog/family-ebook-candidates-for-parent-child-reading": "/static/img/blog/recommendations/family-reading.svg",
+        "/blog/bestseller-waitlist-alternative-ebooks": "/static/img/blog/recommendations/bestseller-alternatives/hero-cover-set.png",
+        "/blog/commute-mystery-ebook-recommendations": "/static/img/blog/recommendations/commute-mystery/hero-cover-set.png",
+        "/blog/ebook-business-starter-recommendations": "/static/img/blog/recommendations/business-starter/hero-cover-set.png",
+        "/blog/family-ebook-candidates-for-parent-child-reading": "/static/img/blog/recommendations/family-reading/hero-cover-set.png",
     }
     for path, cover in recommendation_covers.items():
         body = assert_response(client, path).get_data(as_text=True)

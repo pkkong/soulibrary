@@ -19,6 +19,39 @@ SUPPORTED_BODY_LINK_SCHEMES = ("http://", "https://")
 STRICT_MIN_BODY_CHARS = 3500
 BASELINE_MIN_BODY_CHARS = 900
 SOULIB_SEARCH_BLOCK_RE = re.compile(r"^\[\[soulib-search:([^\]]+)\]\]$", flags=re.MULTILINE)
+GLOBAL_BANNED_PHRASES = (
+    "Soulib에서는 제목 전체와 저자명",
+    "제목 전체와 저자명",
+    "결과가 여러 개라면 출판사와 표지를 대조",
+    "보유 도서관 수가 많은 항목부터 확인",
+)
+RECOMMENDATION_HERO_RE = re.compile(
+    r"^/static/img/blog/recommendations/[0-9a-z-]+/hero-cover-set\.png$"
+)
+RECOMMENDATION_BANNED_PHRASES = (
+    "정확한 Soulib 검색어",
+    "Soulib 검색어",
+    "결과에서 확인할 것",
+    "제목+저자",
+    "제목 전체와 저자명",
+    "검색 카드",
+    "오늘 바로 실행",
+    "행동으로 바꾸는",
+)
+RECOMMENDATION_BANNED_PATTERNS = (
+    (
+        re.compile(r"제목\s*전체.{0,12}저자명"),
+        "title-and-author prompt should not be written as a user instruction",
+    ),
+    (
+        re.compile(r"표지.{0,24}출판사.{0,24}(?:대조|확인)"),
+        "do not repeat cover/publisher comparison instructions in recommendation copy",
+    ),
+    (
+        re.compile(r"출판사.{0,24}표지.{0,24}(?:대조|확인)"),
+        "do not repeat publisher/cover comparison instructions in recommendation copy",
+    ),
+)
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -172,6 +205,10 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
     if strict and not all(term in body for term in ("도서관", "대출")):
         errors.append(f"{label}: strict posts must connect the guidance to library borrowing context")
 
+    for phrase in GLOBAL_BANNED_PHRASES:
+        if phrase in body:
+            errors.append(f"{label}: blog copy must not contain forced guidance phrase `{phrase}`")
+
     if re.search(r"\b(TODO|TBD|FIXME)\b", body, flags=re.IGNORECASE):
         errors.append(f"{label}: contains placeholder TODO/TBD/FIXME")
 
@@ -229,12 +266,21 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
         if len(parts) < 3 or not all(parts[:3]):
             errors.append(f"{label}: Soulib search cards need title, meta, and note fields")
     if strict and meta.get("category_slug") == "recommendations":
+        for phrase in RECOMMENDATION_BANNED_PHRASES:
+            if phrase in body:
+                errors.append(f"{label}: strict recommendation posts must not contain `{phrase}`")
+        for pattern, message in RECOMMENDATION_BANNED_PATTERNS:
+            if pattern.search(body):
+                errors.append(f"{label}: {message}")
         if len(search_blocks) < 3:
             errors.append(f"{label}: strict recommendation posts need at least 3 Soulib search cards")
         if not image_url:
             errors.append(f"{label}: strict recommendation posts need a frontmatter representative image")
-        elif not image_url.startswith("/static/img/blog/recommendations/"):
-            errors.append(f"{label}: strict recommendation representative image must use /static/img/blog/recommendations/, got `{image_url}`")
+        elif not RECOMMENDATION_HERO_RE.fullmatch(image_url):
+            errors.append(
+                f"{label}: strict recommendation representative image must use "
+                f"`/static/img/blog/recommendations/<topic>/hero-cover-set.png`, got `{image_url}`"
+            )
         if not image_url and not images:
             errors.append(f"{label}: strict recommendation posts need a real visual asset")
         if max_consecutive_search_cards(body) > 2:
