@@ -56,8 +56,10 @@ RECOMMENDATION_BANNED_HEADING_RE = re.compile(
     r"^##\s*(?:후보|추천|첫\s*번째\s*후보|두\s*번째\s*후보)\s*\d*[\.\)]?\s+",
     flags=re.MULTILINE,
 )
-REFERENCE_HEADING_RE = re.compile(r"^##\s+참고한 자료\s*$", flags=re.MULTILINE)
-REFERENCE_LINK_RE = re.compile(r"^-\s+\[[^\]]+\]\(https://[^)]+\)\s*$")
+REFERENCE_SECTION_HEADING_RE = re.compile(
+    r"^##\s+(?:참고한 자료|참고 자료|출처|공식 안내와 설치 링크|References?|Sources?)\s*$",
+    flags=re.MULTILINE | re.IGNORECASE,
+)
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -90,17 +92,6 @@ def markdown_links(body: str) -> list[tuple[str, str]]:
 
 def markdown_images(body: str) -> list[tuple[str, str]]:
     return re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", body)
-
-
-def reference_section_lines(body: str) -> list[str]:
-    match = REFERENCE_HEADING_RE.search(body)
-    if not match:
-        return []
-    section = body[match.end() :]
-    next_heading = re.search(r"^##\s+", section, flags=re.MULTILINE)
-    if next_heading:
-        section = section[: next_heading.start()]
-    return [line.strip() for line in section.splitlines() if line.strip()]
 
 
 def soulib_search_blocks(body: str) -> list[list[str]]:
@@ -238,13 +229,8 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
     if re.search(r"<[^>]+>", body):
         errors.append(f"{label}: raw HTML is not supported in blog posts")
 
-    references = reference_section_lines(body)
-    if references:
-        if not any(REFERENCE_LINK_RE.fullmatch(line) for line in references):
-            errors.append(f"{label}: reference section must include at least one `- [title](https://...)` link")
-        for line in references:
-            if not REFERENCE_LINK_RE.fullmatch(line):
-                errors.append(f"{label}: reference section entries must be `- [title](https://...)`, got `{line}`")
+    if REFERENCE_SECTION_HEADING_RE.search(body):
+        errors.append(f"{label}: use inline reference links in body copy instead of a bottom reference/source section")
 
     links = markdown_links(body)
     if strict and meta.get("category_slug") == "guide" and len(links) < 2:
