@@ -34,6 +34,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run blog quality check
+        run: python scripts/blog_quality_check.py
+
       - name: Run smoke test
         run: python scripts/smoke_test.py
 

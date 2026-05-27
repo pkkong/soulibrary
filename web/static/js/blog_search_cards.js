@@ -9,14 +9,6 @@
         return String(value || "").toLowerCase().replace(/[^0-9a-z가-힣]/g, "");
     }
 
-    function escapeAttr(value) {
-        return String(value || "")
-            .replaceAll("&", "&amp;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;");
-    }
-
     function coverCandidateUrls(book) {
         const urls = [];
         function addUrl(value) {
@@ -69,29 +61,47 @@
         return payload.items || [];
     }
 
-    function installCover(card, urls, title) {
+    function resetCover(card) {
         const cover = card.querySelector(".blog-search-card-cover");
-        if (!cover || !urls.length) return;
-        let index = 0;
-        function useNext() {
-            const url = urls[index];
-            if (!url) return;
-            cover.innerHTML = `<img src="${escapeAttr(url)}" alt="" loading="lazy">`;
-            const img = cover.querySelector("img");
-            img.addEventListener("error", () => {
-                index += 1;
-                useNext();
-            });
+        if (cover) {
+            cover.replaceChildren();
+        }
+        delete card.dataset.coverReady;
+    }
+
+    function loadCover(url, preferNext) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.alt = "";
+            img.loading = "lazy";
+            img.decoding = "async";
             img.addEventListener("load", () => {
-                if (img.naturalWidth > 0 && img.naturalWidth < MIN_COVER_SOURCE_WIDTH && urls[index + 1]) {
-                    index += 1;
-                    useNext();
+                if (preferNext && img.naturalWidth > 0 && img.naturalWidth < MIN_COVER_SOURCE_WIDTH) {
+                    resolve(null);
+                    return;
                 }
-            });
+                resolve(img);
+            }, { once: true });
+            img.addEventListener("error", () => resolve(null), { once: true });
+            img.src = url;
+        });
+    }
+
+    async function installCover(card, urls, title) {
+        const cover = card.querySelector(".blog-search-card-cover");
+        if (!cover || !urls.length) {
+            resetCover(card);
+            return;
+        }
+        for (let index = 0; index < urls.length; index += 1) {
+            const img = await loadCover(urls[index], index < urls.length - 1);
+            if (!img) continue;
+            cover.replaceChildren(img);
             card.dataset.coverReady = "1";
             card.setAttribute("aria-label", `Soulib에서 ${title || "도서"} 검색`);
+            return;
         }
-        useNext();
+        resetCover(card);
     }
 
     async function hydrateCard(card) {
@@ -108,9 +118,10 @@
                 book = bestBookWithCover(items, title, meta) || bestBook(items, title, meta);
                 urls = coverCandidateUrls(book);
             }
-            installCover(card, urls, title);
+            await installCover(card, urls, title);
         } catch (error) {
             // Blog content remains usable as a text search card if live cover hydration fails.
+            resetCover(card);
         }
     }
 

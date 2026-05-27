@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import quote
 
@@ -28,6 +29,7 @@ from live_search.connectors.bookers import BookersConnector  # noqa: E402
 from live_search.models import LiveSearchResult  # noqa: E402
 from live_search.normalizer import merge_live_results, normalize_author, normalize_title_for_group  # noqa: E402
 from live_search.service import _result_matches_query  # noqa: E402
+from blog_posts import get_blog_posts  # noqa: E402
 
 
 def assert_response(client, path, expected_status=200):
@@ -36,6 +38,49 @@ def assert_response(client, path, expected_status=200):
         body = response.get_data(as_text=True)[:500]
         raise AssertionError(f"{path} returned {response.status_code}, expected {expected_status}: {body}")
     return response
+
+
+class ImgSrcParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.srcs = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "img":
+            attr_map = dict(attrs)
+            self.srcs.append(attr_map.get("src", ""))
+
+
+def image_sources(html):
+    parser = ImgSrcParser()
+    parser.feed(html)
+    return parser.srcs
+
+
+def assert_blog_images_load(client):
+    posts = get_blog_posts()
+    paths = ["/blog", "/blog?category=guide", "/blog?category=recommendations"]
+    paths.extend(f"/blog/{post['slug']}" for post in posts)
+    failures = []
+    seen = set()
+    for path in paths:
+        body = assert_response(client, path).get_data(as_text=True)
+        for src in image_sources(body):
+            key = (path, src)
+            if key in seen:
+                continue
+            seen.add(key)
+            if not src.startswith("/static/"):
+                failures.append(f"{path}: rendered blog image must use /static/, got `{src}`")
+                continue
+            response = client.get(src)
+            content_type = response.headers.get("Content-Type", "")
+            if response.status_code != 200 or not response.data:
+                failures.append(f"{path}: image `{src}` returned {response.status_code} ({len(response.data)} bytes)")
+            elif not (content_type.startswith("image/") or src.endswith(".svg")):
+                failures.append(f"{path}: image `{src}` returned unexpected content type `{content_type}`")
+    if failures:
+        raise AssertionError("Broken blog images:\n" + "\n".join(failures))
 
 
 def main():
@@ -104,6 +149,7 @@ def main():
         raise AssertionError("blog page did not render SeoulOn-specific visual")
     if blog_body.find("blog-more") > blog_body.find("blog-category-section"):
         raise AssertionError("blog article list should render before topic cards")
+    assert_blog_images_load(client)
     guide_blog = assert_response(client, "/blog?category=guide")
     guide_blog_body = guide_blog.get_data(as_text=True)
     if "서울 전자도서관을 처음 이용할 때 준비할 것" not in guide_blog_body or "이용 안내" not in guide_blog_body:

@@ -2812,8 +2812,8 @@ body.has-topbar .search-top {
 
 .blog-figure-tall img {
     height: min(560px, 68svh);
-    object-fit: cover;
-    object-position: top center;
+    object-fit: contain;
+    object-position: center top;
 }
 
 .blog-figure figcaption {

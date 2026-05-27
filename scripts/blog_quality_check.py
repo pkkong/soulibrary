@@ -96,7 +96,7 @@ def static_path_exists(url: str) -> bool:
 
 
 def frontmatter_image_allowed(url: str) -> bool:
-    return static_path_exists(url) or url.startswith("https://")
+    return static_path_exists(url)
 
 
 def tokens(text: str) -> set[str]:
@@ -198,7 +198,7 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
     image_url = meta.get("image", "")
     if image_url:
         if not frontmatter_image_allowed(image_url):
-            errors.append(f"{label}: frontmatter image must be an existing /static/ asset or trusted https image, got `{image_url}`")
+            errors.append(f"{label}: frontmatter image must be an existing /static/ asset, got `{image_url}`")
         if strict and len(meta.get("image_alt", "")) < 12:
             errors.append(f"{label}: strict posts need specific image_alt text")
 

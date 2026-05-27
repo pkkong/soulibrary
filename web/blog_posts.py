@@ -3,6 +3,7 @@ import os
 import re
 from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import quote
 
 try:
@@ -56,9 +57,18 @@ def _category_for(meta):
 
 def _safe_image(value):
     url = _clean(value)
-    if url.startswith("/static/") or re.match(r"^https?://", url):
+    if url.startswith("/static/") and _static_file_exists(url):
+        return url
+    if re.match(r"^https?://", url):
         return url
     return ""
+
+
+def _static_file_exists(url):
+    if not url.startswith("/static/"):
+        return False
+    path = os.path.join(ROOT_DIR, "web", url.lstrip("/").replace("/", os.sep))
+    return os.path.isfile(path)
 
 
 def _parse_frontmatter(text):
@@ -97,10 +107,35 @@ def _inline(text):
 
 @lru_cache(maxsize=64)
 def _image_size(url):
-    if not Image or not url.startswith("/static/"):
+    if not url.startswith("/static/"):
         return None, None
     path = os.path.join(ROOT_DIR, "web", url.lstrip("/").replace("/", os.sep))
     if not os.path.isfile(path):
+        return None, None
+    if Path(path).suffix.lower() == ".svg":
+        try:
+            head = Path(path).read_text(encoding="utf-8")[:1000]
+        except OSError:
+            return None, None
+        width_match = re.search(r'\bwidth="([0-9.]+)(?:px)?"', head)
+        height_match = re.search(r'\bheight="([0-9.]+)(?:px)?"', head)
+        if width_match and height_match:
+            return int(float(width_match.group(1))), int(float(height_match.group(1)))
+        viewbox_match = re.search(r'\bviewBox="([0-9.\s-]+)"', head)
+        if viewbox_match:
+            parts = [float(part) for part in viewbox_match.group(1).split()]
+            if len(parts) == 4 and parts[2] > 0 and parts[3] > 0:
+                return int(parts[2]), int(parts[3])
+        return None, None
+    if Path(path).suffix.lower() == ".png":
+        try:
+            with open(path, "rb") as image_file:
+                header = image_file.read(24)
+            if header.startswith(b"\x89PNG\r\n\x1a\n") and len(header) >= 24:
+                return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
+        except OSError:
+            return None, None
+    if not Image:
         return None, None
     try:
         with Image.open(path) as img:
@@ -117,13 +152,17 @@ def _render_image(line):
     url = _clean(match.group(2))
     if not (url.startswith("/static/") or re.match(r"^https?://", url)):
         return None
+    if url.startswith("/static/") and not _static_file_exists(url):
+        return None
     safe_alt = html.escape(alt, quote=True)
     safe_url = html.escape(url, quote=True)
     width, height = _image_size(url)
     size_attrs = f' width="{width}" height="{height}"' if width and height else ""
     figure_class = "blog-figure"
-    if (width and height and height / max(width, 1) >= 1.6) or url.startswith("/static/img/blog/soulib-guide/"):
+    if width and height and height / max(width, 1) >= 1.25:
         figure_class += " blog-figure-tall"
+    if width and height and width / max(height, 1) >= 1.25:
+        figure_class += " blog-figure-wide"
     if url.startswith("/static/img/blog/seoul-on/"):
         figure_class += " blog-figure-wide"
     caption = f"<figcaption>{html.escape(alt)}</figcaption>" if alt else ""
