@@ -231,6 +231,10 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
     if strict and meta.get("category_slug") == "recommendations":
         if len(search_blocks) < 3:
             errors.append(f"{label}: strict recommendation posts need at least 3 Soulib search cards")
+        if not image_url:
+            errors.append(f"{label}: strict recommendation posts need a frontmatter representative image")
+        elif not image_url.startswith("/static/img/blog/recommendations/"):
+            errors.append(f"{label}: strict recommendation representative image must use /static/img/blog/recommendations/, got `{image_url}`")
         if not image_url and not images:
             errors.append(f"{label}: strict recommendation posts need a real visual asset")
         if max_consecutive_search_cards(body) > 2:

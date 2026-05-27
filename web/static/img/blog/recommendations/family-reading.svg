@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">아이와 함께 찾는 가족 독서 전자책 후보</title>
+  <desc id="desc">보호자와 아이가 함께 읽을 전자책 후보를 비교하고 내 서재에 저장하는 대표 이미지</desc>
+  <rect width="1200" height="760" fill="#f6f8fb"/>
+  <rect x="92" y="84" width="1016" height="592" rx="44" fill="#ffffff"/>
+  <text x="146" y="158" fill="#1d1d1f" font-family="Arial, sans-serif" font-size="42" font-weight="800">함께 고르는 전자책</text>
+  <text x="146" y="202" fill="#6e6e73" font-family="Arial, sans-serif" font-size="22">아이 취향과 보호자 기준을 나란히 놓고 비교합니다.</text>
+  <g transform="translate(158 292)">
+    <rect width="380" height="260" rx="34" fill="#fff7ed" stroke="#ffedd5"/>
+    <text x="42" y="68" fill="#9a3412" font-family="Arial, sans-serif" font-size="26" font-weight="800">아이의 후보</text>
+    <rect x="48" y="104" width="84" height="120" rx="14" fill="#fb923c"/>
+    <rect x="158" y="104" width="84" height="120" rx="14" fill="#facc15"/>
+    <rect x="268" y="104" width="64" height="120" rx="14" fill="#fdba74"/>
+  </g>
+  <g transform="translate(662 292)">
+    <rect width="380" height="260" rx="34" fill="#eef6ff" stroke="#dbeafe"/>
+    <text x="42" y="68" fill="#1d4ed8" font-family="Arial, sans-serif" font-size="26" font-weight="800">보호자의 기준</text>
+    <rect x="48" y="108" width="248" height="18" rx="9" fill="#2563eb"/>
+    <rect x="48" y="150" width="188" height="18" rx="9" fill="#60a5fa"/>
+    <rect x="48" y="192" width="218" height="18" rx="9" fill="#93c5fd"/>
+  </g>
+  <path d="M552 414h84" stroke="#d1d5db" stroke-width="8" stroke-linecap="round"/>
+  <path d="M614 390l28 24-28 24" fill="none" stroke="#d1d5db" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="290" y="594" width="620" height="54" rx="27" fill="#f2f2f7"/>
+  <text x="396" y="629" fill="#1d1d1f" font-family="Arial, sans-serif" font-size="20" font-weight="760">검색, 비교, 저장을 가족 루틴으로 연결</text>
+</svg>

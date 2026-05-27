@@ -4,8 +4,8 @@ description: 당장 읽고 싶은데 예약 대기가 긴 독자를 위해 Souli
 category: 책 추천
 category_slug: recommendations
 date: 2026-05-27
-image: /static/img/blog/soulib-guide/my-shelf.png
-image_alt: Soulib 내 서재에서 대체 전자책 후보를 관리하는 화면
+image: /static/img/blog/recommendations/bestseller-alternatives.svg
+image_alt: 예약이 긴 베스트셀러 대신 바로 읽을 전자책 후보를 비교하는 이미지
 ---
 
 ## 먼저 실행할 순서부터

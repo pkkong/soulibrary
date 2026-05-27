@@ -135,14 +135,26 @@ def main():
         raise AssertionError("SF recommendation post did not render internal search link")
     if 'data-search-query="마션 앤디 위어"' not in sf_rec_body or "blog-search-card-cover" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render cover-ready search cards")
-    if "project-hail-mary-official-poster" not in sf_rec_body or "blog-post-cover is-external" not in sf_rec_body:
-        raise AssertionError("SF recommendation post did not render official poster cover")
+    if "/static/img/blog/recommendations/sf-next-read.svg" not in sf_rec_body:
+        raise AssertionError("SF recommendation post did not render recommendation-specific cover")
+    if "project-hail-mary-official-poster" in sf_rec_body or "blog-post-cover is-external" in sf_rec_body:
+        raise AssertionError("recommendation posts should not use an external poster as the representative image")
     if "blog_search_cards.js" not in sf_rec_body:
         raise AssertionError("blog post page did not include search card cover hydration script")
     bestseller_rec_blog = assert_response(client, "/blog/bestseller-waitlist-alternative-ebooks")
     bestseller_rec_body = bestseller_rec_blog.get_data(as_text=True)
     if "search-project-hail-mary" in bestseller_rec_body or "detail-project-hail-mary" in bestseller_rec_body:
         raise AssertionError("unrelated recommendation posts must not reuse Project Hail Mary screenshots")
+    recommendation_covers = {
+        "/blog/bestseller-waitlist-alternative-ebooks": "/static/img/blog/recommendations/bestseller-alternatives.svg",
+        "/blog/commute-mystery-ebook-recommendations": "/static/img/blog/recommendations/commute-mystery.svg",
+        "/blog/ebook-business-starter-recommendations": "/static/img/blog/recommendations/business-starter.svg",
+        "/blog/family-ebook-candidates-for-parent-child-reading": "/static/img/blog/recommendations/family-reading.svg",
+    }
+    for path, cover in recommendation_covers.items():
+        body = assert_response(client, path).get_data(as_text=True)
+        if cover not in body:
+            raise AssertionError(f"{path} did not render recommendation-specific cover {cover}")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
     blog_post_body = blog_post.get_data(as_text=True)

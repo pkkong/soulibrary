@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">프로젝트 헤일메리 다음에 읽을 SF 전자책 후보</title>
+  <desc id="desc">우주 배경의 이야기 이후 이어서 읽을 SF 전자책 후보를 Soulib에서 비교하는 대표 이미지</desc>
+  <rect width="1200" height="760" fill="#f5f7fb"/>
+  <rect x="92" y="84" width="1016" height="592" rx="44" fill="#ffffff"/>
+  <text x="146" y="158" fill="#1d1d1f" font-family="Arial, sans-serif" font-size="42" font-weight="800">다음 SF 고르기</text>
+  <text x="146" y="202" fill="#6e6e73" font-family="Arial, sans-serif" font-size="22">한 작품의 여운을 비슷한 문제 해결형 SF로 이어갑니다.</text>
+  <g transform="translate(152 274)">
+    <rect width="278" height="326" rx="34" fill="#111827"/>
+    <circle cx="198" cy="90" r="34" fill="#f8fafc"/>
+    <circle cx="92" cy="172" r="54" fill="#38bdf8" opacity="0.9"/>
+    <path d="M54 218c62-36 148-34 208 4" fill="none" stroke="#f8fafc" stroke-width="7" stroke-linecap="round" opacity="0.86"/>
+    <text x="42" y="284" fill="#ffffff" font-family="Arial, sans-serif" font-size="25" font-weight="800">출발점</text>
+  </g>
+  <path d="M474 438h100" stroke="#d1d5db" stroke-width="8" stroke-linecap="round"/>
+  <path d="M548 410l34 28-34 28" fill="none" stroke="#d1d5db" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(626 250)">
+    <rect width="138" height="214" rx="22" fill="#eef6ff" stroke="#dbeafe"/>
+    <rect x="34" y="40" width="70" height="106" rx="12" fill="#2563eb"/>
+    <rect x="46" y="64" width="46" height="8" rx="4" fill="#bfdbfe"/>
+    <rect x="46" y="86" width="34" height="8" rx="4" fill="#93c5fd"/>
+    <text x="34" y="182" fill="#1d1d1f" font-family="Arial, sans-serif" font-size="17" font-weight="760">문제 해결</text>
+  </g>
+  <g transform="translate(800 250)">
+    <rect width="138" height="214" rx="22" fill="#f0fdf4" stroke="#dcfce7"/>
+    <rect x="34" y="40" width="70" height="106" rx="12" fill="#16a34a"/>
+    <rect x="46" y="64" width="46" height="8" rx="4" fill="#bbf7d0"/>
+    <rect x="46" y="86" width="38" height="8" rx="4" fill="#86efac"/>
+    <text x="34" y="182" fill="#1d1d1f" font-family="Arial, sans-serif" font-size="17" font-weight="760">한국 SF</text>
+  </g>
+  <g transform="translate(974 250)">
+    <rect width="138" height="214" rx="22" fill="#faf5ff" stroke="#f3e8ff"/>
+    <rect x="34" y="40" width="70" height="106" rx="12" fill="#9333ea"/>
+    <rect x="46" y="64" width="46" height="8" rx="4" fill="#e9d5ff"/>
+    <rect x="46" y="86" width="30" height="8" rx="4" fill="#d8b4fe"/>
+    <text x="34" y="182" fill="#1d1d1f" font-family="Arial, sans-serif" font-size="17" font-weight="760">우주 서사</text>
+  </g>
+  <rect x="626" y="512" width="486" height="58" rx="29" fill="#f2f2f7"/>
+  <text x="688" y="549" fill="#1d1d1f" font-family="Arial, sans-serif" font-size="21" font-weight="760">검색 카드에서 표지와 저자를 함께 확인</text>
+</svg>
