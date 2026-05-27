@@ -2707,7 +2707,7 @@ body.has-topbar .search-top {
     border-radius: 5px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
-    padding: 1px 4px;
+    padding: 1px 0;
     font-weight: 760;
 }
 
