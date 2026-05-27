@@ -30,6 +30,20 @@ GLOBAL_BANNED_PHRASES = (
     "관련 흐름은",
     "배경 맥락은",
     "하절기 독서문화 캠페인",
+    "Soulib은 책을 찾고 비교하는 도구",
+    "Soulib은 책을 찾고 보유 경로를 비교하는 도구",
+    "Soulib은 책을 비교하고 찾는",
+    "Soulib은 검색과 보유 비교를 돕는",
+    "대출·예약·열람",
+    "대출·예약·로그인·열람",
+    "이 경계를 분리",
+    "서비스 역할을 섞어",
+    "역할을 분리",
+    "검색은 됐는데",
+    "왜 바로 안 읽히지",
+    "왜 안 열리지",
+    "혼란을 크게 줄",
+    "시행착오를 크게 줄",
 )
 RECOMMENDATION_HERO_RE = re.compile(
     r"^/static/img/blog/recommendations/[0-9a-z-]+/hero-cover-set\.png$"
@@ -58,6 +72,18 @@ RECOMMENDATION_BANNED_SEARCH_CARD_TITLES = {
     "클라라와 태양": "현재 도서관 실검색에서 실제 작품 대신 해설서가 잡히므로 추천 카드 대상으로 쓰지 않습니다.",
 }
 RECOMMENDATION_BANNED_PATTERNS = (
+    (
+        re.compile(r"Soulib은.{0,50}(?:도구|서비스|통합검색).{0,90}(?:실제|대출·예약|각\s*도서관|공급사)"),
+        "do not write formulaic Soulib-vs-library role disclaimers in blog copy",
+    ),
+    (
+        re.compile(r"(?:이|그|서비스)\s*경계.{0,24}(?:분리|구분)"),
+        "do not use boundary-separation meta copy",
+    ),
+    (
+        re.compile(r"검색은.{0,24}왜.{0,24}(?:읽히지|열리지)"),
+        "do not stage fake reader confusion quotes",
+    ),
     (
         re.compile(r"제목\s*전체.{0,12}저자명"),
         "title-and-author prompt should not be written as a user instruction",
