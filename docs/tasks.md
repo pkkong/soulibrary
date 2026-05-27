@@ -19,11 +19,12 @@
 ## 표준 작업 흐름
 
 ```text
-작업 분류: Direct / Explorer-required / Worker-required / QA-required
--> 역할 배정: Explorer / Worker / UX/UI Designer / Editor / QA
+작업 분류: Direct / Explorer-required / Worker-required / Instruction Steward Worker-required / QA-required
+-> 역할 배정: Explorer / Worker / UX/UI Designer / Editor / QA / Instruction Steward Worker
 -> 파일 소유권 지정
 -> 조사 또는 구현
 -> 메인 리뷰
+-> 반복 지적이면 사용자 지적과 반영 문서 규칙 매핑 확인
 -> python scripts/smoke_test.py
 -> git diff --check
 -> commit/push
@@ -40,6 +41,9 @@
 - 원인 불명 버그는 Explorer가 먼저 재현과 영향 범위를 찾고, 구현 Worker는 별도로 둔다.
 - 배포 감시는 성공하면 자동화를 멈추고, 평시 Ops Watcher는 과도하게 자주 돌리지 않는다.
 - 메인 채팅방은 최종 판단과 커밋/배포를 맡되, 혼자 구현부터 검수까지 끝내지 않는다.
+- `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 같은 지시서/MD 운영 규칙 변경은 기본적으로 Instruction Steward Worker가 맡는다.
+- 반복 지적이 나오면 Instruction Update Loop로 지적 내용을 관련 문서 규칙에 반영하고, 최종 보고에 `사용자 지적 -> 반영 문서/규칙` 매핑을 남긴다.
+- 블로그, 디자인, 버그, 운영 자동화에서 새 문제가 나오면 해당 가이드 문서 갱신 필요성도 함께 검토한다.
 
 ## 커밋 금지
 

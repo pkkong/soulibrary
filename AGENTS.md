@@ -7,7 +7,8 @@
 - 메인 채팅방은 Project Lead 역할을 맡는다.
 - 실제 구현은 기본적으로 서브에이전트에게 위임한다.
 - 메인 채팅방은 기획, 범위 정의, 작업 분해, 리뷰, 검증, 배포 판단을 우선한다.
-- 작은 문서 수정, 긴급한 단일 라인 수정, 최종 통합 조정은 메인에서 직접 처리할 수 있다.
+- 지시서와 운영 문서 수정도 기본적으로 `Instruction Steward Worker`에게 위임한다.
+- 명백한 오타 또는 깨진 링크 1줄 수정과 최종 통합 조정은 메인에서 직접 처리할 수 있다.
 - 서브에이전트 작업은 항상 명확한 책임 범위와 파일 소유권을 지정한 뒤 시작한다.
 - 여러 에이전트가 같은 파일을 동시에 수정하지 않도록 작업을 분리한다.
 - 사용자 또는 다른 에이전트가 만든 변경을 되돌리지 않는다.
@@ -35,6 +36,7 @@
 - `Direct`: 메인이 직접 처리한다.
 - `Explorer-required`: 원인, 영향 범위, 파일 위치를 먼저 조사한다.
 - `Worker-required`: 역할별 Worker가 구현한다.
+- `Instruction Steward Worker-required`: 지시서와 운영 문서 규칙 변경을 Instruction Steward Worker가 구현한다.
 - `QA-required`: 구현 전후 검증 또는 배포 판단이 핵심이다.
 
 `Direct`를 선택할 때는 직접 처리 사유를 한 줄로 남긴다. 예: `직접 처리 사유: 문서의 오타 1줄 수정`.
@@ -46,14 +48,16 @@
 - 사용자-facing UI/UX 변경: `UX/UI Designer` 후 `Frontend Worker`
 - 블로그 신규 작성/대폭 수정: `Content Writer` 후 `Editor/Fact Checker`
 - 배포, CI, 자동화 변경: `QA-required`
+- `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 같은 지시서/MD 운영 규칙 변경: `Instruction Steward Worker-required`
 - 사용자가 반복 지적한 영역: `Explorer-required` 또는 `UX/UI Designer` 먼저
+- 반복 지적이 운영 방식, 역할 분리, 검수 누락과 관련되면 구현 전 `Instruction Steward Worker-required`를 먼저 적용한다.
 
 ## 직접 처리 예외
 
 메인 채팅방이 직접 처리할 수 있는 일은 아래로 제한한다.
 
-- 1개 파일의 20줄 안팎 문서 수정
-- 명백한 오타, 버전 쿼리, 설정값 같은 단일 지점 수정
+- 지시서/MD의 명백한 오타 또는 깨진 링크 1줄 수정
+- 지시서/MD 운영 규칙 변경이 아닌 버전 쿼리, 설정값 같은 단일 지점 수정
 - 서브에이전트 결과를 통합하기 위한 작은 충돌 해결
 - 테스트 실행, diff 확인, 커밋, 푸시, 배포 확인
 - 사용자에게 바로 설명해야 하는 운영 판단
@@ -65,6 +69,7 @@
 - 검색 결과, 상세, 내 서재, 오류 신고 같은 핵심 UX 변경
 - 버그 신고 재현과 원인 분석
 - 배포, GitHub Actions, Cloudtype, Search Console 자동화 변경
+- 지시서/MD 운영 규칙 추가, 삭제, 재구성
 - 사용자가 반복적으로 지적한 품질 문제 재발 방지 작업
 
 메인이 직접 처리한 예외 작업도 최종 보고에는 `직접 처리 사유`, `검증`, `남은 위험`을 포함한다.
@@ -84,7 +89,7 @@
 - 테스트 실행과 결과 해석
 - Git 상태 확인
 - 커밋, PR, 배포 여부 판단
-- `README_DEV.md`, `docs/tasks.md`, 이 문서 같은 운영 지침 관리
+- 운영 지침 변경 필요성 기록, Instruction Steward Worker 위임, 결과 리뷰
 
 메인 채팅방은 구현을 직접 시작하기 전에 먼저 아래를 결정한다.
 
@@ -92,6 +97,7 @@
 - 서브에이전트에 맡길 수 있을 만큼 범위가 명확한가
 - 작업 파일이 다른 진행 중인 작업과 충돌하지 않는가
 - 결과 검증 방법이 명확한가
+- 지시서 변경이라면 단순 오타/링크 1줄 Direct 예외인지, 아니면 Instruction Steward Worker에게 맡길 일인지
 
 ## 서브에이전트 팀 구조
 
@@ -268,6 +274,32 @@
 - Cloudtype 배포 전 점검
 - 로컬 실행 검증 절차 정리
 
+### Instruction Steward Worker
+
+용도: `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 같은 지시서와 운영 문서의 규칙을 반복 가능하게 관리한다.
+
+주요 담당 범위:
+
+- `AGENTS.md`
+- `README_DEV.md`
+- `docs/tasks.md`
+- 작업 유형별 가이드 문서. 단, 메인이 소유 파일로 명시한 경우에만 수정한다.
+
+대표 작업:
+
+- 사용자가 지적한 운영 실패나 반복 지적을 문서 규칙으로 반영
+- Direct 예외, Worker 위임 기준, 검수 게이트 문구 정리
+- 블로그, 디자인, 버그, 운영 자동화에서 새 문제가 나온 경우 관련 가이드 갱신 여부 확인
+- 최종 보고에 `사용자 지적 -> 반영 문서/규칙` 매핑 작성
+
+규칙:
+
+- 지시서/MD 운영 규칙 변경은 기본적으로 이 Worker가 맡는다.
+- 메인 채팅방은 직접 문서를 고치지 않고 변경 필요성 기록, 위임, 리뷰, 커밋/푸시만 맡는다.
+- 단순 오타 또는 깨진 링크 1줄 수정만 Direct 예외로 허용한다.
+- 구현 파일, 콘텐츠 파일, 자동화 파일은 소유 파일로 지정되지 않는 한 수정하지 않는다.
+- 기존 사용자/다른 에이전트 변경을 되돌리지 않는다.
+
 ### Ops Watcher
 
 용도: 신고 이슈, 배포 상태, 운영 이상 징후 감시.
@@ -290,7 +322,7 @@
 
 작업을 위임할 때 메인 채팅방은 서브에이전트에게 다음 정보를 명시한다.
 
-- 역할: Explorer, Backend Worker, Frontend Worker, Crawler/Data Worker, QA/Release Worker
+- 역할: Explorer, Backend Worker, Frontend Worker, Crawler/Data Worker, QA/Release Worker, Instruction Steward Worker
 - 목표: 한 문장으로 끝나는 구체적인 결과
 - 소유 파일: 수정 가능한 파일 또는 디렉터리
 - 금지 범위: 건드리면 안 되는 파일 또는 기능
@@ -324,6 +356,8 @@ Backend Worker로 진행.
 
 Content Writer 단독 발행은 금지한다. 자동화도 동일하다.
 
+블로그 품질 문제나 발행 게이트 누락이 새로 드러나면 Content Writer 또는 Editor/Fact Checker 작업과 별도로 Instruction Steward Worker가 `content/blog/_README.md`, `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 등 관련 가이드 갱신 필요성을 검토한다.
+
 ### UI/UX 변경
 
 UI/UX 변경은 다음 순서를 통과해야 한다.
@@ -336,6 +370,8 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 
 디자인 불만이 한 번 이상 나온 화면은 바로 구현을 반복하지 말고 UX/UI Designer 게이트로 되돌린다.
 
+새 디자인 문제가 반복되거나 검수 기준 누락이 확인되면 UX/UI Designer 작업과 별도로 Instruction Steward Worker가 `docs/UX_UI_Guide.md`, `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 등 관련 가이드 갱신 필요성을 검토한다.
+
 ### 버그 신고
 
 버그 신고는 다음 순서를 통과해야 한다.
@@ -347,6 +383,8 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 
 치명적 신뢰 오류는 비슷한 패턴을 전수 검색하고 회귀 테스트 또는 감사 스크립트를 추가한다.
 
+버그 재발 원인이 역할 분리, 재현 절차, 검수 누락이면 Explorer 또는 구현 Worker와 별도로 Instruction Steward Worker가 관련 지시서 갱신을 맡는다.
+
 ### 배포와 운영 감시
 
 배포/운영 감시는 다음 기준을 따른다.
@@ -355,6 +393,19 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 - 평시 Ops Watcher는 6시간 이상 간격 또는 주 1회 분석을 기본으로 한다.
 - 신규 오류 신고가 들어온 직후, 배포 지연 중, 인증/검색 장애 의심 상황에서는 임시로 주기를 좁힐 수 있다.
 - 자동화는 새 글/새 코드 발행보다 “감지, 요약, 게이트 통과 여부 확인”을 우선한다.
+- 운영 자동화에서 새 문제가 나오면 QA/Release Worker와 별도로 Instruction Steward Worker가 해당 가이드 문서 갱신 필요성을 검토한다.
+
+### Instruction Update Loop
+
+사용자가 운영 방식, 역할 분리, 품질 게이트, 반복 지적 반영 누락을 지적하면 아래 순서를 따른다.
+
+1. 메인 채팅방은 지적 내용, 발생 영역, 재발 위험을 기록한다.
+2. 단순 오타 또는 깨진 링크 1줄이 아니면 `Instruction Steward Worker-required`로 분류한다.
+3. Instruction Steward Worker에게 소유 파일, 금지 범위, 완료 기준, 보고 형식을 명시해 위임한다.
+4. Worker는 지적 내용을 `AGENTS.md` 중심 규칙으로 반영하고, `README_DEV.md`와 `docs/tasks.md`에는 요약 또는 참조를 남긴다.
+5. 블로그, 디자인, 버그, 운영 자동화에서 새 문제가 나온 경우 해당 작업 가이드도 함께 갱신할지 검토한다.
+6. 메인 채팅방은 diff, 파일 소유권, `git diff --check`, 지적-규칙 매핑을 리뷰한 뒤 커밋/푸시 여부를 판단한다.
+7. 최종 보고에는 어떤 지적이 어떤 문서 규칙으로 반영됐는지 매핑한다.
 
 ## 병렬 작업 규칙
 
@@ -376,12 +427,15 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 - 블로그 글은 Content Writer와 Editor/Fact Checker 역할이 분리됐는가
 - UI 변경은 UX/UI Designer의 방향 검토 또는 스크린샷 비교가 있었는가
 - 자동화가 발행/커밋 권한을 갖는 경우 QA 게이트가 별도로 있었는가
+- 지시서 변경은 Instruction Steward Worker에게 위임됐는가
+- 반복 지적은 Instruction Update Loop를 거쳐 문서 규칙으로 반영됐는가
 
 최종 보고는 최소한 아래 항목을 포함한다.
 
-- 작업 분류: Direct, Explorer-required, Worker-required, QA-required 중 무엇이었는가
-- 참여 역할: main, Explorer, Worker, UX/UI Designer, Editor/Fact Checker, QA/Release 중 실제 참여자
+- 작업 분류: Direct, Explorer-required, Worker-required, Instruction Steward Worker-required, QA-required 중 무엇이었는가
+- 참여 역할: main, Explorer, Worker, Instruction Steward Worker, UX/UI Designer, Editor/Fact Checker, QA/Release 중 실제 참여자
 - 변경 파일
+- 사용자 지적 -> 반영 문서/규칙 매핑
 - 검증 명령과 결과
 - 미검증 항목이 있다면 사유
 - 배포 또는 자동화 상태

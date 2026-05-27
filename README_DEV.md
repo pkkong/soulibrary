@@ -14,7 +14,7 @@
 
 ## 에이전트 운영 방식
 
-Codex 메인 채팅방은 기획, 계획, 감시, 리뷰, 검증, 운영 지침 관리를 맡고, 실제 구현은 기본적으로 역할별 서브에이전트에게 위임합니다.
+Codex 메인 채팅방은 기획, 계획, 감시, 리뷰, 검증, 운영 지침 변경 필요성 기록을 맡고, 실제 구현과 지시서 수정은 기본적으로 역할별 서브에이전트에게 위임합니다.
 
 자세한 팀 구조와 위임 규칙은 [AGENTS.md](AGENTS.md)를 기준으로 합니다.
 
@@ -24,10 +24,13 @@ Codex 메인 채팅방은 기획, 계획, 감시, 리뷰, 검증, 운영 지침 
 Direct
 Explorer-required
 Worker-required
+Instruction Steward Worker-required
 QA-required
 ```
 
-코드, 화면, 블로그, 자동화 변경은 기본적으로 `Worker-required` 또는 `QA-required`입니다. 메인 채팅방이 직접 처리하는 경우에는 직접 처리 사유를 남깁니다.
+코드, 화면, 블로그, 자동화 변경은 기본적으로 `Worker-required` 또는 `QA-required`입니다. `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 같은 지시서/MD 운영 규칙 변경은 기본적으로 `Instruction Steward Worker-required`입니다.
+
+메인 채팅방은 지시서를 직접 고치기보다 변경 필요성 기록, Worker 위임, 리뷰, 커밋/푸시를 맡습니다. 단순 오타 또는 깨진 링크 1줄 수정만 `Direct` 예외로 허용하고, 이 경우에도 직접 처리 사유를 남깁니다.
 
 ## Codespaces에서 시작
 
@@ -64,6 +67,7 @@ Codespaces에서는 포트 `5001`이 자동 포워딩됩니다. 모바일이나 
 → 코드 또는 문서 수정
 → Worker/Editor/QA 보고 확인
 → 메인 채팅방 리뷰
+→ 반복 지적이면 사용자 지적과 반영 문서 규칙 매핑 확인
 → 검증 실행
 → Codespaces에서 실행 확인
 → python scripts/smoke_test.py 통과
