@@ -95,6 +95,10 @@ def static_path_exists(url: str) -> bool:
     return path.is_file()
 
 
+def frontmatter_image_allowed(url: str) -> bool:
+    return static_path_exists(url) or url.startswith("https://")
+
+
 def tokens(text: str) -> set[str]:
     return {
         token
@@ -193,8 +197,8 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
 
     image_url = meta.get("image", "")
     if image_url:
-        if not static_path_exists(image_url):
-            errors.append(f"{label}: frontmatter image must be an existing /static/ asset, got `{image_url}`")
+        if not frontmatter_image_allowed(image_url):
+            errors.append(f"{label}: frontmatter image must be an existing /static/ asset or trusted https image, got `{image_url}`")
         if strict and len(meta.get("image_alt", "")) < 12:
             errors.append(f"{label}: strict posts need specific image_alt text")
 
@@ -204,6 +208,12 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
             errors.append(f"{label}: body image must be an existing /static/ asset, got `{url}`")
         if strict and len(alt.strip()) < 12:
             errors.append(f"{label}: strict body images need specific alt/caption text")
+
+    image_paths = [image_url, *[url for _alt, url in images]]
+    if path.name != "sf-ebook-starter-recommendations.md":
+        for url in image_paths:
+            if "project-hail-mary" in url:
+                errors.append(f"{label}: posts not specifically about Project Hail Mary must not reuse Project Hail Mary screenshots")
 
     malformed_search_blocks = [
         line.strip()
@@ -234,11 +244,6 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
             nearby = SOULIB_SEARCH_BLOCK_RE.sub("", body[start:end])
             if compact_text(title) not in compact_text(nearby):
                 errors.append(f"{label}: search card `{title}` is not close enough to matching book discussion")
-        image_paths = [image_url, *[url for _alt, url in images]]
-        if path.name != "sf-ebook-starter-recommendations.md":
-            for url in image_paths:
-                if "project-hail-mary" in url:
-                    errors.append(f"{label}: unrelated recommendation posts must not reuse Project Hail Mary screenshots")
 
     if strict and any(word in body for word in ("모든 도서관", "무조건", "반드시 대출", "자동으로 대출")):
         errors.append(f"{label}: strict post contains risky absolute wording")

@@ -153,9 +153,8 @@ def _render_soulib_search_card(line):
         f'<a class="blog-search-card" href="{safe_href}" data-search-query="{safe_query}" '
         f'data-search-title="{safe_title_attr}" data-search-meta="{safe_meta_attr}" '
         f'aria-label="Soulib에서 {safe_title} 검색">'
-        '<span class="blog-search-card-cover" aria-hidden="true"><span>표지</span></span>'
+        '<span class="blog-search-card-cover" aria-hidden="true"></span>'
         '<span class="blog-search-card-copy">'
-        '<span class="blog-search-card-kicker">Soulib 검색</span>'
         f'<strong>{safe_title}</strong>'
         f'<span class="blog-search-card-meta">{safe_meta}</span>'
         f'<small class="blog-search-card-note">{safe_note}</small>'
@@ -245,11 +244,13 @@ def _load_post(path):
     slug = os.path.splitext(os.path.basename(path))[0]
     title = _clean(meta.get("title")) or slug
     category_slug, category_title = _category_for(meta)
+    image = _safe_image(meta.get("image"))
     return {
         "slug": slug,
         "title": title,
         "description": _clean(meta.get("description")),
-        "image": _safe_image(meta.get("image")),
+        "image": image,
+        "image_is_external": image.startswith("http://") or image.startswith("https://"),
         "image_alt": _clean(meta.get("image_alt")) or title,
         "category": category_title,
         "category_slug": category_slug,

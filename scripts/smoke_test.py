@@ -123,16 +123,20 @@ def main():
         raise AssertionError("ebook search guide post did not render")
     if "blog-highlight" not in ebook_search_body or "<strong>" not in ebook_search_body:
         raise AssertionError("ebook search guide did not render emphasis markup")
-    if "/static/img/blog/soulib-guide/search-project-hail-mary.png" not in ebook_search_body:
+    if "/static/img/blog/soulib-guide/search-results-example.svg" not in ebook_search_body:
         raise AssertionError("ebook search guide did not render search screenshot")
     sf_rec_blog = assert_response(client, "/blog/sf-ebook-starter-recommendations")
     sf_rec_body = sf_rec_blog.get_data(as_text=True)
-    if "blog-search-card" not in sf_rec_body or "Soulib 검색" not in sf_rec_body:
+    if "blog-search-card" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render Soulib search cards")
+    if "blog-search-card-kicker" in sf_rec_body or ">Soulib 검색<" in sf_rec_body:
+        raise AssertionError("SF recommendation search cards should not render redundant kicker text")
     if "/search?q=%EB%A7%88%EC%85%98%20%EC%95%A4%EB%94%94%20%EC%9C%84%EC%96%B4&amp;field=title_author" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render internal search link")
     if 'data-search-query="마션 앤디 위어"' not in sf_rec_body or "blog-search-card-cover" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render cover-ready search cards")
+    if "project-hail-mary-official-poster" not in sf_rec_body or "blog-post-cover is-external" not in sf_rec_body:
+        raise AssertionError("SF recommendation post did not render official poster cover")
     if "blog_search_cards.js" not in sf_rec_body:
         raise AssertionError("blog post page did not include search card cover hydration script")
     bestseller_rec_blog = assert_response(client, "/blog/bestseller-waitlist-alternative-ebooks")

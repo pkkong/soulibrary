@@ -4,7 +4,7 @@ description: 대출가능, 예약, 구독형, 상태 정보 없음이 각각 어
 category: 이용 안내
 category_slug: guide
 date: 2026-05-21
-image: /static/img/blog/soulib-guide/detail-project-hail-mary.png
+image: /static/img/blog/soulib-guide/detail-status-example.svg
 image_alt: Soulib 상세 화면의 대출 상태 예시
 ---
 
@@ -14,7 +14,7 @@ image_alt: Soulib 상세 화면의 대출 상태 예시
 
 Soulib의 상태 표시는 “어디부터 확인하면 좋을지”를 빠르게 고르는 기준입니다. ==실제 대출, 예약, 반납 예정일, 이용 권한은 연결된 도서관 또는 전자책 공급사 화면에서 최종 확인해야 합니다.==
 
-![상세 화면에서는 공급사와 도서관별 대출 상태를 나누어 확인합니다.](/static/img/blog/soulib-guide/detail-project-hail-mary.png)
+![상세 화면에서는 공급사와 도서관별 대출 상태를 나누어 확인합니다.](/static/img/blog/soulib-guide/detail-status-example.svg)
 
 ## 대출가능
 

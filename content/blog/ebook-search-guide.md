@@ -4,7 +4,7 @@ description: 전자도서관 검색, 전자책 검색, 이북 검색을 할 때 
 category: 이용 안내
 category_slug: guide
 date: 2026-05-22
-image: /static/img/blog/soulib-guide/search-project-hail-mary.png
+image: /static/img/blog/soulib-guide/search-results-example.svg
 image_alt: Soulib 검색 결과 화면
 ---
 
@@ -29,7 +29,7 @@ image_alt: Soulib 검색 결과 화면
 
 ## 1. 제목 전체로 먼저 검색하세요
 
-책 제목을 알고 있다면 제목 전체를 입력하는 것이 가장 안정적입니다. 예를 들어 프로젝트 헤일메리를 찾는다면 프로젝트만 입력하기보다 프로젝트 헤일메리처럼 입력하는 편이 더 정확합니다.
+책 제목을 알고 있다면 제목 전체를 입력하는 것이 가장 안정적입니다. 제목 일부만 입력하면 관련 키워드가 들어간 다른 자료가 함께 섞일 수 있으므로, 가능하면 **제목 전체와 저자명**을 함께 넣으세요.
 
 짧은 키워드는 관련 없는 책까지 많이 불러올 수 있습니다. 반대로 제목 전체를 입력하면 같은 제목의 다른 판본이나 오디오북, 요약본을 구분하기 쉬워집니다.
 
@@ -37,7 +37,7 @@ image_alt: Soulib 검색 결과 화면
 
 전자도서관 검색 결과에는 같은 제목의 책이 여러 권 보일 수 있습니다. 이때는 제목만 보지 말고 **표지, 저자, 출판사**를 함께 확인하세요.
 
-![검색 결과에서는 표지, 저자, 출판사를 함께 보고 원하는 책을 고릅니다.](/static/img/blog/soulib-guide/search-project-hail-mary.png)
+![검색 결과에서는 표지, 저자, 출판사를 함께 보고 원하는 책을 고릅니다.](/static/img/blog/soulib-guide/search-results-example.svg)
 
 특히 고전, 베스트셀러, 요약본, 개정판은 제목이 비슷한 경우가 많습니다. 원하는 책이 맞는지 확인한 뒤 상세 화면으로 들어가면 잘못된 책을 열어보는 시간을 줄일 수 있습니다.
 
@@ -45,7 +45,7 @@ image_alt: Soulib 검색 결과 화면
 
 책 상세 화면에서는 교보, YES24, 기타 도서관처럼 공급사 기준으로 결과가 나뉘어 보입니다. 여기서 중요한 것은 내가 실제로 로그인할 수 있는 도서관을 먼저 고르는 것입니다.
 
-![상세 화면에서 교보, YES24, 기타 도서관의 보유 현황을 비교합니다.](/static/img/blog/soulib-guide/detail-project-hail-mary.png)
+![상세 화면에서 교보, YES24, 기타 도서관의 보유 현황을 비교합니다.](/static/img/blog/soulib-guide/detail-status-example.svg)
 
 예를 들어 서울도서관, 거주지 자치구 도서관, 직장이나 학교가 속한 지역 도서관처럼 이미 회원 자격이 있는 도서관이 있다면 그 결과를 우선 확인하세요. 처음 쓰는 도서관은 정회원 인증이나 전자책 이용 동의가 필요할 수 있습니다.
 
