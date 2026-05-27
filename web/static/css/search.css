@@ -2692,12 +2692,13 @@ body.has-topbar .search-top {
 }
 
 .blog-body mark.blog-highlight {
-    color: inherit;
-    background: linear-gradient(transparent 48%, rgba(255, 214, 10, 0.34) 48%);
-    border-radius: 4px;
+    color: #111827;
+    background: rgba(255, 214, 10, 0.34);
+    border-radius: 5px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
-    padding: 0 2px;
+    padding: 1px 4px;
+    font-weight: 760;
 }
 
 .blog-search-grid {
