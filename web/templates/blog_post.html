@@ -19,7 +19,7 @@
 
     {% if post.image %}
     <figure class="blog-post-cover{% if post.image_is_external %} is-external{% endif %}">
-        <img src="{{ post.image }}{% if not post.image_is_external %}?v=20260527b{% endif %}" alt="{{ post.image_alt }}" loading="eager">
+        <img src="{{ post.image }}{% if not post.image_is_external %}?v=20260527c{% endif %}" alt="{{ post.image_alt }}" loading="eager">
     </figure>
     {% endif %}
 
@@ -101,5 +101,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/blog_search_cards.js', v='20260527d') }}"></script>
+<script src="{{ url_for('static', filename='js/blog_search_cards.js', v='20260527e') }}"></script>
 {% endblock %}

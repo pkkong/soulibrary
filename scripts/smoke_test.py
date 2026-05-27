@@ -134,6 +134,8 @@ def main():
         raise AssertionError("search page title should keep the service name")
     if "책 제목이나 저자를 검색하세요." not in search_body:
         raise AssertionError("search page should keep the concise empty state")
+    if "search.js?v=live20260527a" not in search_body:
+        raise AssertionError("search page should use the current search asset")
 
     blog = assert_response(client, "/blog")
     blog_body = blog.get_data(as_text=True)
@@ -177,9 +179,9 @@ def main():
         raise AssertionError("SF recommendation post did not render Soulib search cards")
     if "blog-search-card-kicker" in sf_rec_body or ">Soulib 검색<" in sf_rec_body:
         raise AssertionError("SF recommendation search cards should not render redundant kicker text")
-    if "/search?q=%EB%A7%88%EC%85%98%20%EC%95%A4%EB%94%94%20%EC%9C%84%EC%96%B4&amp;field=title_author" not in sf_rec_body:
-        raise AssertionError("SF recommendation post did not render internal search link")
-    if 'data-search-query="마션 앤디 위어"' not in sf_rec_body or "blog-search-card-cover" not in sf_rec_body:
+    if "/search?q=%EB%A7%88%EC%85%98&amp;field=title&amp;refine=%EC%95%A4%EB%94%94%20%EC%9C%84%EC%96%B4" not in sf_rec_body:
+        raise AssertionError("SF recommendation post should link to title search with author refine")
+    if 'data-search-query="마션"' not in sf_rec_body or "blog-search-card-cover" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render cover-ready search cards")
     if 'data-cover-url="/static/img/blog/book-covers/martian.jpg"' not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render local book cover for search cards")
@@ -189,9 +191,14 @@ def main():
         raise AssertionError("recommendation posts should not use an external poster as the representative image")
     if "blog_search_cards.js" not in sf_rec_body:
         raise AssertionError("blog post page did not include search card cover hydration script")
-    if "blog_search_cards.js?v=20260527d" not in sf_rec_body:
+    if "blog_search_cards.js?v=20260527e" not in sf_rec_body:
         raise AssertionError("blog post page should use the current search card hydration asset")
+    card_js = assert_response(client, "/static/js/blog_search_cards.js?v=20260527e").get_data(as_text=True)
+    if 'field: "title_author"' in card_js or 'field: "title"' not in card_js:
+        raise AssertionError("blog search card hydration should use title search with refine, not title_author")
     commute_rec_body = assert_response(client, "/blog/commute-mystery-ebook-recommendations").get_data(as_text=True)
+    if "/search?q=%EC%9A%A9%EC%9D%98%EC%9E%90%20X%EC%9D%98%20%ED%97%8C%EC%8B%A0&amp;field=title&amp;refine=%ED%9E%88%EA%B0%80%EC%8B%9C%EB%85%B8%20%EA%B2%8C%EC%9D%B4%EA%B3%A0" not in commute_rec_body:
+        raise AssertionError("commute mystery cards should not concatenate title and author in the search query")
     if "blog-advice-fit" not in commute_rec_body or "blog-advice-skip" not in commute_rec_body:
         raise AssertionError("commute mystery post should render recommendation advice labels")
     if (
@@ -213,6 +220,11 @@ def main():
         body = assert_response(client, path).get_data(as_text=True)
         if cover not in body:
             raise AssertionError(f"{path} did not render recommendation-specific cover {cover}")
+    family_rec_body = assert_response(client, "/blog/family-ebook-candidates-for-parent-child-reading").get_data(as_text=True)
+    if "아름다운 아이" not in family_rec_body or "/search?q=%EC%95%84%EB%A6%84%EB%8B%A4%EC%9A%B4%20%EC%95%84%EC%9D%B4&amp;field=title" not in family_rec_body:
+        raise AssertionError("family recommendation should use the searchable Korean title for Wonder")
+    if "클라라와 태양" in sf_rec_body or "천 개의 파랑" not in sf_rec_body:
+        raise AssertionError("SF recommendation should not keep unavailable book-card targets")
 
     blog_post = assert_response(client, "/blog/soulib-guide")
     blog_post_body = blog_post.get_data(as_text=True)

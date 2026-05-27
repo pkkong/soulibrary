@@ -580,10 +580,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const field = (params.get("field") || "").trim();
     if (_isValidSearchField(field)) selectedField = field;
+    refineQueryText = (params.get("refine") || "").trim();
 
     const input = document.getElementById("query");
     if (input) input.value = q;
-    search();
+    currentQueryText = q;
+    fetchSearch(q, refineQueryText);
 });
 
 const refineToggle = document.getElementById("refine-toggle");

@@ -38,6 +38,10 @@ RECOMMENDATION_BANNED_PHRASES = (
     "오늘 바로 실행",
     "행동으로 바꾸는",
 )
+RECOMMENDATION_BANNED_SEARCH_CARD_TITLES = {
+    "원더": "Soulib에서는 영화명/별칭보다 국내 검색 가능 제목 `아름다운 아이`를 사용해야 합니다.",
+    "클라라와 태양": "현재 도서관 실검색에서 실제 작품 대신 해설서가 잡히므로 추천 카드 대상으로 쓰지 않습니다.",
+}
 RECOMMENDATION_BANNED_PATTERNS = (
     (
         re.compile(r"제목\s*전체.{0,12}저자명"),
@@ -276,6 +280,11 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
     for parts in search_blocks:
         if len(parts) < 3 or not all(parts[:3]):
             errors.append(f"{label}: Soulib search cards need title, meta, and note fields")
+        if len(parts) >= 4 and parts[3] and compact_text(parts[3]) != compact_text(parts[0]):
+            errors.append(
+                f"{label}: Soulib search card `{parts[0]}` must use a title-only fallback query, "
+                "not a title+author query"
+            )
     if strict and meta.get("category_slug") == "recommendations":
         bad_heading = RECOMMENDATION_BANNED_HEADING_RE.search(body)
         if bad_heading:
@@ -288,6 +297,13 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
                 errors.append(f"{label}: {message}")
         if len(search_blocks) < 3:
             errors.append(f"{label}: strict recommendation posts need at least 3 Soulib search cards")
+        for entry in search_entries:
+            title = entry["parts"][0] if entry["parts"] else ""
+            if title in RECOMMENDATION_BANNED_SEARCH_CARD_TITLES:
+                errors.append(
+                    f"{label}: search card `{title}` is not an approved searchable title. "
+                    f"{RECOMMENDATION_BANNED_SEARCH_CARD_TITLES[title]}"
+                )
         if not image_url:
             errors.append(f"{label}: strict recommendation posts need a frontmatter representative image")
         elif not RECOMMENDATION_HERO_RE.fullmatch(image_url):

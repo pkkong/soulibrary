@@ -7,6 +7,8 @@ Local files in this directory are used to compose Soulib blog recommendation her
 | `almond.jpg` | `https://image.yes24.com/goods/119700269/L` |
 | `and-then-none.jpg` | `https://image.yes24.com/goods/11865751/L` |
 | `atomic-habits.jpg` | `https://image.yes24.com/goods/69655504/L` |
+| `beautiful-child.jpg` | `https://image.yes24.com/goods/122607522/L` |
+| `blue-thousand.jpg` | `https://image.yes24.com/goods/91766653/L` |
 | `counterflow.jpg` | `https://image.yes24.com/goods/119120517/L` |
 | `deca-house.jpg` | `https://image.yes24.com/goods/1517194/L` |
 | `dollargut.jpg` | `https://image.yes24.com/goods/91065309/L` |

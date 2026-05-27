@@ -79,8 +79,9 @@
         return bestBook(withCover, targetTitle, targetMeta);
     }
 
-    async function fetchBooks(query) {
-        const params = new URLSearchParams({ query, field: "title_author", limit: "8" });
+    async function fetchBooks(query, refine) {
+        const params = new URLSearchParams({ query, field: "title", limit: "8" });
+        if (refine) params.set("refine", refine);
         const response = await fetch(`/api/live_search?${params.toString()}`, {
             headers: { "Accept": "application/json" },
         });
@@ -182,11 +183,11 @@
         if (!allowRemote) return;
         if (!query) return;
         try {
-            let items = await fetchBooks(query);
+            let items = await fetchBooks(query, meta);
             let book = bestBookWithCover(items, title, meta) || bestBook(items, title, meta);
             let urls = coverCandidateUrls(book);
             if (!urls.length && title && title !== query) {
-                items = await fetchBooks(title);
+                items = await fetchBooks(title, meta);
                 book = bestBookWithCover(items, title, meta) || bestBook(items, title, meta);
                 urls = coverCandidateUrls(book);
             }

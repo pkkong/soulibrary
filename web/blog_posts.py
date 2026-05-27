@@ -45,12 +45,14 @@ BLOG_SEARCH_CARD_COVERS = {
     "십각관의 살인": "/static/img/blog/book-covers/deca-house.jpg",
     "아몬드": "/static/img/blog/book-covers/almond.jpg",
     "아주 작은 습관의 힘": "/static/img/blog/book-covers/atomic-habits.jpg",
+    "아름다운 아이": "/static/img/blog/book-covers/beautiful-child.jpg",
     "역행자": "/static/img/blog/book-covers/counterflow.jpg",
     "완득이": "/static/img/blog/book-covers/wandeuk.jpg",
     "용의자 X의 헌신": "/static/img/blog/book-covers/suspect-x.jpg",
     "우리가 빛의 속도로 갈 수 없다면": "/static/img/blog/book-covers/kim-lightspeed.jpg",
     "원더": "/static/img/blog/book-covers/wonder.jpg",
     "원씽": "/static/img/blog/book-covers/one-thing.jpg",
+    "천 개의 파랑": "/static/img/blog/book-covers/blue-thousand.jpg",
     "클라라와 태양": "/static/img/blog/book-covers/klara-sun.jpg",
     "트렌드 코리아 2026": "/static/img/blog/book-covers/trend-korea-2026.jpg",
     "페인트": "/static/img/blog/book-covers/paint.jpg",
@@ -213,12 +215,16 @@ def _render_soulib_search_card(line):
     if len(parts) < 3:
         return None
     title, meta, note = parts[:3]
-    query = parts[3] if len(parts) >= 4 and parts[3] else " ".join(part for part in (title, meta) if part)
-    if not title or not query:
+    fallback_query = parts[3] if len(parts) >= 4 and parts[3] else ""
+    search_query = title
+    if not title:
         return None
-    href = f"/search?q={quote(query)}&field=title_author"
+    href = f"/search?q={quote(search_query)}&field=title"
+    if meta:
+        href += f"&refine={quote(meta)}"
     safe_href = html.escape(href, quote=True)
-    safe_query = html.escape(query, quote=True)
+    safe_query = html.escape(search_query, quote=True)
+    safe_fallback_query = html.escape(fallback_query, quote=True)
     safe_title = html.escape(title)
     safe_title_attr = html.escape(title, quote=True)
     safe_meta = html.escape(meta)
@@ -228,7 +234,8 @@ def _render_soulib_search_card(line):
     cover_attr = f' data-cover-url="{html.escape(cover_url, quote=True)}"' if cover_url else ""
     return (
         f'<a class="blog-search-card" href="{safe_href}" data-search-query="{safe_query}" '
-        f'data-search-title="{safe_title_attr}" data-search-meta="{safe_meta_attr}"{cover_attr} '
+        f'data-search-title="{safe_title_attr}" data-search-meta="{safe_meta_attr}" '
+        f'data-fallback-query="{safe_fallback_query}"{cover_attr} '
         f'aria-label="Soulib에서 {safe_title} 검색">'
         '<span class="blog-search-card-cover" aria-hidden="true"></span>'
         '<span class="blog-search-card-copy">'
