@@ -51,10 +51,104 @@ class ImgSrcParser(HTMLParser):
             self.srcs.append(attr_map.get("src", ""))
 
 
+class BlogPrimaryListParser(HTMLParser):
+    VOID_TAGS = {
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.cards = []
+        self._in_primary = False
+        self._primary_depth = 0
+        self._in_card = False
+        self._card_depth = 0
+        self._current = None
+
+    @staticmethod
+    def _classes(attrs):
+        attr_map = dict(attrs)
+        return set((attr_map.get("class") or "").split()), attr_map
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        classes, attr_map = self._classes(attrs)
+        starts_primary = tag == "section" and "blog-primary-list" in classes
+        if starts_primary:
+            self._in_primary = True
+            self._primary_depth = 1
+        elif self._in_primary and tag not in self.VOID_TAGS:
+            self._primary_depth += 1
+
+        if not self._in_primary:
+            return
+
+        starts_card = tag == "a" and "blog-card" in classes
+        if starts_card:
+            self._in_card = True
+            self._card_depth = 1
+            self._current = {
+                "href": attr_map.get("href", ""),
+                "date": "",
+                "text_parts": [],
+            }
+        elif self._in_card and tag not in self.VOID_TAGS:
+            self._card_depth += 1
+
+        if self._in_card and tag == "time" and self._current is not None:
+            self._current["date"] = attr_map.get("datetime", "")
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if self._in_card and tag not in self.VOID_TAGS:
+            self._card_depth -= 1
+            if self._card_depth == 0:
+                text = " ".join(" ".join(self._current.get("text_parts", [])).split())
+                self.cards.append(
+                    {
+                        "href": self._current.get("href", ""),
+                        "date": self._current.get("date", ""),
+                        "text": text,
+                    }
+                )
+                self._in_card = False
+                self._current = None
+
+        if self._in_primary and tag not in self.VOID_TAGS:
+            self._primary_depth -= 1
+            if self._primary_depth <= 0:
+                self._in_primary = False
+
+    def handle_data(self, data):
+        if self._current is not None:
+            text = data.strip()
+            if text:
+                self._current["text_parts"].append(text)
+
+
 def image_sources(html):
     parser = ImgSrcParser()
     parser.feed(html)
     return parser.srcs
+
+
+def blog_primary_cards(html):
+    parser = BlogPrimaryListParser()
+    parser.feed(html)
+    return parser.cards
 
 
 def assert_blog_images_load(client):
@@ -139,29 +233,62 @@ def main():
 
     blog = assert_response(client, "/blog")
     blog_body = blog.get_data(as_text=True)
-    if "blog-home-hero" not in blog_body or "주제별 보기" not in blog_body or "책 추천" not in blog_body:
+    posts = get_blog_posts()
+    if not posts:
+        raise AssertionError("blog smoke test requires at least one published post")
+    if "blog-home" not in blog_body or "주제별 보기" not in blog_body or "책 추천" not in blog_body:
         raise AssertionError("blog page did not render expected markup")
     if "blog-local-nav" not in blog_body or "blog-local-search" not in blog_body or "blog-menu-dropdown" not in blog_body:
         raise AssertionError("blog page did not render local navigation and search")
-    if "이 순서로 시작하세요" not in blog_body or "blog-starter-item" not in blog_body:
-        raise AssertionError("blog page did not render starter guide links")
-    if "blog-visual-strip" not in blog_body or "blog-card-thumb" not in blog_body:
-        raise AssertionError("blog page did not render visual screenshots")
-    if "/static/img/blog/seoul-on/seoul-on-cover.svg" not in blog_body:
-        raise AssertionError("blog page did not render SeoulOn-specific visual")
-    if blog_body.find("blog-more") > blog_body.find("blog-category-section"):
+    if "최근 글" not in blog_body or "blog-primary-list" not in blog_body or "blog-card-thumb" not in blog_body:
+        raise AssertionError("blog page did not render the latest-post-first article list")
+    if "blog-home-hero" in blog_body or "blog-visual-strip" in blog_body or "이 순서로 시작하세요" in blog_body:
+        raise AssertionError("blog page should not render the old hero, visual strip, or starter-first copy")
+    primary_list_index = blog_body.find("blog-primary-list")
+    starter_index = blog_body.find("blog-starter")
+    category_index = blog_body.find("blog-category-section")
+    if primary_list_index < 0 or (starter_index >= 0 and primary_list_index > starter_index):
+        raise AssertionError("blog article list should render before starter links")
+    if primary_list_index < 0 or (category_index >= 0 and primary_list_index > category_index):
         raise AssertionError("blog article list should render before topic cards")
+    rendered_blog_cards = blog_primary_cards(blog_body)
+    if not rendered_blog_cards:
+        raise AssertionError("blog page did not render blog post cards")
+    expected_blog_hrefs = [f"/blog/{post['slug']}" for post in posts]
+    rendered_blog_hrefs = [card["href"] for card in rendered_blog_cards]
+    compare_count = min(5, len(expected_blog_hrefs), len(rendered_blog_hrefs))
+    if rendered_blog_hrefs[:compare_count] != expected_blog_hrefs[:compare_count]:
+        raise AssertionError(
+            "blog page did not render latest posts first: "
+            f"expected {expected_blog_hrefs[:compare_count]}, got {rendered_blog_hrefs[:compare_count]}"
+        )
+    newest_date = max(post.get("date") or "" for post in posts)
+    if rendered_blog_cards[0].get("date") != newest_date:
+        raise AssertionError(
+            "blog page first card should use the newest post date: "
+            f"expected {newest_date}, got {rendered_blog_cards[0].get('date')}"
+        )
     assert_blog_images_load(client)
     guide_blog = assert_response(client, "/blog?category=guide")
     guide_blog_body = guide_blog.get_data(as_text=True)
-    if "서울 전자도서관을 처음 이용할 때 준비할 것" not in guide_blog_body or "이용 안내" not in guide_blog_body:
+    if (
+        "blog-filter-head" not in guide_blog_body
+        or "blog-primary-list" not in guide_blog_body
+        or "서울 전자도서관을 처음 이용할 때 준비할 것" not in guide_blog_body
+        or "이용 안내" not in guide_blog_body
+    ):
         raise AssertionError("blog category filter did not render guide posts")
     legacy_library_blog = assert_response(client, "/blog?category=library")
     if "서울 전자도서관을 처음 이용할 때 준비할 것" not in legacy_library_blog.get_data(as_text=True):
         raise AssertionError("legacy blog library category did not map to guide posts")
     searched_blog = assert_response(client, f"/blog?blog_q={quote('서울온')}")
     searched_blog_body = searched_blog.get_data(as_text=True)
-    if "서울 전자도서관을 처음 이용할 때 준비할 것" not in searched_blog_body:
+    if (
+        "blog-filter-head" not in searched_blog_body
+        or "blog-primary-list" not in searched_blog_body
+        or "검색 결과" not in searched_blog_body
+        or "서울 전자도서관을 처음 이용할 때 준비할 것" not in searched_blog_body
+    ):
         raise AssertionError("blog search did not render matching posts")
     if "/static/img/blog/seoul-on/seoul-on-cover.svg" not in searched_blog_body:
         raise AssertionError("SeoulOn search result did not render SeoulOn-specific visual")
@@ -199,13 +326,8 @@ def main():
     commute_rec_body = assert_response(client, "/blog/commute-mystery-ebook-recommendations").get_data(as_text=True)
     if "/search?q=%EC%9A%A9%EC%9D%98%EC%9E%90%20X%EC%9D%98%20%ED%97%8C%EC%8B%A0&amp;field=title&amp;refine=%ED%9E%88%EA%B0%80%EC%8B%9C%EB%85%B8%20%EA%B2%8C%EC%9D%B4%EA%B3%A0" not in commute_rec_body:
         raise AssertionError("commute mystery cards should not concatenate title and author in the search query")
-    if "blog-advice-fit" not in commute_rec_body or "blog-advice-skip" not in commute_rec_body:
-        raise AssertionError("commute mystery post should render recommendation advice labels")
-    if (
-        '<strong class="blog-advice-label">읽기 좋은 순간</strong>' not in commute_rec_body
-        or '<strong class="blog-advice-label">아쉬울 수 있는 점</strong>' not in commute_rec_body
-    ):
-        raise AssertionError("recommendation advice labels should use scannable display copy")
+    if "blog-advice-fit" in commute_rec_body or "blog-advice-skip" in commute_rec_body:
+        raise AssertionError("recommendation posts should keep book-fit copy in plain paragraphs")
     bestseller_rec_blog = assert_response(client, "/blog/bestseller-waitlist-alternative-ebooks")
     bestseller_rec_body = bestseller_rec_blog.get_data(as_text=True)
     if "search-project-hail-mary" in bestseller_rec_body or "detail-project-hail-mary" in bestseller_rec_body:

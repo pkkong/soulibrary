@@ -8,91 +8,31 @@
     {% include "partials/blog_nav.html" %}
 
     {% if active_category_info or blog_query %}
-    <section class="blog-context-hero" aria-labelledby="blog-context-title">
-        <p class="blog-kicker">{% if blog_query %}검색{% else %}주제{% endif %}</p>
-        <h1 id="blog-context-title">
-            {% if blog_query %}"{{ blog_query }}" 검색 결과{% else %}{{ active_category_info.title }}{% endif %}
-        </h1>
-        <p>
-            {% if blog_query %}
-            블로그 글 제목과 본문에서 검색어와 관련된 글을 모았습니다.
-            {% elif active_category_info.slug == "guide" %}
-            Soulib 사용법, 서울온 준비, 전자책 앱 설치와 대출 상태 해석을 한 흐름으로 정리합니다.
-            {% else %}
-            서울시 전자도서관에서 찾아볼 만한 책을 주제별로 소개합니다.
-            {% endif %}
-        </p>
-        <div class="blog-context-actions">
-            <a href="/blog">전체 글 보기</a>
-            {% if active_category_info and active_category_info.slug == "guide" and guide_post %}
-            <a href="/blog/{{ guide_post.slug }}">처음 읽을 글</a>
-            {% elif active_category_info and active_category_info.latest %}
-            <a href="/blog/{{ active_category_info.latest.slug }}">처음 읽을 글</a>
+    <header class="blog-filter-head" aria-labelledby="blog-filter-title">
+        <div>
+            <p class="blog-kicker">{% if blog_query %}검색{% else %}주제{% endif %}</p>
+            <h1 id="blog-filter-title">
+                {% if blog_query %}"{{ blog_query }}" 검색 결과{% else %}{{ active_category_info.title }}{% endif %}
+            </h1>
+            {% if active_category_info %}
+            <p>{{ active_category_info.count }}편</p>
             {% endif %}
         </div>
-    </section>
-    {% else %}
-    <section class="blog-home-hero" aria-labelledby="blog-title">
-        <p class="blog-kicker">Soulib 블로그</p>
-        <h1 id="blog-title"><span>서울 전자책을</span> <span>더 쉽게 찾는 법</span></h1>
-        <p>검색부터 서울온 준비, 내 서재까지 실제 화면과 함께 정리합니다.</p>
-    </section>
+        <a href="/blog">전체 글</a>
+    </header>
     {% endif %}
 
-    {% if not active_category_info and not blog_query %}
-    <section class="blog-visual-strip" aria-label="Soulib 주요 화면">
-        <figure>
-            <img src="{{ url_for('static', filename='img/blog/soulib-guide/home.png') }}" alt="Soulib 홈 검색 화면" loading="lazy">
-            <figcaption>홈 검색</figcaption>
-        </figure>
-        <figure>
-            <img src="{{ url_for('static', filename='img/blog/seoul-on/seoul-on-cover.svg') }}" alt="서울온 앱 설치와 도서관 시설카드 준비 안내" loading="lazy">
-            <figcaption>서울온 준비</figcaption>
-        </figure>
-        <figure>
-            <img src="{{ url_for('static', filename='img/blog/soulib-guide/my-shelf.png') }}" alt="내 서재 화면" loading="lazy">
-            <figcaption>내 서재</figcaption>
-        </figure>
-    </section>
-    {% endif %}
-
-    {% if starter_posts and not active_category_info and not blog_query %}
-    <section class="blog-starter" aria-labelledby="blog-starter-title">
+    <section class="blog-more blog-primary-list" aria-labelledby="blog-more-title">
         <div class="blog-section-head">
-            <p class="blog-kicker">처음이라면</p>
-            <h2 id="blog-starter-title">이 순서로 시작하세요</h2>
-        </div>
-        <div class="blog-starter-list">
-            {% for item in starter_posts %}
-            <a class="blog-starter-item" href="/blog/{{ item.slug }}">
-                {% if item.image %}
-                <span class="blog-starter-thumb">
-                    <img src="{{ item.image }}{% if not item.image_is_external %}?v=20260527c{% endif %}" alt="" loading="lazy">
-                </span>
-                {% else %}
-                <span class="blog-starter-number">{{ loop.index }}</span>
-                {% endif %}
-                <div>
-                    <span class="blog-starter-order">{{ loop.index }}</span>
-                    <strong>{{ item.title }}</strong>
-                    {% if item.description %}<small>{{ item.description }}</small>{% endif %}
-                </div>
-            </a>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-
-    <section class="blog-more" aria-labelledby="blog-more-title">
-        <div class="blog-section-head">
+            {% if blog_query or active_category_title %}
             <p class="blog-kicker">글 목록</p>
+            {% endif %}
+            {% if active_category_info or blog_query %}
             <h2 id="blog-more-title">
-                {% if blog_query %}검색 결과{% elif active_category_title %}{{ active_category_title }} 글{% else %}최근 글{% endif %}
+                {% if blog_query %}검색 결과{% else %}{{ active_category_title }} 글{% endif %}
             </h2>
-            {% if blog_query %}
-            <p class="blog-section-note">"{{ blog_query }}"에 대한 글을 보여줍니다.</p>
-            {% elif active_category_title %}
-            <p class="blog-section-note">{{ active_category_info.count }}편의 글이 있습니다.</p>
+            {% else %}
+            <h1 id="blog-more-title">최근 글</h1>
             {% endif %}
         </div>
 
@@ -116,9 +56,9 @@
             {% else %}
             <div class="blog-empty">
                 {% if active_category_info and active_category_info.slug == "recommendations" %}
-                책 추천 글을 준비 중입니다. 신간, 베스트셀러, 주제별 추천을 차례로 추가하겠습니다.
+                책 추천 글을 준비 중입니다.
                 {% elif blog_query %}
-                아직 맞는 글이 없습니다. 서울온, 대출, 앱, 도서관처럼 더 짧은 단어로 다시 검색해보세요.
+                아직 맞는 글이 없습니다. 더 짧은 단어로 다시 검색해보세요.
                 {% else %}
                 조건에 맞는 글이 없습니다.
                 {% endif %}
@@ -127,9 +67,34 @@
         </div>
     </section>
 
+    {% if starter_posts and not active_category_info and not blog_query %}
+    <section class="blog-starter" aria-labelledby="blog-starter-title">
+        <div class="blog-section-head">
+            <h2 id="blog-starter-title">처음 읽을 글</h2>
+        </div>
+        <div class="blog-starter-list">
+            {% for item in starter_posts %}
+            <a class="blog-starter-item" href="/blog/{{ item.slug }}">
+                {% if item.image %}
+                <span class="blog-starter-thumb">
+                    <img src="{{ item.image }}{% if not item.image_is_external %}?v=20260527c{% endif %}" alt="" loading="lazy">
+                </span>
+                {% else %}
+                <span class="blog-starter-number">{{ loop.index }}</span>
+                {% endif %}
+                <div>
+                    <span class="blog-starter-order">{{ loop.index }}</span>
+                    <strong>{{ item.title }}</strong>
+                    {% if item.description %}<small>{{ item.description }}</small>{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     <section class="blog-category-section" aria-labelledby="blog-category-title">
         <div class="blog-section-head">
-            <p class="blog-kicker">주제</p>
             <h2 id="blog-category-title">{% if active_category_info or blog_query %}다른 주제 보기{% else %}주제별 보기{% endif %}</h2>
         </div>
         <div class="blog-category-grid">
