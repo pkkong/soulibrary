@@ -52,6 +52,12 @@ RECOMMENDATION_BANNED_PATTERNS = (
         "do not repeat publisher/cover comparison instructions in recommendation copy",
     ),
 )
+RECOMMENDATION_BANNED_HEADING_RE = re.compile(
+    r"^##\s*(?:후보|추천|첫\s*번째\s*후보|두\s*번째\s*후보)\s*\d*[\.\)]?\s+",
+    flags=re.MULTILINE,
+)
+REFERENCE_HEADING_RE = re.compile(r"^##\s+참고한 자료\s*$", flags=re.MULTILINE)
+REFERENCE_LINK_RE = re.compile(r"^-\s+\[[^\]]+\]\(https://[^)]+\)\s*$")
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -84,6 +90,17 @@ def markdown_links(body: str) -> list[tuple[str, str]]:
 
 def markdown_images(body: str) -> list[tuple[str, str]]:
     return re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", body)
+
+
+def reference_section_lines(body: str) -> list[str]:
+    match = REFERENCE_HEADING_RE.search(body)
+    if not match:
+        return []
+    section = body[match.end() :]
+    next_heading = re.search(r"^##\s+", section, flags=re.MULTILINE)
+    if next_heading:
+        section = section[: next_heading.start()]
+    return [line.strip() for line in section.splitlines() if line.strip()]
 
 
 def soulib_search_blocks(body: str) -> list[list[str]]:
@@ -221,6 +238,14 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
     if re.search(r"<[^>]+>", body):
         errors.append(f"{label}: raw HTML is not supported in blog posts")
 
+    references = reference_section_lines(body)
+    if references:
+        if not any(REFERENCE_LINK_RE.fullmatch(line) for line in references):
+            errors.append(f"{label}: reference section must include at least one `- [title](https://...)` link")
+        for line in references:
+            if not REFERENCE_LINK_RE.fullmatch(line):
+                errors.append(f"{label}: reference section entries must be `- [title](https://...)`, got `{line}`")
+
     links = markdown_links(body)
     if strict and meta.get("category_slug") == "guide" and len(links) < 2:
         errors.append(f"{label}: strict guide posts need at least two official http(s) source links")
@@ -266,6 +291,9 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
         if len(parts) < 3 or not all(parts[:3]):
             errors.append(f"{label}: Soulib search cards need title, meta, and note fields")
     if strict and meta.get("category_slug") == "recommendations":
+        bad_heading = RECOMMENDATION_BANNED_HEADING_RE.search(body)
+        if bad_heading:
+            errors.append(f"{label}: recommendation headings should use book titles, not numbered candidate labels `{bad_heading.group(0).strip()}`")
         for phrase in RECOMMENDATION_BANNED_PHRASES:
             if phrase in body:
                 errors.append(f"{label}: strict recommendation posts must not contain `{phrase}`")
