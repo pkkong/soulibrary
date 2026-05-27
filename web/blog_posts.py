@@ -46,6 +46,7 @@ BLOG_SEARCH_CARD_COVERS = {
     "아몬드": "/static/img/blog/book-covers/almond.jpg",
     "아주 작은 습관의 힘": "/static/img/blog/book-covers/atomic-habits.jpg",
     "아름다운 아이": "/static/img/blog/book-covers/beautiful-child.jpg",
+    "밝은 밤": "/static/img/blog/book-covers/bright-night.jpg",
     "역행자": "/static/img/blog/book-covers/counterflow.jpg",
     "완득이": "/static/img/blog/book-covers/wandeuk.jpg",
     "용의자 X의 헌신": "/static/img/blog/book-covers/suspect-x.jpg",

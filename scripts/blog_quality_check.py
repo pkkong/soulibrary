@@ -24,6 +24,12 @@ GLOBAL_BANNED_PHRASES = (
     "제목 전체와 저자명",
     "결과가 여러 개라면 출판사와 표지를 대조",
     "보유 도서관 수가 많은 항목부터 확인",
+    "최근 공공도서관 대출 흐름",
+    "계절 리듬",
+    "좋은 신호입니다",
+    "관련 흐름은",
+    "배경 맥락은",
+    "하절기 독서문화 캠페인",
 )
 RECOMMENDATION_HERO_RE = re.compile(
     r"^/static/img/blog/recommendations/[0-9a-z-]+/hero-cover-set\.png$"
@@ -44,6 +50,8 @@ RECOMMENDATION_BANNED_PHRASES = (
     "먼저 답부터",
     "실행 순서",
     "입력 예시",
+    "지금 사람들이 실제로 읽는",
+    "입문자가 한 권을 끝내는 경험",
 )
 RECOMMENDATION_BANNED_SEARCH_CARD_TITLES = {
     "원더": "Soulib에서는 영화명/별칭보다 국내 검색 가능 제목 `아름다운 아이`를 사용해야 합니다.",

@@ -215,11 +215,16 @@ def main():
         "/blog/commute-mystery-ebook-recommendations": "/static/img/blog/recommendations/commute-mystery/hero-cover-set.png",
         "/blog/ebook-business-starter-recommendations": "/static/img/blog/recommendations/business-starter/hero-cover-set.png",
         "/blog/family-ebook-candidates-for-parent-child-reading": "/static/img/blog/recommendations/family-reading/hero-cover-set.png",
+        "/blog/korean-fiction-ebook-starter-recommendations": "/static/img/blog/recommendations/korean-fiction-starter/hero-cover-set.png",
     }
     for path, cover in recommendation_covers.items():
         body = assert_response(client, path).get_data(as_text=True)
         if cover not in body:
             raise AssertionError(f"{path} did not render recommendation-specific cover {cover}")
+        if path == "/blog/korean-fiction-ebook-starter-recommendations" and (
+            'data-cover-url="/static/img/blog/book-covers/bright-night.jpg"' not in body
+        ):
+            raise AssertionError("Korean fiction recommendation did not render the local Bright Night cover")
     family_rec_body = assert_response(client, "/blog/family-ebook-candidates-for-parent-child-reading").get_data(as_text=True)
     if "아름다운 아이" not in family_rec_body or "/search?q=%EC%95%84%EB%A6%84%EB%8B%A4%EC%9A%B4%20%EC%95%84%EC%9D%B4&amp;field=title" not in family_rec_body:
         raise AssertionError("family recommendation should use the searchable Korean title for Wonder")
