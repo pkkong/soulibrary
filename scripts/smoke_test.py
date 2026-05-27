@@ -189,8 +189,16 @@ def main():
         raise AssertionError("recommendation posts should not use an external poster as the representative image")
     if "blog_search_cards.js" not in sf_rec_body:
         raise AssertionError("blog post page did not include search card cover hydration script")
-    if "blog_search_cards.js?v=20260527c" not in sf_rec_body:
+    if "blog_search_cards.js?v=20260527d" not in sf_rec_body:
         raise AssertionError("blog post page should use the current search card hydration asset")
+    commute_rec_body = assert_response(client, "/blog/commute-mystery-ebook-recommendations").get_data(as_text=True)
+    if "blog-advice-fit" not in commute_rec_body or "blog-advice-skip" not in commute_rec_body:
+        raise AssertionError("commute mystery post should render recommendation advice labels")
+    if (
+        '<strong class="blog-advice-label">읽기 좋은 이유</strong>' not in commute_rec_body
+        or '<strong class="blog-advice-label">맞지 않을 수 있는 경우</strong>' not in commute_rec_body
+    ):
+        raise AssertionError("recommendation advice labels should use scannable display copy")
     bestseller_rec_blog = assert_response(client, "/blog/bestseller-waitlist-alternative-ebooks")
     bestseller_rec_body = bestseller_rec_blog.get_data(as_text=True)
     if "search-project-hail-mary" in bestseller_rec_body or "detail-project-hail-mary" in bestseller_rec_body:

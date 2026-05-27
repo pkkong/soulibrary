@@ -67,7 +67,7 @@
             <a class="blog-starter-item" href="/blog/{{ item.slug }}">
                 {% if item.image %}
                 <span class="blog-starter-thumb">
-                    <img src="{{ item.image }}" alt="" loading="lazy">
+                    <img src="{{ item.image }}{% if not item.image_is_external %}?v=20260527b{% endif %}" alt="" loading="lazy">
                 </span>
                 {% else %}
                 <span class="blog-starter-number">{{ loop.index }}</span>
@@ -101,7 +101,7 @@
             <a class="blog-card{% if post.image %} has-thumb{% endif %}" href="/blog/{{ post.slug }}">
                 {% if post.image %}
                 <span class="blog-card-thumb">
-                    <img src="{{ post.image }}" alt="" loading="lazy">
+                    <img src="{{ post.image }}{% if not post.image_is_external %}?v=20260527b{% endif %}" alt="" loading="lazy">
                 </span>
                 {% endif %}
                 <span class="blog-card-copy">

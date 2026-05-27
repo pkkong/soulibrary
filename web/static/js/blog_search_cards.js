@@ -94,6 +94,7 @@
         if (cover) {
             cover.replaceChildren();
         }
+        card.style.removeProperty("--blog-search-card-cover-bg");
         delete card.dataset.coverReady;
     }
 
@@ -124,8 +125,13 @@
         });
     }
 
+    function coverBackgroundValue(url) {
+        return `url(${JSON.stringify(String(url || ""))})`;
+    }
+
     function markCoverReady(card, cover, img, title) {
         cover.replaceChildren(img);
+        card.style.setProperty("--blog-search-card-cover-bg", coverBackgroundValue(img.currentSrc || img.src));
         card.dataset.coverReady = "1";
         card.setAttribute("aria-label", `Soulib에서 ${title || "도서"} 검색`);
     }

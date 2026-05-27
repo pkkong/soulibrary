@@ -240,6 +240,25 @@ def _render_soulib_search_card(line):
     )
 
 
+def _render_advice_paragraph(line):
+    labels = {
+        "왜 이 책이 맞는지": ("읽기 좋은 이유", "fit"),
+        "이런 독자는 건너뛰세요": ("맞지 않을 수 있는 경우", "skip"),
+    }
+    label_pattern = "|".join(re.escape(label) for label in labels)
+    match = re.match(rf"^({label_pattern})\s*[:：]\s*(.+)$", line)
+    if not match:
+        return None
+    raw_label, body = match.group(1), match.group(2).strip()
+    display_label, tone = labels[raw_label]
+    return (
+        f'<p class="blog-advice blog-advice-{tone}">'
+        f'<strong class="blog-advice-label">{html.escape(display_label)}</strong>'
+        f'<span class="blog-advice-copy">{_inline(body)}</span>'
+        '</p>'
+    )
+
+
 def _render_heading(level, text):
     anchor = ""
     match = re.search(r"\s+\{#([0-9A-Za-z_-]+)\}$", text)
@@ -284,6 +303,12 @@ def _render_body(body):
             flush_list()
             flush_search_cards()
             blocks.append(image_html)
+            continue
+        advice_html = _render_advice_paragraph(line)
+        if advice_html:
+            flush_list()
+            flush_search_cards()
+            blocks.append(advice_html)
             continue
         if line.startswith("### "):
             flush_list()
