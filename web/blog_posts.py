@@ -251,6 +251,9 @@ def _render_advice_paragraph(line):
     labels = {
         "왜 이 책이 맞는지": ("읽기 좋은 이유", "fit"),
         "이런 독자는 건너뛰세요": ("맞지 않을 수 있는 경우", "skip"),
+        "읽기 좋은 순간": ("읽기 좋은 순간", "fit"),
+        "아쉬울 수 있는 점": ("아쉬울 수 있는 점", "skip"),
+        "찾을 때 메모": ("찾을 때 메모", "fit"),
     }
     label_pattern = "|".join(re.escape(label) for label in labels)
     match = re.match(rf"^({label_pattern})\s*[:：]\s*(.+)$", line)

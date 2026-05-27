@@ -29,14 +29,21 @@ RECOMMENDATION_HERO_RE = re.compile(
     r"^/static/img/blog/recommendations/[0-9a-z-]+/hero-cover-set\.png$"
 )
 RECOMMENDATION_BANNED_PHRASES = (
+    "전자책 추천",
     "정확한 Soulib 검색어",
     "Soulib 검색어",
     "결과에서 확인할 것",
+    "결과에서 볼 포인트",
     "제목+저자",
     "제목 전체와 저자명",
     "검색 카드",
     "오늘 바로 실행",
     "행동으로 바꾸는",
+    "왜 이 책이 맞는지",
+    "이런 독자는 건너뛰세요",
+    "먼저 답부터",
+    "실행 순서",
+    "입력 예시",
 )
 RECOMMENDATION_BANNED_SEARCH_CARD_TITLES = {
     "원더": "Soulib에서는 영화명/별칭보다 국내 검색 가능 제목 `아름다운 아이`를 사용해야 합니다.",
@@ -286,6 +293,9 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
                 "not a title+author query"
             )
     if strict and meta.get("category_slug") == "recommendations":
+        recommendation_title = meta.get("title", "")
+        if re.search(r"(?:전자책\s*)?추천(?:\s*\d+권)?", recommendation_title):
+            errors.append(f"{label}: recommendation title should not read like an SEO keyword list")
         bad_heading = RECOMMENDATION_BANNED_HEADING_RE.search(body)
         if bad_heading:
             errors.append(f"{label}: recommendation headings should use book titles, not numbered candidate labels `{bad_heading.group(0).strip()}`")

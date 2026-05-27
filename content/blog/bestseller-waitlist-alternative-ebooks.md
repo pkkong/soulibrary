@@ -1,6 +1,6 @@
 ---
-title: 예약이 긴 베스트셀러 대신 지금 찾는 전자책 추천
-description: 예약 대기가 길 때 비슷한 독서 만족을 줄 수 있는 전자책을 주제와 읽기 상황별로 정리했습니다.
+title: 예약이 길 때, 대신 읽어도 좋은 책들
+description: 예약 대기가 길 때 비슷한 독서 만족을 줄 수 있는 책을 주제와 읽기 상황별로 나눠 봤습니다.
 category: 책 추천
 category_slug: recommendations
 date: 2026-05-27

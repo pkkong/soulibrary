@@ -1,6 +1,6 @@
 ---
-title: 전자책으로 시작하기 좋은 경제경영 추천
-description: 경제경영 입문자가 부담 없이 고를 수 있는 전자책을 돈, 습관, 집중, 트렌드 관점으로 정리했습니다.
+title: 경제경영서, 처음엔 한 가지 질문으로 고르기
+description: 경제경영 입문자가 부담 없이 고를 수 있도록 돈, 습관, 집중, 트렌드 관점의 책을 나눠 봤습니다.
 category: 책 추천
 category_slug: recommendations
 date: 2026-05-27

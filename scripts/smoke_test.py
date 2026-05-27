@@ -202,8 +202,8 @@ def main():
     if "blog-advice-fit" not in commute_rec_body or "blog-advice-skip" not in commute_rec_body:
         raise AssertionError("commute mystery post should render recommendation advice labels")
     if (
-        '<strong class="blog-advice-label">읽기 좋은 이유</strong>' not in commute_rec_body
-        or '<strong class="blog-advice-label">맞지 않을 수 있는 경우</strong>' not in commute_rec_body
+        '<strong class="blog-advice-label">읽기 좋은 순간</strong>' not in commute_rec_body
+        or '<strong class="blog-advice-label">아쉬울 수 있는 점</strong>' not in commute_rec_body
     ):
         raise AssertionError("recommendation advice labels should use scannable display copy")
     bestseller_rec_blog = assert_response(client, "/blog/bestseller-waitlist-alternative-ebooks")

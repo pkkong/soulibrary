@@ -1,6 +1,6 @@
 ---
-title: 아이와 함께 찾기 좋은 전자책 6권
-description: 초등 고학년부터 중학생 자녀와 보호자가 함께 읽기 좋은 전자책을 작품별 대화 주제와 난이도로 정리했습니다.
+title: 아이와 같이 읽고 이야기하기 좋은 책
+description: 초등 고학년부터 중학생 자녀와 보호자가 함께 읽기 좋은 책을 대화 주제와 난이도로 나눠 봤습니다.
 category: 책 추천
 category_slug: recommendations
 date: 2026-05-27
