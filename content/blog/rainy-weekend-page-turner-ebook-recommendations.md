@@ -4,7 +4,7 @@ description: 비 오는 주말에 몰입하기 좋은 미스터리를 사건의 
 category: 책 추천
 category_slug: recommendations
 date: 2026-05-27
-image: /static/img/blog/recommendations/commute-mystery/hero-cover-set.png
+image: /static/img/blog/recommendations/rainy-weekend/hero-cover-set.png
 image_alt: 장마철 주말 몰입 독서에 어울리는 미스터리 책 표지 세트
 ---
 
