@@ -26,6 +26,35 @@ BLOG_CATEGORIES = [
         "description": "신간, 베스트셀러, 주제별 추천 목록을 준비합니다.",
     },
 ]
+BLOG_SEARCH_CARD_COVERS = {
+    "13.67": "/static/img/blog/book-covers/thirteen-sixtyseven.jpg",
+    "긴긴밤": "/static/img/blog/book-covers/long-night.jpg",
+    "그리고 아무도 없었다": "/static/img/blog/book-covers/and-then-none.jpg",
+    "달러구트 꿈 백화점": "/static/img/blog/book-covers/dollargut.jpg",
+    "돈의 속성": "/static/img/blog/book-covers/money-attribute.jpg",
+    "돌이킬 수 없는 약속": "/static/img/blog/book-covers/promise.jpg",
+    "마당을 나온 암탉": "/static/img/blog/book-covers/hen.jpg",
+    "마션": "/static/img/blog/book-covers/martian.jpg",
+    "미드나잇 라이브러리": "/static/img/blog/book-covers/midnight-library.jpg",
+    "부의 추월차선": "/static/img/blog/book-covers/millionaire-fastlane.jpg",
+    "불편한 편의점": "/static/img/blog/book-covers/inconvenient-store.jpg",
+    "살인자의 기억법": "/static/img/blog/book-covers/murderer-memory.jpg",
+    "삼체 1부": "/static/img/blog/book-covers/three-body.jpg",
+    "세이노의 가르침": "/static/img/blog/book-covers/sayno.jpg",
+    "숨": "/static/img/blog/book-covers/exhalation.jpg",
+    "십각관의 살인": "/static/img/blog/book-covers/deca-house.jpg",
+    "아몬드": "/static/img/blog/book-covers/almond.jpg",
+    "아주 작은 습관의 힘": "/static/img/blog/book-covers/atomic-habits.jpg",
+    "역행자": "/static/img/blog/book-covers/counterflow.jpg",
+    "완득이": "/static/img/blog/book-covers/wandeuk.jpg",
+    "용의자 X의 헌신": "/static/img/blog/book-covers/suspect-x.jpg",
+    "우리가 빛의 속도로 갈 수 없다면": "/static/img/blog/book-covers/kim-lightspeed.jpg",
+    "원더": "/static/img/blog/book-covers/wonder.jpg",
+    "원씽": "/static/img/blog/book-covers/one-thing.jpg",
+    "클라라와 태양": "/static/img/blog/book-covers/klara-sun.jpg",
+    "트렌드 코리아 2026": "/static/img/blog/book-covers/trend-korea-2026.jpg",
+    "페인트": "/static/img/blog/book-covers/paint.jpg",
+}
 CATEGORY_ALIASES = {
     "이용 안내": "guide",
     "Soulib 이용 가이드": "guide",
@@ -69,6 +98,13 @@ def _static_file_exists(url):
         return False
     path = os.path.join(ROOT_DIR, "web", url.lstrip("/").replace("/", os.sep))
     return os.path.isfile(path)
+
+
+def _search_card_cover_url(title):
+    url = BLOG_SEARCH_CARD_COVERS.get(title)
+    if url and _static_file_exists(url):
+        return url
+    return ""
 
 
 def _parse_frontmatter(text):
@@ -188,9 +224,11 @@ def _render_soulib_search_card(line):
     safe_meta = html.escape(meta)
     safe_meta_attr = html.escape(meta, quote=True)
     safe_note = html.escape(note)
+    cover_url = _search_card_cover_url(title)
+    cover_attr = f' data-cover-url="{html.escape(cover_url, quote=True)}"' if cover_url else ""
     return (
         f'<a class="blog-search-card" href="{safe_href}" data-search-query="{safe_query}" '
-        f'data-search-title="{safe_title_attr}" data-search-meta="{safe_meta_attr}" '
+        f'data-search-title="{safe_title_attr}" data-search-meta="{safe_meta_attr}"{cover_attr} '
         f'aria-label="Soulib에서 {safe_title} 검색">'
         '<span class="blog-search-card-cover" aria-hidden="true"></span>'
         '<span class="blog-search-card-copy">'

@@ -181,12 +181,16 @@ def main():
         raise AssertionError("SF recommendation post did not render internal search link")
     if 'data-search-query="마션 앤디 위어"' not in sf_rec_body or "blog-search-card-cover" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render cover-ready search cards")
+    if 'data-cover-url="/static/img/blog/book-covers/martian.jpg"' not in sf_rec_body:
+        raise AssertionError("SF recommendation post did not render local book cover for search cards")
     if "/static/img/blog/recommendations/sf-next-read/hero-cover-set.png" not in sf_rec_body:
         raise AssertionError("SF recommendation post did not render recommendation-specific cover")
     if "project-hail-mary-official-poster" in sf_rec_body or "blog-post-cover is-external" in sf_rec_body:
         raise AssertionError("recommendation posts should not use an external poster as the representative image")
     if "blog_search_cards.js" not in sf_rec_body:
         raise AssertionError("blog post page did not include search card cover hydration script")
+    if "blog_search_cards.js?v=20260527c" not in sf_rec_body:
+        raise AssertionError("blog post page should use the current search card hydration asset")
     bestseller_rec_blog = assert_response(client, "/blog/bestseller-waitlist-alternative-ebooks")
     bestseller_rec_body = bestseller_rec_blog.get_data(as_text=True)
     if "search-project-hail-mary" in bestseller_rec_body or "detail-project-hail-mary" in bestseller_rec_body:

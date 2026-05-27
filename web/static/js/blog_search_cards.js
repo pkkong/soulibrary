@@ -1,5 +1,6 @@
 (function () {
-    const cards = Array.from(document.querySelectorAll(".blog-search-card[data-search-query]"));
+    const cards = Array.from(document.querySelectorAll(".blog-search-card"))
+        .filter(card => card.dataset.searchQuery || card.dataset.coverUrl || card.dataset.coverUrls);
     if (!cards.length) return;
 
     const MAX_HYDRATED_CARDS = 8;
@@ -9,18 +10,45 @@
         return String(value || "").toLowerCase().replace(/[^0-9a-z가-힣]/g, "");
     }
 
+    function addCoverUrl(urls, value, allowRelative) {
+        const url = String(value || "").trim();
+        let normalized = "";
+        if (!url) return;
+        if (/^https?:\/\//i.test(url) || url.startsWith("//")) {
+            normalized = url.startsWith("//") ? `https:${url}` : url;
+        } else if (allowRelative && (/^(\/|\.\/|\.\.\/)/.test(url) || /^data:image\//i.test(url))) {
+            normalized = url;
+        }
+        if (!normalized || urls.includes(normalized)) return;
+        urls.push(normalized);
+    }
+
     function coverCandidateUrls(book) {
         const urls = [];
-        function addUrl(value) {
-            const url = String(value || "").trim();
-            if (!url || urls.includes(url)) return;
-            if (!/^https?:\/\//i.test(url) && !url.startsWith("//")) return;
-            urls.push(url.startsWith("//") ? `https:${url}` : url);
-        }
-        addUrl(book && book.image_url);
+        addCoverUrl(urls, book && book.image_url, false);
         (Array.isArray(book && book.image_candidates) ? book.image_candidates : []).forEach(candidate => {
-            addUrl(typeof candidate === "string" ? candidate : candidate && (candidate.url || candidate.image_url));
+            addCoverUrl(urls, typeof candidate === "string" ? candidate : candidate && (candidate.url || candidate.image_url), false);
         });
+        return urls;
+    }
+
+    function cardCoverUrls(card) {
+        const urls = [];
+        addCoverUrl(urls, card.dataset.coverUrl, true);
+        const coverUrls = String(card.dataset.coverUrls || "").trim();
+        if (!coverUrls) return urls;
+        if (coverUrls.startsWith("[")) {
+            try {
+                const parsed = JSON.parse(coverUrls);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(url => addCoverUrl(urls, url, true));
+                    return urls;
+                }
+            } catch (error) {
+                // Fall through to delimiter parsing below.
+            }
+        }
+        coverUrls.split(/[\n,|]+/).forEach(url => addCoverUrl(urls, url, true));
         return urls;
     }
 
@@ -69,45 +97,83 @@
         delete card.dataset.coverReady;
     }
 
-    function loadCover(url, preferNext) {
+    function createCoverImage(url) {
+        const img = new Image();
+        img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.src = url;
+        return img;
+    }
+
+    function waitForCover(img, preferNext) {
         return new Promise(resolve => {
-            const img = new Image();
-            img.alt = "";
-            img.loading = "lazy";
-            img.decoding = "async";
-            img.addEventListener("load", () => {
+            function finish() {
                 if (preferNext && img.naturalWidth > 0 && img.naturalWidth < MIN_COVER_SOURCE_WIDTH) {
-                    resolve(null);
+                    resolve(false);
                     return;
                 }
-                resolve(img);
-            }, { once: true });
-            img.addEventListener("error", () => resolve(null), { once: true });
-            img.src = url;
+                resolve(img.naturalWidth > 0);
+            }
+            if (img.complete) {
+                finish();
+                return;
+            }
+            img.addEventListener("load", finish, { once: true });
+            img.addEventListener("error", () => resolve(false), { once: true });
         });
+    }
+
+    function markCoverReady(card, cover, img, title) {
+        cover.replaceChildren(img);
+        card.dataset.coverReady = "1";
+        card.setAttribute("aria-label", `Soulib에서 ${title || "도서"} 검색`);
+    }
+
+    async function loadCover(url, preferNext) {
+        const img = createCoverImage(url);
+        return await waitForCover(img, preferNext) ? img : null;
     }
 
     async function installCover(card, urls, title) {
         const cover = card.querySelector(".blog-search-card-cover");
         if (!cover || !urls.length) {
             resetCover(card);
-            return;
+            return false;
         }
         for (let index = 0; index < urls.length; index += 1) {
             const img = await loadCover(urls[index], index < urls.length - 1);
             if (!img) continue;
-            cover.replaceChildren(img);
-            card.dataset.coverReady = "1";
-            card.setAttribute("aria-label", `Soulib에서 ${title || "도서"} 검색`);
-            return;
+            markCoverReady(card, cover, img, title);
+            return true;
         }
         resetCover(card);
+        return false;
     }
 
-    async function hydrateCard(card) {
+    async function installLocalCover(card, urls, title) {
+        const cover = card.querySelector(".blog-search-card-cover");
+        if (!cover || !urls.length) return false;
+        for (let index = 0; index < urls.length; index += 1) {
+            const img = createCoverImage(urls[index]);
+            markCoverReady(card, cover, img, title);
+            if (await waitForCover(img, index < urls.length - 1)) return true;
+            resetCover(card);
+        }
+        return false;
+    }
+
+    async function hydrateCard(card, options) {
+        const allowRemote = !options || options.allowRemote !== false;
         const query = card.dataset.searchQuery || "";
         const title = card.dataset.searchTitle || "";
         const meta = card.dataset.searchMeta || "";
+        const localUrls = cardCoverUrls(card);
+        if (localUrls.length) {
+            const installedLocalCover = await installLocalCover(card, localUrls, title);
+            if (installedLocalCover || !allowRemote) return;
+        }
+        if (!allowRemote) return;
         if (!query) return;
         try {
             let items = await fetchBooks(query);
@@ -126,8 +192,14 @@
     }
 
     function start() {
-        cards.slice(0, MAX_HYDRATED_CARDS).forEach((card, index) => {
-            window.setTimeout(() => hydrateCard(card), index * 120);
+        const remoteCards = cards.filter(card => card.dataset.searchQuery).slice(0, MAX_HYDRATED_CARDS);
+        const remoteCardSet = new Set(remoteCards);
+        cards.forEach((card) => {
+            const localUrls = cardCoverUrls(card);
+            if (!localUrls.length && !remoteCardSet.has(card)) return;
+            const remoteIndex = remoteCards.indexOf(card);
+            const delay = remoteIndex >= 0 ? remoteIndex * 120 : 0;
+            window.setTimeout(() => hydrateCard(card, { allowRemote: remoteCardSet.has(card) }), delay);
         });
     }
 
