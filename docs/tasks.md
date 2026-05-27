@@ -19,15 +19,27 @@
 ## 표준 작업 흐름
 
 ```text
-branch 생성
--> 수정
+작업 분류: Direct / Explorer-required / Worker-required / QA-required
+-> 역할 배정: Explorer / Worker / UX/UI Designer / Editor / QA
+-> 파일 소유권 지정
+-> 조사 또는 구현
+-> 메인 리뷰
 -> python scripts/smoke_test.py
+-> git diff --check
 -> commit/push
 -> PR
 -> main merge
 -> GitHub Actions 성공 확인
 -> Cloudtype 반영 확인
 ```
+
+## 작업 유형별 운영 메모
+
+- 블로그 글은 Writer가 초안을 쓰고 Editor/Fact Checker가 반려 권한을 가진다. 추천글은 `scripts/blog_live_search_audit.py`를 통과해야 한다.
+- UI/UX 변경은 UX/UI Designer가 방향을 잡고 Frontend Worker가 구현한다. 심미 리스크가 있으면 모바일/데스크톱 스크린샷을 남긴다.
+- 원인 불명 버그는 Explorer가 먼저 재현과 영향 범위를 찾고, 구현 Worker는 별도로 둔다.
+- 배포 감시는 성공하면 자동화를 멈추고, 평시 Ops Watcher는 과도하게 자주 돌리지 않는다.
+- 메인 채팅방은 최종 판단과 커밋/배포를 맡되, 혼자 구현부터 검수까지 끝내지 않는다.
 
 ## 커밋 금지
 

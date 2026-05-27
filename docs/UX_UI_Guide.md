@@ -13,6 +13,13 @@ Soulib은 모바일 사용자가 빠르게 책을 검색하고, 어느 전자도
 - Fast path first: 검색 결과에서 상세 페이지로 이동할 때는 검색 응답에 포함된 책 데이터를 우선 사용한다. 사용자가 이미 본 결과를 상세에서 다시 검색하면 안 된다.
 - No demo noise: 랜딩에는 플랫폼 뱃지, 가짜 예시 결과, 기능 설명 카드 등을 두지 않는다.
 
+## 작업 게이트
+- 사용자-facing 화면 변경은 UX/UI Designer가 먼저 문제 정의와 방향을 잡는다.
+- Frontend Worker는 승인된 방향을 구현하고, 임의로 장식 요소를 추가하지 않는다.
+- 심미 리스크가 있는 변경은 구현 전후 360px, 430px, desktop 스크린샷을 남긴다.
+- 불필요한 선, 색, 그림자, 텍스트 버튼, 카드 안 카드, AI스러운 설명 문구가 보이면 반려한다.
+- 같은 화면에 대한 디자인 불만이 반복되면 바로 재구현하지 말고 mockup 단계로 되돌린다.
+
 ## 타이포그래피
 - 기본 폰트: Pretendard.
 - fallback: `-apple-system`, `BlinkMacSystemFont`, `Segoe UI`, `Noto Sans KR`, `sans-serif`.

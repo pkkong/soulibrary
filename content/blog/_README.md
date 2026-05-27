@@ -57,6 +57,9 @@ date: 2026-05-21
 
 자동 작성 품질 기준:
 
+- 블로그 자동화는 Writer, Editor/Fact Checker, QA 역할이 분리되어야 합니다. Writer가 자기 글을 직접 최종 승인하거나 바로 발행하면 안 됩니다.
+- Writer는 초안 작성까지만 책임집니다. Editor/Fact Checker는 문체, 사실관계, Soulib 검색 연결, 표지 이미지, reference 링크를 검수하고 반려할 수 있어야 합니다.
+- QA는 deterministic check를 실행하고, 실패하거나 애매한 글은 커밋하지 않습니다.
 - 자동화는 매 실행마다 최대 1개 글만 작성합니다. 품질 기준을 못 맞추면 새 글을 만들지 않습니다.
 - 자동 발행 글은 `python scripts/blog_quality_check.py --strict content/blog/<slug>.md`를 통과해야 합니다.
 - 주제는 기존 글과 중복되지 않아야 합니다. 같은 결론을 제목만 바꿔 반복하는 글은 발행하지 않습니다.
@@ -104,9 +107,11 @@ date: 2026-05-21
 
 자동 작성 에이전트 발행 순서:
 
+- Content Writer, Editor/Fact Checker, QA가 같은 역할로 뭉개지지 않게 작업 보고를 분리합니다.
 - 먼저 `content/blog/`의 기존 글 제목, 결론, 섹션 흐름을 요약하고 중복 주제를 제외합니다.
 - 새 글의 독자 문제, 검색 의도, 공식 출처 URL, 섹션 설계를 먼저 정합니다.
 - 초안을 작성한 뒤 스스로 저품질 판정 기준을 적용해 하나라도 걸리면 파일을 삭제하고 발행하지 않습니다.
+- Editor/Fact Checker가 AI스러운 문장, 무관한 이미지, 본문과 분리된 책 카드, Soulib에서 잡히지 않는 책을 확인합니다.
 - 발행 후보 파일에 `python scripts/blog_quality_check.py --strict content/blog/<slug>.md`를 실행합니다.
 - 책 추천 글이면 `PYTHONPATH=web python scripts/blog_live_search_audit.py content/blog/<slug>.md`를 실행합니다.
 - 이어서 `python scripts/smoke_test.py`와 `git diff --check`를 실행합니다.
