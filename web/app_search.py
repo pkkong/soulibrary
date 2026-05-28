@@ -788,6 +788,25 @@ def search_page():
     )
 
 
+@app.route("/ops/onboarding-preview")
+def onboarding_preview_page():
+    meta_title = "온보딩 미리보기 - 서울시 전자도서 통합검색"
+    meta_description = "운영자 확인용 Soulib 시작하기 화면입니다."
+    return render_template(
+        "onboarding_preview.html",
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="",
+        canonical_url="",
+        meta_title=meta_title,
+        meta_description=meta_description,
+        og_title=meta_title,
+        og_description=meta_description,
+        og_url=_public_url("/ops/onboarding-preview"),
+        robots_meta="noindex,nofollow",
+    )
+
+
 @app.route("/blog")
 def blog_page():
     all_posts = get_blog_posts()
