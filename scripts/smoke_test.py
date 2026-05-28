@@ -290,7 +290,7 @@ def main():
         or "서울 전자도서관을 처음 이용할 때 준비할 것" not in searched_blog_body
     ):
         raise AssertionError("blog search did not render matching posts")
-    if "/static/img/blog/seoul-on/seoul-on-cover.svg" not in searched_blog_body:
+    if "/static/img/blog/seoul-on/seoul-on-google-play.png" not in searched_blog_body:
         raise AssertionError("SeoulOn search result did not render SeoulOn-specific visual")
     ebook_search_blog = assert_response(client, "/blog/ebook-search-guide")
     ebook_search_body = ebook_search_blog.get_data(as_text=True)
@@ -298,7 +298,7 @@ def main():
         raise AssertionError("ebook search guide post did not render")
     if "blog-highlight" not in ebook_search_body or "<strong>" not in ebook_search_body:
         raise AssertionError("ebook search guide did not render emphasis markup")
-    if "/static/img/blog/soulib-guide/search-results-example.svg" not in ebook_search_body:
+    if "/static/img/blog/guide-screens/soulib-search-results.png" not in ebook_search_body:
         raise AssertionError("ebook search guide did not render search screenshot")
     sf_rec_blog = assert_response(client, "/blog/sf-ebook-starter-recommendations")
     sf_rec_body = sf_rec_blog.get_data(as_text=True)
