@@ -4,10 +4,12 @@
 {% block body_class %}page-reports{% endblock %}
 
 {% block content %}
-<div class="reports-shell">
-    <section class="reports-head" aria-labelledby="reports-title">
-        <h1 id="reports-title">오류 신고</h1>
-        <p>검색 결과, 대출 상태, 화면 오류를 간단히 남겨주세요.</p>
+<div class="app-shell reports-shell">
+    <section class="app-page-head reports-head" aria-labelledby="reports-title">
+        <div>
+            <h1 class="app-page-title" id="reports-title">신고</h1>
+            <p>검색 결과, 대출 상태, 화면 오류를 간단히 남겨주세요.</p>
+        </div>
     </section>
 
     {% if saved %}

@@ -4,16 +4,17 @@
 {% block body_class %}page-blog{% endblock %}
 
 {% block content %}
-<div class="blog-shell blog-home">
+<div class="app-shell blog-shell blog-home">
     {% include "partials/blog_nav.html" %}
+    <h1 class="sr-only">블로그</h1>
 
     {% if active_category_info or blog_query %}
-    <header class="blog-filter-head" aria-labelledby="blog-filter-title">
+    <header class="app-section blog-filter-head" aria-labelledby="blog-filter-title">
         <div>
             <p class="blog-kicker">{% if blog_query %}검색{% else %}주제{% endif %}</p>
-            <h1 id="blog-filter-title">
+            <h2 id="blog-filter-title">
                 {% if blog_query %}"{{ blog_query }}" 검색 결과{% else %}{{ active_category_info.title }}{% endif %}
-            </h1>
+            </h2>
             {% if active_category_info %}
             <p>{{ active_category_info.count }}편</p>
             {% endif %}
@@ -23,7 +24,7 @@
     {% endif %}
 
     <section class="blog-more blog-primary-list" aria-labelledby="blog-more-title">
-        <div class="blog-section-head">
+        <div class="app-section-head blog-section-head">
             {% if blog_query or active_category_title %}
             <p class="blog-kicker">글 목록</p>
             {% endif %}
@@ -32,7 +33,7 @@
                 {% if blog_query %}검색 결과{% else %}{{ active_category_title }} 글{% endif %}
             </h2>
             {% else %}
-            <h1 id="blog-more-title">최근 글</h1>
+            <h2 id="blog-more-title">최근 글</h2>
             {% endif %}
         </div>
 
@@ -69,7 +70,7 @@
 
     {% if starter_posts and not active_category_info and not blog_query %}
     <section class="blog-starter" aria-labelledby="blog-starter-title">
-        <div class="blog-section-head">
+        <div class="app-section-head blog-section-head">
             <h2 id="blog-starter-title">처음 읽을 글</h2>
         </div>
         <div class="blog-starter-list">
@@ -94,7 +95,7 @@
     {% endif %}
 
     <section class="blog-category-section" aria-labelledby="blog-category-title">
-        <div class="blog-section-head">
+        <div class="app-section-head blog-section-head">
             <h2 id="blog-category-title">{% if active_category_info or blog_query %}다른 주제 보기{% else %}주제별 보기{% endif %}</h2>
         </div>
         <div class="blog-category-grid">

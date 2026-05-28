@@ -10,25 +10,25 @@
 {% block body_class %}page-shared-shelf{% endblock %}
 
 {% block content %}
-<div class="shelf-shell shared-shelf-shell">
+<div class="app-shell shelf-shell shared-shelf-shell">
     {% if error %}
-        <section class="shelf-head">
+        <section class="app-page-head shelf-head">
             <div>
                 <div class="shelf-kicker">공유 서재</div>
-                <h1>공유 서재</h1>
+                <h1 class="app-page-title">공유 서재</h1>
                 <p>{{ error }}</p>
             </div>
         </section>
     {% else %}
-        <section class="shelf-head shared-shelf-head" aria-labelledby="shared-shelf-title">
+        <section class="app-page-head shelf-head shared-shelf-head" aria-labelledby="shared-shelf-title">
             <div>
                 <div class="shelf-kicker">공유 서재</div>
-                <h1 id="shared-shelf-title">{{ shelf.title }}</h1>
+                <h1 class="app-page-title" id="shared-shelf-title">{{ shelf.title }}</h1>
                 {% if shelf.description %}
                     <p>{{ shelf.description }}</p>
                 {% endif %}
             </div>
-            <button class="shelf-icon-button" id="shared-copy-list" type="button" aria-label="내 서재에 복사">
+            <button class="app-icon-button shelf-icon-button" id="shared-copy-list" type="button" aria-label="내 서재에 복사">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 5v14"></path>
                     <path d="M5 12h14"></path>
@@ -36,7 +36,7 @@
             </button>
         </section>
 
-        <section class="shelf-panel shared-shelf-summary" aria-label="공유 서재 요약">
+        <section class="app-section shelf-panel shared-shelf-summary" aria-label="공유 서재 요약">
             <div class="shared-summary-row">
                 <span>총 {{ shelf.books|length }}권</span>
                 <span id="shared-availability-summary">소장 정보 확인 가능</span>
@@ -44,8 +44,8 @@
             <div id="shared-copy-status" class="shelf-share-status" aria-live="polite"></div>
         </section>
 
-        <section class="shelf-panel" aria-labelledby="shared-books-title">
-            <div class="shelf-section-head">
+        <section class="app-section shelf-panel" aria-labelledby="shared-books-title">
+            <div class="app-section-head shelf-section-head">
                 <h2 id="shared-books-title">책 목록</h2>
             </div>
             <div id="shared-shelf-items" class="shelf-items"></div>

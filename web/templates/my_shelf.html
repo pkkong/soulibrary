@@ -4,17 +4,17 @@
 {% block body_class %}page-my-shelf{% endblock %}
 
 {% block content %}
-<div class="shelf-shell">
-    <section class="shelf-head" aria-labelledby="shelf-title">
-        <h1 id="shelf-title">내 서재</h1>
-        <div class="shelf-head-actions">
-            <button class="shelf-icon-button" id="shelf-create-toggle" type="button" aria-label="새 서재 만들기" aria-expanded="false">
+<div class="app-shell shelf-shell">
+    <section class="app-page-head shelf-head" aria-labelledby="shelf-title">
+        <h1 class="app-page-title" id="shelf-title">내 서재</h1>
+        <div class="app-head-actions shelf-head-actions">
+            <button class="app-icon-button shelf-icon-button" id="shelf-create-toggle" type="button" aria-label="새 서재 만들기" aria-expanded="false">
                 <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
                     <path d="M12 5v14"></path>
                     <path d="M5 12h14"></path>
                 </svg>
             </button>
-            <button class="shelf-icon-button" id="shelf-manage-toggle" type="button" aria-label="서재 관리" aria-expanded="false">
+            <button class="app-icon-button shelf-icon-button" id="shelf-manage-toggle" type="button" aria-label="서재 관리" aria-expanded="false">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
                     <path d="M5 12h.01"></path>
                     <path d="M12 12h.01"></path>
@@ -24,7 +24,7 @@
         </div>
     </section>
 
-    <section class="shelf-panel shelf-manager" aria-labelledby="shelf-manager-title">
+    <section class="app-section shelf-panel shelf-manager" aria-labelledby="shelf-manager-title">
         <div class="shelf-manager-row">
             <h2 id="shelf-manager-title" class="sr-only">서재</h2>
             <div id="shelf-list-tabs" class="shelf-list-tabs" role="tablist" aria-label="서재 목록"></div>
@@ -73,8 +73,8 @@
         </form>
     </section>
 
-    <section class="shelf-panel" aria-labelledby="shelf-list-title">
-        <div class="shelf-section-head">
+    <section class="app-section shelf-panel" aria-labelledby="shelf-list-title">
+        <div class="app-section-head shelf-section-head">
             <div>
                 <h2 id="shelf-list-title">담은 책</h2>
                 <p id="shelf-list-desc" class="shelf-active-desc"></p>
