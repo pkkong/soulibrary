@@ -282,7 +282,7 @@ details[open] > .app-icon-button {
 }
 
 .onboarding-shell {
-    padding-bottom: calc(34px + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--bottom-nav-h) + 48px + env(safe-area-inset-bottom));
 }
 
 .onboarding-head {
@@ -311,20 +311,63 @@ details[open] > .app-icon-button {
     word-break: keep-all;
 }
 
-.onboarding-hero {
-    overflow: hidden;
+.onboarding-search-demo {
+    min-height: 132px;
+    display: flex;
+    align-items: center;
     margin: 8px 0 24px;
     border-radius: 18px;
     background: #f8f8fa;
     border: 1px solid #f2f2f7;
+    padding: 18px;
 }
 
-.onboarding-hero img {
-    display: block;
+.onboarding-search-demo-bar {
+    min-height: 54px;
     width: 100%;
-    max-height: 360px;
-    object-fit: cover;
-    object-position: top center;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    border: 1px solid #e5e5ea;
+    border-radius: 16px;
+    background: #ffffff;
+    padding: 0 7px 0 16px;
+}
+
+.onboarding-search-demo-icon {
+    color: #8e8e93;
+    display: inline-flex;
+    flex: 0 0 auto;
+}
+
+.onboarding-search-demo-bar input {
+    min-width: 0;
+    flex: 1;
+    height: 54px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #1d1d1f;
+    font-size: 16px;
+    font-weight: var(--fw-plain);
+}
+
+.onboarding-search-demo-bar input::placeholder {
+    color: #8e8e93;
+}
+
+.onboarding-search-demo-bar button {
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 999px;
+    background: #1d1d1f;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
 }
 
 .onboarding-section {
@@ -347,7 +390,7 @@ details[open] > .app-icon-button {
     display: grid;
     grid-template-columns: 34px minmax(0, 1fr);
     gap: 12px;
-    padding: 14px 0;
+    padding: 12px 0;
     border-top: 1px solid #f2f2f7;
 }
 
@@ -406,9 +449,9 @@ details[open] > .app-icon-button {
 .onboarding-screen-grid img {
     display: block;
     width: 100%;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    object-position: top center;
+    height: 420px;
+    object-fit: contain;
+    object-position: center top;
     border-radius: 14px;
     background: #f8f8fa;
     border: 1px solid #f2f2f7;
@@ -3560,8 +3603,23 @@ body.has-topbar .search-top {
     .onboarding-search-panel {
         grid-template-columns: 1fr;
     }
-    .onboarding-hero img {
-        max-height: 280px;
+    .onboarding-search-demo {
+        min-height: 108px;
+        padding: 14px;
+        margin-bottom: 22px;
+    }
+    .onboarding-search-demo-bar {
+        min-height: 52px;
+    }
+    .onboarding-search-demo-bar input {
+        height: 52px;
+    }
+    .onboarding-steps li {
+        padding: 10px 0;
+        gap: 10px;
+    }
+    .onboarding-screen-grid img {
+        height: 390px;
     }
     .onboarding-search-panel {
         padding: 16px;
