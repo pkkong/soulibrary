@@ -19,11 +19,11 @@
     --home-top-fill: 0px;
     --section-divider-h: 0px;
     --app-shell-w: 860px;
-    --fw-copy: 450;
-    --fw-plain: 500;
-    --fw-ui: 540;
-    --fw-title: 600;
-    --fw-display: 650;
+    --fw-copy: 400;
+    --fw-plain: 450;
+    --fw-ui: 500;
+    --fw-title: 550;
+    --fw-display: 600;
 }
 
 * { box-sizing: border-box; }
@@ -2095,8 +2095,8 @@ body.has-topbar .search-top {
     position: relative;
     overflow: hidden;
     display: block;
-    border: 1px solid #f2f2f7;
-    background: #f2f2f7;
+    border: 0;
+    background: transparent;
 }
 
 .blog-card-thumb {
@@ -2209,10 +2209,10 @@ body.has-topbar .search-top {
 .blog-visual-strip figure {
     min-width: 0;
     margin: 0;
-    border: 1px solid #e5e5ea;
+    border: 0;
     border-radius: 18px;
-    background: #fbfbfd;
-    padding: 10px;
+    background: transparent;
+    padding: 0;
 }
 
 .blog-visual-strip img {
@@ -2573,10 +2573,10 @@ body.has-topbar .search-top {
 .blog-post-cover {
     margin: 18px auto 0;
     width: min(100%, 520px);
-    border: 1px solid #e5e5ea;
+    border: 0;
     border-radius: 18px;
-    background: #fbfbfd;
-    padding: 10px;
+    background: transparent;
+    padding: 0;
 }
 
 .blog-post-cover img {
@@ -2852,7 +2852,7 @@ body.has-topbar .search-top {
     gap: 14px;
     padding: 12px 0;
     border: 0;
-    border-top: 1px solid #f2f2f7;
+    border-top: 0;
     border-radius: 0;
     background: #ffffff;
     color: #1d1d1f;
@@ -2884,9 +2884,9 @@ body.has-topbar .search-top {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border: 1px solid #f2f2f7;
+    border: 0;
     border-radius: 6px;
-    background: #ffffff;
+    background: transparent;
     color: #8e8e93;
 }
 
@@ -2980,9 +2980,9 @@ body.has-topbar .search-top {
     display: block;
     width: 100%;
     height: auto;
-    border: 1px solid #e5e5ea;
+    border: 0;
     border-radius: 12px;
-    background: #ffffff;
+    background: transparent;
 }
 
 .blog-figure-tall {
@@ -3079,7 +3079,7 @@ body.has-topbar .search-top {
         display: none;
     }
     .blog-visual-strip figure {
-        padding: 8px;
+        padding: 0;
         border-radius: 16px;
     }
     .blog-visual-strip img {
@@ -3148,7 +3148,6 @@ body.has-topbar .search-top {
     }
     .blog-post-cover {
         width: min(100%, 330px);
-        padding: 8px;
         border-radius: 16px;
     }
     .blog-post-cover img {
