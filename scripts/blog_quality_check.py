@@ -19,6 +19,12 @@ SUPPORTED_BODY_LINK_SCHEMES = ("http://", "https://")
 STRICT_MIN_BODY_CHARS = 3500
 BASELINE_MIN_BODY_CHARS = 900
 SOULIB_SEARCH_BLOCK_RE = re.compile(r"^\[\[soulib-search:([^\]]+)\]\]$", flags=re.MULTILINE)
+try:
+    sys.path.insert(0, str(WEB_DIR))
+    from blog_posts import BLOG_SEARCH_CARD_COVERS
+except Exception:
+    BLOG_SEARCH_CARD_COVERS = {}
+
 GLOBAL_BANNED_PHRASES = (
     "Soulib에서는 제목 전체와 저자명",
     "제목 전체와 저자명",
@@ -357,12 +363,23 @@ def validate_post(path: Path, strict: bool, all_paths: list[Path]) -> list[str]:
             )
         if not image_url and not images:
             errors.append(f"{label}: strict recommendation posts need a real visual asset")
+        if images:
+            errors.append(
+                f"{label}: recommendation body images are not allowed; use the frontmatter cover set "
+                "and Soulib search cards instead"
+            )
         if max_consecutive_search_cards(body) > 2:
             errors.append(f"{label}: recommendation search cards must be placed near each book section, not grouped in a top card pile")
         for entry in search_entries:
             title = entry["parts"][0] if entry["parts"] else ""
             if not title:
                 continue
+            cover_path = BLOG_SEARCH_CARD_COVERS.get(title)
+            if not cover_path or not static_path_exists(cover_path):
+                errors.append(
+                    f"{label}: search card `{title}` needs a local cover mapping in "
+                    "`web/blog_posts.py` BLOG_SEARCH_CARD_COVERS before publishing"
+                )
             start = max(0, entry["offset"] - 900)
             end = min(len(body), entry["offset"] + 1100)
             nearby = SOULIB_SEARCH_BLOCK_RE.sub("", body[start:end])
