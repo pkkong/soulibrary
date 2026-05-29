@@ -832,26 +832,22 @@ details[open] > .app-icon-button {
 }
 
 .placement-guide-pill {
-    min-height: 48px;
+    min-height: 34px;
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     align-self: center;
-    margin-top: 14px;
-    padding: 6px 8px 6px 7px;
-    border: 1px solid #e5e5ea;
+    margin-top: 11px;
+    padding: 0 10px;
+    border: 1px solid #f2f2f7;
     border-radius: 999px;
-    background: #fbfbfd;
-    color: #1d1d1f;
+    background: rgba(251, 251, 253, 0.72);
+    color: #6e6e73;
     text-decoration: none;
 }
 
 .placement-guide-pill-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 999px;
-    background: #f2f2f7;
-    color: #6e6e73;
+    color: #8e8e93;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -859,45 +855,22 @@ details[open] > .app-icon-button {
 }
 
 .placement-guide-pill-copy {
-    display: grid;
-    gap: 1px;
-    text-align: left;
-}
-
-.placement-guide-pill-copy strong {
-    color: #1d1d1f;
+    display: inline-flex;
+    align-items: center;
     font-size: 13px;
-    line-height: 1.25;
-    font-weight: var(--fw-ui);
-}
-
-.placement-guide-pill-copy small {
-    color: #8e8e93;
-    font-size: 11px;
     line-height: 1.25;
     font-weight: var(--fw-plain);
 }
 
 .placement-guide-pill-arrow {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    background: #ffffff;
-    border: 1px solid #e5e5ea;
-    position: relative;
-    flex: 0 0 auto;
-}
-
-.placement-guide-pill-arrow::before {
-    content: "";
-    position: absolute;
-    left: 9px;
-    top: 8px;
     width: 7px;
     height: 7px;
-    border-top: 1.7px solid #6e6e73;
-    border-right: 1.7px solid #6e6e73;
+    margin-left: 1px;
+    border-top: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
     transform: rotate(45deg);
+    position: relative;
+    flex: 0 0 auto;
 }
 
 .placement-search-top {
