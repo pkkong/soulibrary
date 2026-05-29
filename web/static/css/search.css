@@ -528,8 +528,7 @@ details[open] > .app-icon-button {
     text-decoration: none;
 }
 
-.onboarding-path-card a::after,
-.onboarding-link-list a::after {
+.onboarding-path-card a::after {
     content: "";
     width: 7px;
     height: 7px;
@@ -589,41 +588,89 @@ details[open] > .app-icon-button {
     cursor: pointer;
 }
 
-.onboarding-link-list {
-    display: grid;
-    gap: 8px;
+.onboarding-related-kicker {
+    margin: 0 0 5px;
+    color: #8e8e93;
+    font-size: 12px;
+    line-height: 1.25;
+    font-weight: var(--fw-ui);
 }
 
-.onboarding-link-list a {
-    min-height: 66px;
+.onboarding-related-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+}
+
+.onboarding-related-card {
+    min-height: 76px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 28px;
     align-items: center;
-    column-gap: 12px;
-    padding: 12px 0;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #f2f2f7;
+    border-radius: 16px;
+    background: #fbfbfd;
     color: #1d1d1f;
     text-decoration: none;
-    border-top: 1px solid #f2f2f7;
 }
 
-.onboarding-link-list a:first-child {
-    border-top: 0;
+.onboarding-related-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid #e5e5ea;
+    color: #6e6e73;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.onboarding-link-list strong {
+.onboarding-related-copy {
+    min-width: 0;
     display: block;
+}
+
+.onboarding-related-copy strong {
+    display: block;
+    color: #1d1d1f;
     font-size: 15px;
     line-height: 1.35;
     font-weight: var(--fw-title);
+    letter-spacing: 0;
+    word-break: keep-all;
 }
 
-.onboarding-link-list span {
+.onboarding-related-copy span {
     display: block;
     margin-top: 3px;
     color: #6e6e73;
     font-size: 13px;
     line-height: 1.35;
     font-weight: var(--fw-plain);
+    word-break: keep-all;
+}
+
+.onboarding-related-arrow {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid #e5e5ea;
+    position: relative;
+}
+
+.onboarding-related-arrow::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 10px;
+    width: 7px;
+    height: 7px;
+    border-top: 1.7px solid #6e6e73;
+    border-right: 1.7px solid #6e6e73;
+    transform: rotate(45deg);
 }
 
 .placement-preview-shell {
