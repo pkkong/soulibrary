@@ -673,6 +673,100 @@ details[open] > .app-icon-button {
     transform: rotate(45deg);
 }
 
+@media (min-width: 900px) {
+    .page-onboarding-preview .app-main {
+        padding-bottom: 56px;
+    }
+    .page-onboarding-preview .bottom-nav-app {
+        display: none;
+    }
+    .onboarding-shell {
+        max-width: 1040px;
+        padding-top: 28px;
+        padding-bottom: 56px;
+    }
+    .onboarding-head {
+        min-height: 46px;
+        padding-bottom: 18px;
+    }
+    .onboarding-search-demo {
+        min-height: 116px;
+        margin-bottom: 20px;
+        padding: 16px;
+    }
+    .onboarding-flow-strip {
+        margin-bottom: 28px;
+    }
+    .onboarding-steps {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+    .onboarding-steps li,
+    .onboarding-steps li:first-child {
+        grid-template-columns: 34px minmax(0, 1fr);
+        align-content: start;
+        min-height: 138px;
+        padding: 14px;
+        border: 1px solid #f2f2f7;
+        border-radius: 16px;
+        background: #fbfbfd;
+    }
+    .onboarding-steps p {
+        line-height: 1.45;
+    }
+    .onboarding-screens .onboarding-section-head,
+    .onboarding-section-head {
+        margin-bottom: 14px;
+    }
+    .onboarding-screen-grid {
+        gap: 14px;
+    }
+    .onboarding-screen-grid figure {
+        padding: 18px 18px 14px;
+        border: 1px solid #f2f2f7;
+        border-radius: 18px;
+        background: #fbfbfd;
+    }
+    .onboarding-screen-grid img {
+        width: min(100%, 260px);
+        height: 340px;
+        margin: 0 auto;
+        object-fit: cover;
+        object-position: top center;
+        border-radius: 18px;
+        background: #ffffff;
+        border-color: #e5e5ea;
+    }
+    .onboarding-screen-grid figcaption {
+        max-width: 320px;
+        margin: 10px auto 0;
+        text-align: center;
+    }
+    .onboarding-path-grid {
+        gap: 14px;
+    }
+    .onboarding-search-panel {
+        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        padding: 18px;
+    }
+    .onboarding-related-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+    }
+    .onboarding-related-card {
+        min-height: 116px;
+        grid-template-columns: 40px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-items: start;
+        padding: 14px;
+    }
+    .onboarding-related-arrow {
+        grid-column: 2;
+        justify-self: start;
+        margin-top: 6px;
+    }
+}
+
 .placement-preview-shell {
     width: min(100%, 1180px);
     margin: 0 auto;
