@@ -5,7 +5,7 @@ export default defineConfig({
   brand: {
     displayName: '서울 전자책 찾기',
     primaryColor: '#3182F6',
-    icon: 'https://www.soulib.kr/static/img/app-icon-1024.png',
+    icon: 'https://www.soulib.kr/static/img/app-icon-600.png',
   },
   web: {
     host: 'localhost',

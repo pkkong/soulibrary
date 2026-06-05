@@ -20,6 +20,7 @@ const fieldOptions: Array<{ value: SearchField; label: string }> = [
 ];
 
 const reportCategories = ['오류', '검색 결과', '대출 상태', '화면', '기타'];
+const quickSearchKeywords = ['달러구트', '불편한 편의점', '소년이 온다', '총균쇠', '트렌드 코리아'];
 
 function countTotal(counts?: BookCounts) {
   return Number(counts?.total || 0);
@@ -36,6 +37,10 @@ function libraryLabel(book: SearchBook) {
   return libraries ? `${libraries}곳` : '확인 필요';
 }
 
+function metaLabel(book: SearchBook) {
+  return [book.author, book.publisher].filter(Boolean).join(' · ') || '도서 정보 확인 중';
+}
+
 function platformLabels(book: SearchBook) {
   const labels = new Set<string>();
   (book.libraries || []).forEach((library) => {
@@ -43,6 +48,10 @@ function platformLabels(book: SearchBook) {
     if (provider) labels.add(provider);
   });
   return Array.from(labels).slice(0, 3);
+}
+
+function currentPageUrl() {
+  return typeof window === 'undefined' ? '' : window.location.href;
 }
 
 function EmptyCover() {
@@ -74,18 +83,22 @@ function BookCard({
         </span>
         <span className="book-info">
           <span className="book-title">{book.title}</span>
-          <span className="book-meta">{[book.author, book.publisher].filter(Boolean).join(' · ') || '정보 확인 중'}</span>
-          <span className="book-badges">
-            <span className="badge strong">{libraryLabel(book)}</span>
+          <span className="book-meta">{metaLabel(book)}</span>
+          <span className="book-subrow">
+            <span className="book-count">{libraryLabel(book)}</span>
             {platformLabels(book).map((label) => (
-              <span className="badge" key={label}>
+              <span className="book-chip" key={label}>
                 {label}
               </span>
             ))}
           </span>
         </span>
       </button>
-      <button className={saved ? 'small-button active' : 'small-button'} type="button" onClick={() => onToggleShelf(book)}>
+      <button
+        className={saved ? 'small-button shelf-button active' : 'small-button shelf-button'}
+        type="button"
+        onClick={() => onToggleShelf(book)}
+      >
         {saved ? '저장됨' : '담기'}
       </button>
     </article>
@@ -108,9 +121,8 @@ function SearchView({
   const [total, setTotal] = useState(0);
   const [message, setMessage] = useState('');
 
-  async function handleSearch(event: FormEvent) {
-    event.preventDefault();
-    const cleanQuery = query.trim();
+  async function runSearch(nextQuery: string) {
+    const cleanQuery = nextQuery.trim();
     if (!cleanQuery) {
       setMessage('검색어를 입력해 주세요.');
       return;
@@ -132,16 +144,27 @@ function SearchView({
     }
   }
 
+  async function handleSearch(event: FormEvent) {
+    event.preventDefault();
+    await runSearch(query);
+  }
+
+  function handleQuickSearch(keyword: string) {
+    setQuery(keyword);
+    void runSearch(keyword);
+  }
+
   return (
-    <main className="screen">
-      <section className="hero">
-        <p className="eyebrow">Soulib</p>
-        <h1>서울 전자책 찾기</h1>
-        <p>서울 공공 전자책 서비스를 한 번에 확인합니다.</p>
-      </section>
+    <main className="screen search-screen">
+      <header className="app-bar">
+        <div>
+          <h1>전자책 검색</h1>
+          <p>서울 공공 전자책 제공 현황</p>
+        </div>
+      </header>
 
       <form className="search-form" onSubmit={handleSearch}>
-        <label className="search-label" htmlFor="query">
+        <label className="sr-only" htmlFor="query">
           검색어
         </label>
         <div className="search-row">
@@ -153,7 +176,7 @@ function SearchView({
             enterKeyHint="search"
           />
           <button className="primary-button" type="submit" disabled={state === 'loading'}>
-            {state === 'loading' ? '검색 중' : '검색'}
+            {state === 'loading' ? '검색중' : '검색'}
           </button>
         </div>
         <div className="segmented" aria-label="검색 범위">
@@ -170,12 +193,26 @@ function SearchView({
         </div>
       </form>
 
-      <section className="result-head" aria-live="polite">
-        {state === 'done' && results.length > 0 ? <h2>{total}권</h2> : <h2>검색</h2>}
-        {message ? <p className={state === 'error' ? 'status error' : 'status'}>{message}</p> : null}
-      </section>
+      {state !== 'idle' || message ? (
+        <section className="result-head" aria-live="polite">
+          {state === 'done' && results.length > 0 ? <h2>{total}권</h2> : <h2>검색 결과</h2>}
+          {message ? <p className={state === 'error' ? 'status error' : 'status'}>{message}</p> : null}
+        </section>
+      ) : null}
 
       <section className="book-list">
+        {state === 'idle' ? (
+          <section className="quick-search" aria-label="빠른 검색">
+            <h2>바로 찾아보기</h2>
+            <div className="quick-chip-row">
+              {quickSearchKeywords.map((keyword) => (
+                <button type="button" className="quick-chip" key={keyword} onClick={() => handleQuickSearch(keyword)}>
+                  {keyword}
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {state === 'loading' ? <div className="panel-note">실시간으로 확인하고 있습니다.</div> : null}
         {results.map((book) => (
           <BookCard
@@ -234,11 +271,16 @@ function DetailView({
   return (
     <main className="screen detail-screen">
       <div className="top-actions">
-        <button className="text-button" type="button" onClick={onBack}>
-          이전
+        <button className="icon-button" type="button" onClick={onBack} aria-label="이전 화면">
+          ‹
         </button>
-        <button className={saved ? 'small-button active' : 'small-button'} type="button" onClick={() => onToggleShelf(detail)}>
-          {saved ? '저장됨' : '서재 담기'}
+        <span className="top-title">상세</span>
+        <button
+          className={saved ? 'small-button shelf-button active' : 'small-button shelf-button'}
+          type="button"
+          onClick={() => onToggleShelf(detail)}
+        >
+          {saved ? '저장됨' : '담기'}
         </button>
       </div>
 
@@ -247,9 +289,9 @@ function DetailView({
           <BookCover book={detail} />
         </span>
         <div>
-          <p className="eyebrow">{libraryLabel(detail)}</p>
+          <p className="detail-count">{libraryLabel(detail)}</p>
           <h1>{detail.title}</h1>
-          <p>{[detail.author, detail.publisher].filter(Boolean).join(' · ') || '도서 정보 확인 중'}</p>
+          <p>{metaLabel(detail)}</p>
         </div>
       </section>
 
@@ -258,16 +300,17 @@ function DetailView({
 
       <section className="count-strip" aria-label="제공 현황">
         <span>
-          <b>{detail.counts?.kyobo || 0}</b>
-          교보
+          <b>{libraryLabel(detail)}</b>
+          {' '}제공
         </span>
         <span>
-          <b>{detail.counts?.yes24 || 0}</b>
-          YES24
+          교보 <b>{detail.counts?.kyobo || 0}</b>
         </span>
         <span>
-          <b>{detail.counts?.other || 0}</b>
-          기타
+          YES24 <b>{detail.counts?.yes24 || 0}</b>
+        </span>
+        <span>
+          기타 <b>{detail.counts?.other || 0}</b>
         </span>
       </section>
 
@@ -302,10 +345,10 @@ function ShelfView({
 }) {
   return (
     <main className="screen">
-      <section className="section-head">
+      <section className="section-head shelf-head">
         <div>
-          <p className="eyebrow">내 서재</p>
-          <h1>{shelf.length}권</h1>
+          <h1>내 서재</h1>
+          <p>{shelf.length}권 저장됨</p>
         </div>
       </section>
 
@@ -319,10 +362,10 @@ function ShelfView({
                 </span>
                 <span className="book-info">
                   <span className="book-title">{book.title}</span>
-                  <span className="book-meta">{[book.author, book.publisher].filter(Boolean).join(' · ') || '정보 확인 중'}</span>
+                  <span className="book-meta">{metaLabel(book)}</span>
                 </span>
               </button>
-              <button className="small-button" type="button" onClick={() => onRemove(book.key)}>
+              <button className="remove-button" type="button" onClick={() => onRemove(book.key)}>
                 빼기
               </button>
             </article>
@@ -341,7 +384,7 @@ function ReportView() {
   const [payload, setPayload] = useState<ReportPayload>({
     category: '오류',
     message: '',
-    page_url: '',
+    page_url: currentPageUrl(),
   });
   const [submitState, setSubmitState] = useState<LoadState>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
@@ -375,7 +418,7 @@ function ReportView() {
     setSubmitMessage('신고를 보내는 중입니다.');
     try {
       const data = await submitReport({ ...payload, message });
-      setPayload({ category: '오류', message: '', page_url: '' });
+      setPayload({ category: '오류', message: '', page_url: currentPageUrl() });
       setSubmitState('done');
       setSubmitMessage(data.message || '신고를 접수했습니다.');
     } catch (error) {
@@ -385,27 +428,32 @@ function ReportView() {
   }
 
   return (
-    <main className="screen">
-      <section className="section-head">
+    <main className="screen report-screen">
+      <section className="section-head report-head">
         <div>
-          <p className="eyebrow">오류 신고</p>
-          <h1>문제 남기기</h1>
+          <h1>신고</h1>
+          <p>검색 결과나 화면 문제를 남겨 주세요.</p>
         </div>
-        <span className="badge">{recent?.count_label || '확인 중'}</span>
+        <span className="soft-badge">{recent?.count_label || '확인 중'}</span>
       </section>
-      <div className={recent?.unavailable ? 'panel-note error' : 'panel-note'}>{recentMessage}</div>
+      <p className={recent?.unavailable ? 'inline-note error' : 'inline-note'}>{recentMessage}</p>
 
       <form className="report-form" onSubmit={handleSubmit}>
-        <label>
-          분류
-          <select value={payload.category} onChange={(event) => setPayload({ ...payload, category: event.target.value })}>
+        <fieldset className="category-field">
+          <legend>분류</legend>
+          <div className="pill-group" aria-label="신고 분류">
             {reportCategories.map((category) => (
-              <option key={category} value={category}>
+              <button
+                key={category}
+                type="button"
+                className={payload.category === category ? 'selected' : ''}
+                onClick={() => setPayload({ ...payload, category })}
+              >
                 {category}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </fieldset>
         <label>
           내용
           <textarea
@@ -416,15 +464,7 @@ function ReportView() {
             placeholder="무엇이 불편했는지 적어 주세요."
           />
         </label>
-        <label>
-          문제가 있던 화면
-          <input
-            value={payload.page_url || ''}
-            onChange={(event) => setPayload({ ...payload, page_url: event.target.value })}
-            placeholder="선택 입력"
-            inputMode="url"
-          />
-        </label>
+        <input type="hidden" value={payload.page_url || ''} readOnly />
         <button className="primary-button full" type="submit" disabled={submitState === 'loading'}>
           {submitState === 'loading' ? '보내는 중' : '보내기'}
         </button>
@@ -500,7 +540,7 @@ export default function App() {
       ) : null}
       {activeView === 'shelf' ? <ShelfView shelf={shelf} onOpenDetail={openDetail} onRemove={removeShelfBook} /> : null}
       {activeView === 'report' ? <ReportView /> : null}
-      <BottomNav view={activeView} onChange={changeView} />
+      <BottomNav view={activeView === 'detail' ? detailBackView : activeView} onChange={changeView} />
     </div>
   );
 }

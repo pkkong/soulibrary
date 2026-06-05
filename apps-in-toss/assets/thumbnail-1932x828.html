@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1932, initial-scale=1" />
+    <title>서울 전자책 찾기 썸네일</title>
+    <style>
+      :root {
+        color: #191f28;
+        background: #f7f8fa;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 1932px;
+        height: 828px;
+        margin: 0;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, rgba(49, 130, 246, 0.08), rgba(18, 128, 92, 0.07)),
+          #f7f8fa;
+      }
+
+      .canvas {
+        display: grid;
+        grid-template-columns: 720px 1fr;
+        gap: 84px;
+        width: 100%;
+        height: 100%;
+        padding: 92px 118px;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+      }
+
+      .logo-row {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        margin-bottom: 44px;
+      }
+
+      .logo {
+        width: 128px;
+        height: 128px;
+        border-radius: 0;
+      }
+
+      .label {
+        color: #3182f6;
+        font-size: 30px;
+        font-weight: 900;
+        line-height: 1.2;
+      }
+
+      h1 {
+        margin: 0;
+        color: #191f28;
+        font-size: 82px;
+        font-weight: 900;
+        letter-spacing: 0;
+        line-height: 1.08;
+      }
+
+      .subtitle {
+        width: 620px;
+        margin: 30px 0 0;
+        color: #4e5968;
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 0;
+        line-height: 1.42;
+      }
+
+      .keyword-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        width: 620px;
+        margin-top: 42px;
+      }
+
+      .keyword {
+        min-height: 52px;
+        padding: 0 22px;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #4e5968;
+        font-size: 24px;
+        font-weight: 850;
+        line-height: 52px;
+      }
+
+      .screen {
+        align-self: center;
+        width: 762px;
+        border: 1px solid #e6e8eb;
+        border-radius: 34px;
+        background: #ffffff;
+        box-shadow: 0 22px 54px rgba(25, 31, 40, 0.1);
+        overflow: hidden;
+      }
+
+      .appbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 34px 38px 20px;
+      }
+
+      .appbar strong {
+        color: #191f28;
+        font-size: 31px;
+        font-weight: 900;
+      }
+
+      .appbar span {
+        color: #6b7684;
+        font-size: 22px;
+        font-weight: 750;
+      }
+
+      .search {
+        display: grid;
+        grid-template-columns: 1fr 116px;
+        gap: 14px;
+        padding: 0 38px 16px;
+      }
+
+      .input,
+      .button {
+        min-height: 74px;
+        border-radius: 16px;
+        font-size: 25px;
+        font-weight: 800;
+        line-height: 74px;
+      }
+
+      .input {
+        border: 1px solid #d9dee8;
+        padding: 0 24px;
+        color: #191f28;
+        background: #ffffff;
+      }
+
+      .button {
+        color: #ffffff;
+        text-align: center;
+        background: #3182f6;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+        margin: 0 38px 28px;
+        padding: 5px;
+        border-radius: 14px;
+        background: #eceff4;
+      }
+
+      .tab {
+        min-height: 52px;
+        border-radius: 11px;
+        color: #4e5968;
+        font-size: 21px;
+        font-weight: 900;
+        line-height: 52px;
+        text-align: center;
+      }
+
+      .tab.active {
+        background: #ffffff;
+        color: #191f28;
+      }
+
+      .result-head {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 38px 18px;
+        color: #191f28;
+        font-size: 30px;
+        font-weight: 900;
+      }
+
+      .result-head span {
+        color: #12805c;
+        font-size: 24px;
+      }
+
+      .list {
+        display: grid;
+        gap: 13px;
+        padding: 0 38px 38px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 74px minmax(0, 1fr) 88px;
+        gap: 18px;
+        min-height: 108px;
+        align-items: center;
+        padding: 13px 16px 13px 13px;
+        border: 1px solid #e6e8eb;
+        border-radius: 16px;
+        background: #ffffff;
+      }
+
+      .cover {
+        width: 74px;
+        height: 94px;
+        border-radius: 10px;
+        background:
+          linear-gradient(145deg, rgba(49, 130, 246, 0.95), rgba(18, 128, 92, 0.85)),
+          #3182f6;
+      }
+
+      .cover.dark {
+        background:
+          linear-gradient(145deg, rgba(25, 31, 40, 0.96), rgba(49, 130, 246, 0.7)),
+          #191f28;
+      }
+
+      .meta {
+        min-width: 0;
+      }
+
+      .title {
+        overflow: hidden;
+        color: #191f28;
+        font-size: 24px;
+        font-weight: 900;
+        line-height: 1.24;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .author {
+        overflow: hidden;
+        margin-top: 8px;
+        color: #6b7684;
+        font-size: 19px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chips {
+        display: flex;
+        gap: 8px;
+        margin-top: 9px;
+      }
+
+      .count,
+      .chip {
+        min-height: 30px;
+        border-radius: 999px;
+        font-size: 16px;
+        font-weight: 900;
+        line-height: 30px;
+      }
+
+      .count {
+        color: #12805c;
+      }
+
+      .chip {
+        padding: 0 10px;
+        color: #6b7684;
+        background: #f1f4f8;
+      }
+
+      .save {
+        min-height: 48px;
+        border-radius: 13px;
+        color: #1b64da;
+        font-size: 19px;
+        font-weight: 900;
+        line-height: 48px;
+        text-align: center;
+        background: #f2f6fb;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <section class="brand">
+        <div class="logo-row">
+          <img class="logo" src="app-logo-600.png" alt="" />
+          <div class="label">서울 공공 전자책</div>
+        </div>
+        <h1>전자책 보유 현황을<br />한 번에 검색</h1>
+        <p class="subtitle">책 제목이나 저자명으로 서울 공공 전자도서관 제공처를 빠르게 확인하세요.</p>
+        <div class="keyword-row" aria-hidden="true">
+          <span class="keyword">전자책</span>
+          <span class="keyword">도서관</span>
+          <span class="keyword">서울도서관</span>
+          <span class="keyword">책검색</span>
+        </div>
+      </section>
+
+      <section class="screen" aria-label="앱 화면 예시">
+        <div class="appbar">
+          <strong>전자책 검색</strong>
+          <span>서울 공공 전자책 제공 현황</span>
+        </div>
+        <div class="search">
+          <div class="input">달러구트</div>
+          <div class="button">검색</div>
+        </div>
+        <div class="tabs">
+          <div class="tab active">전체</div>
+          <div class="tab">제목</div>
+          <div class="tab">저자</div>
+          <div class="tab">출판사</div>
+        </div>
+        <div class="result-head">
+          <strong>검색 결과</strong>
+          <span>4권</span>
+        </div>
+        <div class="list">
+          <article class="row">
+            <div class="cover"></div>
+            <div class="meta">
+              <div class="title">달러구트 꿈 백화점. 2</div>
+              <div class="author">이미예 · 팩토리나인</div>
+              <div class="chips">
+                <span class="count">30곳</span>
+                <span class="chip">교보문고</span>
+                <span class="chip">YES24</span>
+              </div>
+            </div>
+            <div class="save">담기</div>
+          </article>
+          <article class="row">
+            <div class="cover dark"></div>
+            <div class="meta">
+              <div class="title">달러구트 꿈 백화점</div>
+              <div class="author">이미예 · 팩토리나인</div>
+              <div class="chips">
+                <span class="count">29곳</span>
+                <span class="chip">서울도서관</span>
+                <span class="chip">전자책</span>
+              </div>
+            </div>
+            <div class="save">담기</div>
+          </article>
+          <article class="row">
+            <div class="cover"></div>
+            <div class="meta">
+              <div class="title">읽고 싶은 책을 내 서재에 저장</div>
+              <div class="author">검색 결과를 다시 확인</div>
+              <div class="chips">
+                <span class="count">저장됨</span>
+                <span class="chip">내 서재</span>
+              </div>
+            </div>
+            <div class="save">보기</div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
