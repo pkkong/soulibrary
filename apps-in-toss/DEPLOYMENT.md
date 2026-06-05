@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-05
 
-This app is ready to upload once an Apps in Toss deployment API key is available.
+This app has been uploaded to Apps in Toss.
 
 Official references:
 
@@ -17,6 +17,13 @@ Official references:
 - App logo: `web/static/img/app-icon-600.png`
 - Thumbnail: `apps-in-toss/assets/thumbnail-1932x828.png`
 - Customer support email: `kongncompany@naver.com`
+
+## Latest Upload
+
+- Uploaded at: 2026-06-05 KST
+- deploymentId: `019e97ef-0305-72e6-96e3-8f6de8b46edf`
+- Test scheme: `intoss-private://soulib?_deploymentId=019e97ef-0305-72e6-96e3-8f6de8b46edf`
+- Upload command mode: one-time `ait deploy --api-key ... --scheme-only`
 
 ## Console Entry Summary
 
@@ -65,7 +72,7 @@ cd /Users/pkkong/Projects/library_crawler/apps-in-toss
 PATH=/tmp/node-v22.22.3-darwin-arm64/bin:$PATH ./node_modules/.bin/ait deploy --api-key 'APPS_IN_TOSS_API_KEY' --scheme-only -m "웹앱 UI 반영, 필터/검색 UX 개선, 고객문의 이메일 반영"
 ```
 
-## Current Blocker
+## Previous Blocker
 
 `~/.ait` is empty on this machine, so there is no saved Apps in Toss CLI profile. Running `ait deploy` currently stops at:
 
@@ -73,4 +80,4 @@ PATH=/tmp/node-v22.22.3-darwin-arm64/bin:$PATH ./node_modules/.bin/ait deploy --
 앱인토스 배포 API 키를 입력해주세요
 ```
 
-After the API key is available, no code change is required before upload.
+The upload was completed by passing the API key directly to `ait deploy`. No API key was saved to the local `~/.ait` profile.
