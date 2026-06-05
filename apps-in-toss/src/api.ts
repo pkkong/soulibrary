@@ -6,6 +6,7 @@ import type {
   ReportPayload,
   SearchBook,
   SearchField,
+  SearchFilters,
 } from './types';
 
 const DEFAULT_API_BASE = 'https://www.soulib.kr';
@@ -41,11 +42,13 @@ async function readJson<T extends { error?: string; message?: string }>(response
   return data;
 }
 
-export async function searchBooks(query: string, field: SearchField): Promise<LiveSearchResponse> {
+export async function searchBooks(query: string, field: SearchField, filters: SearchFilters = {}): Promise<LiveSearchResponse> {
   const response = await fetch(
     buildUrl('/api/live_search', {
       query,
       field,
+      providers: filters.providers?.join(','),
+      libraries: filters.libraries?.join(','),
       limit: 20,
       offset: 0,
     }),

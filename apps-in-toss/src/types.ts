@@ -36,11 +36,13 @@ export type SearchBook = {
 export type LiveSearchResponse = {
   total?: number;
   items?: SearchBook[];
-  filters?: {
-    providers?: string[];
-    libraries?: string[];
-  };
+  filters?: SearchFilters;
   error?: string;
+};
+
+export type SearchFilters = {
+  providers?: string[];
+  libraries?: string[];
 };
 
 export type BookDetailResponse = {

@@ -24,7 +24,7 @@ Last updated: 2026-06-05
 
 - Usage age: 만 19세 이상
 - Login/payment: 없음
-- Customer support email: TODO - 실제 수신 가능한 고객문의 이메일 입력 필요
+- Customer support email: kongncompany@naver.com
 - Customer support phone: 없음
 - Customer support chat URL: 없음
 
@@ -83,4 +83,4 @@ PATH=/tmp/node-v22.22.3-darwin-arm64/bin:$PATH npm run build
 
 ## Remaining Required Input
 
-Only one value cannot be decided safely in code: the customer support email. Use a real monitored address before submission.
+None.
