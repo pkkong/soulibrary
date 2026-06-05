@@ -81,6 +81,8 @@ PATH=/tmp/node-v22.22.3-darwin-arm64/bin:$PATH npm run build
 - No user profile collection in the Apps in Toss client.
 - The report form sends category, message, and current page URL to the existing Soulib report API.
 
-## Remaining Required Input
+## Remaining Required Input For Console Fields
 
 None.
+
+The app information fields are complete. Bundle upload still requires an Apps in Toss deployment API key from the console.
