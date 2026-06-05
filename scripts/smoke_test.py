@@ -1232,18 +1232,27 @@ def main():
     class FakeIssueResponse:
         status_code = 201
 
+        def __init__(self, payload):
+            self.payload = payload
+
         def raise_for_status(self):
             return None
 
         def json(self):
             return {
                 "number": 123,
-                "title": "[오류신고] 오류 - 자동 테스트 신고 내용입니다.",
-                "body": "## 신고 내용\n자동 테스트 신고 내용입니다.",
+                "title": self.payload.get("title") or "[오류신고] 오류 - 자동 테스트 신고 내용입니다.",
+                "body": self.payload.get("body") or "## 신고 내용\n자동 테스트 신고 내용입니다.",
                 "html_url": "https://github.com/pkkong/library_crawler/issues/123",
                 "state": "open",
                 "created_at": "2026-05-14T08:17:00Z",
             }
+
+    class FakeIssueFailureResponse:
+        status_code = 500
+
+        def raise_for_status(self):
+            raise RuntimeError("fake issue creation failure")
 
     def fake_issue_get(url, headers=None, params=None, timeout=None):
         if url == "https://api.github.com/repos/pkkong/library_crawler/issues/124/comments":
@@ -1254,12 +1263,21 @@ def main():
             raise AssertionError(f"unexpected issue list params: {params}")
         return FakeIssueListResponse()
 
+    issue_post_calls = {"count": 0}
+
     def fake_issue_post(url, headers=None, json=None, timeout=None):
+        issue_post_calls["count"] += 1
         if url != "https://api.github.com/repos/pkkong/library_crawler/issues":
             raise AssertionError(f"unexpected issue url: {url}")
-        if not json or "자동 테스트 신고 내용입니다." not in json.get("body", ""):
+        body = (json or {}).get("body", "")
+        if "저장 실패 테스트입니다." in body:
+            return FakeIssueFailureResponse()
+        if not json or (
+            "자동 테스트 신고 내용입니다." not in body
+            and "JSON 테스트 신고 내용입니다." not in body
+        ):
             raise AssertionError(f"unexpected issue payload: {json}")
-        return FakeIssueResponse()
+        return FakeIssueResponse(json)
 
     for env_name in github_env_names:
         os.environ.pop(env_name, None)
@@ -1314,6 +1332,38 @@ def main():
             },
             follow_redirects=False,
         )
+        invalid_api_submission = client.post(
+            "/api/reports",
+            json={"category": "오류", "message": "짧음", "page_url": "https://example.com/search"},
+        )
+        trap_call_count = issue_post_calls["count"]
+        trap_api_submission = client.post(
+            "/api/reports",
+            json={
+                "category": "오류",
+                "message": "허니팟 테스트 신고 내용입니다.",
+                "page_url": "https://example.com/search",
+                "website": "https://spam.example.com",
+            },
+        )
+        trap_post_call_count = issue_post_calls["count"]
+        json_submission = client.post(
+            "/api/reports",
+            json={
+                "category": "오류",
+                "message": "JSON 테스트 신고 내용입니다.",
+                "page_url": "https://example.com/toss",
+                "contact": "tester@example.com",
+            },
+        )
+        failed_api_submission = client.post(
+            "/api/reports",
+            json={
+                "category": "오류",
+                "message": "저장 실패 테스트입니다.",
+                "page_url": "https://example.com/failure",
+            },
+        )
     finally:
         report_routes.requests.get = original_get
         report_routes.requests.post = original_post
@@ -1328,6 +1378,34 @@ def main():
         raise AssertionError("newly submitted report was not shown immediately")
     if "이슈 #123" not in submission_body:
         raise AssertionError("newly submitted GitHub issue link was not shown immediately")
+    if invalid_api_submission.status_code != 400:
+        raise AssertionError(f"invalid JSON report returned {invalid_api_submission.status_code}, expected 400")
+    invalid_api_payload = invalid_api_submission.get_json()
+    if "어떤 문제가 있었는지" not in (invalid_api_payload.get("error") or ""):
+        raise AssertionError("invalid JSON report did not reuse report message validation")
+    if trap_api_submission.status_code != 200:
+        raise AssertionError(f"honeypot JSON report returned {trap_api_submission.status_code}, expected 200")
+    if trap_post_call_count != trap_call_count:
+        raise AssertionError("honeypot JSON report attempted to create a GitHub issue")
+    trap_payload = trap_api_submission.get_json()
+    if not trap_payload.get("ok") or trap_payload.get("report") is not None:
+        raise AssertionError("honeypot JSON report did not return a success-like JSON response")
+    if json_submission.status_code != 201:
+        body = json_submission.get_data(as_text=True)[:500]
+        raise AssertionError(f"JSON report submission failed with {json_submission.status_code}: {body}")
+    json_payload = json_submission.get_json()
+    json_report = json_payload.get("report") or {}
+    if not json_payload.get("ok") or json_report.get("issue_number") != 123:
+        raise AssertionError(f"JSON report submission did not return created report summary: {json_payload}")
+    if json_report.get("message") != "JSON 테스트 신고 내용입니다.":
+        raise AssertionError("JSON report summary did not preserve cleaned message")
+    if json_report.get("page_url") != "https://example.com/toss":
+        raise AssertionError("JSON report summary did not preserve page_url")
+    if failed_api_submission.status_code != 500:
+        raise AssertionError(f"failed JSON report returned {failed_api_submission.status_code}, expected 500")
+    failed_payload = failed_api_submission.get_json()
+    if failed_payload.get("error") != report_routes.REPORT_SAVE_ERROR:
+        raise AssertionError("failed JSON report did not return customer-facing save error")
 
     report_routes.requests.get = fake_issue_get
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"

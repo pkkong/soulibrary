@@ -39,9 +39,82 @@ app.register_blueprint(status_api_bp)
 app.register_blueprint(live_search_bp)
 app.register_blueprint(report_bp)
 
+DEFAULT_API_CORS_ALLOWED_ORIGINS = (
+    "https://soulib.apps.tossmini.com",
+    "https://soulib.private-apps.tossmini.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+)
+API_CORS_ALLOWED_ORIGINS_ENV = "API_CORS_ALLOWED_ORIGINS"
+API_CORS_ALLOWED_METHODS = "GET, POST, OPTIONS"
+API_CORS_ALLOWED_HEADERS = "Accept, Content-Type"
+API_CORS_MAX_AGE = "600"
+
+
+def _split_env_list(value):
+    return [item.strip() for item in re.split(r"[,\s]+", str(value or "")) if item.strip()]
+
+
+def _normalize_cors_origin(origin):
+    return str(origin or "").strip().rstrip("/")
+
+
+def _api_cors_allowed_origins():
+    origins = list(DEFAULT_API_CORS_ALLOWED_ORIGINS)
+    for origin in _split_env_list(os.environ.get(API_CORS_ALLOWED_ORIGINS_ENV)):
+        origin = _normalize_cors_origin(origin)
+        if origin not in origins:
+            origins.append(origin)
+    return set(origins)
+
+
+def _is_api_request():
+    return request.path.startswith("/api/")
+
+
+def _allowed_cors_origin():
+    origin = _normalize_cors_origin(request.headers.get("Origin"))
+    if origin and origin in _api_cors_allowed_origins():
+        return origin
+    return ""
+
+
+def _append_vary_origin(response):
+    vary_values = [value.strip() for value in response.headers.get("Vary", "").split(",") if value.strip()]
+    if not any(value.lower() == "origin" for value in vary_values):
+        vary_values.append("Origin")
+    response.headers["Vary"] = ", ".join(vary_values)
+    return response
+
+
+def _apply_api_cors_headers(response):
+    if not _is_api_request():
+        return response
+
+    if request.headers.get("Origin"):
+        response = _append_vary_origin(response)
+
+    allowed_origin = _allowed_cors_origin()
+    if not allowed_origin:
+        return response
+
+    response.headers["Access-Control-Allow-Origin"] = allowed_origin
+    response.headers["Access-Control-Allow-Methods"] = API_CORS_ALLOWED_METHODS
+    response.headers["Access-Control-Allow-Headers"] = API_CORS_ALLOWED_HEADERS
+    response.headers["Access-Control-Max-Age"] = API_CORS_MAX_AGE
+    return response
+
+
+@app.before_request
+def handle_api_cors_preflight():
+    if _is_api_request() and request.method == "OPTIONS":
+        return _apply_api_cors_headers(Response(status=204, mimetype="text/plain"))
+    return None
+
 
 @app.after_request
 def add_html_no_cache_headers(response):
+    response = _apply_api_cors_headers(response)
     if response.content_type and response.content_type.startswith("text/html"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"

@@ -12,6 +12,7 @@ report_bp = Blueprint("reports", __name__)
 MAX_MESSAGE_LEN = 1200
 MAX_CONTACT_LEN = 120
 MAX_PAGE_URL_LEN = 500
+REPORT_MESSAGE_MIN_LEN = 5
 DEFAULT_GITHUB_REPO = "pkkong/library_crawler"
 REPORT_TITLE_PREFIX = "[오류신고]"
 REPORT_STORE_ERROR = "최근 접수 목록을 잠시 불러오지 못했습니다."
@@ -22,6 +23,45 @@ KST = timezone(timedelta(hours=9), "Asia/Seoul")
 def _clean(value: str, limit: int) -> str:
     text = " ".join(str(value or "").split())
     return text[:limit]
+
+
+def _report_form_from_mapping(values) -> dict:
+    values = values or {}
+    return {
+        "category": _clean(values.get("category") or "오류", 20),
+        "message": _clean(values.get("message"), MAX_MESSAGE_LEN),
+        "contact": _clean(values.get("contact"), MAX_CONTACT_LEN),
+        "page_url": _clean(values.get("page_url"), MAX_PAGE_URL_LEN),
+    }
+
+
+def _report_validation_error(form: dict) -> str:
+    if len(form["message"]) < REPORT_MESSAGE_MIN_LEN:
+        return "어떤 문제가 있었는지 조금만 더 적어주세요."
+    return ""
+
+
+def _api_report_datetime(value) -> str:
+    if not value:
+        return ""
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _api_report_summary(report: dict) -> dict:
+    return {
+        "id": report.get("id") or 0,
+        "category": report.get("category") or "오류",
+        "message": report.get("message") or "",
+        "page_url": report.get("page_url") or "",
+        "issue_number": report.get("issue_number"),
+        "issue_url": report.get("issue_url") or "",
+        "status": report.get("status") or "open",
+        "status_label": report.get("status_label") or _status_label(report.get("status")),
+        "created_at": _api_report_datetime(report.get("created_at")),
+        "updated_at": _api_report_datetime(report.get("updated_at")),
+    }
 
 
 def _to_kst(value):
@@ -353,18 +393,12 @@ def reports_page():
     form = _default_report_form(request.args.get("url") or request.referrer or "")
 
     if request.method == "POST":
-        form = {
-            "category": _clean(request.form.get("category") or "오류", 20),
-            "message": _clean(request.form.get("message"), MAX_MESSAGE_LEN),
-            "contact": _clean(request.form.get("contact"), MAX_CONTACT_LEN),
-            "page_url": _clean(request.form.get("page_url"), MAX_PAGE_URL_LEN),
-        }
+        form = _report_form_from_mapping(request.form)
         trap = (request.form.get("website") or "").strip()
         if trap:
             return redirect(url_for("reports.reports_page", saved=1))
-        if len(form["message"]) < 5:
-            error = "어떤 문제가 있었는지 조금만 더 적어주세요."
-        else:
+        error = _report_validation_error(form)
+        if not error:
             try:
                 user_agent = _clean(request.headers.get("User-Agent"), 500)
                 created_report = _create_github_issue(form, user_agent)
@@ -385,6 +419,33 @@ def reports_page():
                 )
 
     return _render_reports_page(form, error=error, saved=saved)
+
+
+@report_bp.route("/api/reports", methods=["POST"])
+def api_create_report():
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return jsonify({"error": "JSON object body is required."}), 400
+
+    form = _report_form_from_mapping(payload)
+    trap = str(payload.get("website") or "").strip()
+    if trap:
+        return jsonify({"ok": True, "message": "신고가 접수되었습니다.", "report": None})
+
+    error = _report_validation_error(form)
+    if error:
+        return jsonify({"error": error}), 400
+
+    try:
+        user_agent = _clean(request.headers.get("User-Agent"), 500)
+        created_report = _create_github_issue(form, user_agent)
+        return jsonify({"ok": True, "report": _api_report_summary(created_report)}), 201
+    except Exception as exc:
+        detail = _github_error_detail(exc)
+        print(f"[report error] github issue creation failed: {detail} raw={exc}")
+        return jsonify({"error": REPORT_SAVE_ERROR}), 500
 
 
 @report_bp.route("/api/reports/recent")
