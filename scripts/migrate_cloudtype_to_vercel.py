@@ -247,7 +247,7 @@ def build_supabase_database_url(project_ref):
     user = f"postgres.{project_ref}"
     encoded_user = urllib.parse.quote(user, safe="")
     encoded_password = urllib.parse.quote(password, safe="")
-    host = f"aws-0-{region}.pooler.supabase.com"
+    host = optional_env("SUPABASE_POOLER_HOST", f"aws-1-{region}.pooler.supabase.com")
     return f"postgres://{encoded_user}:{encoded_password}@{host}:6543/postgres?sslmode=require"
 
 
@@ -289,7 +289,7 @@ def configure_vercel_project(vercel_cli, database_url):
     project = optional_env("VERCEL_PROJECT", DEFAULT_VERCEL_PROJECT)
 
     link_cmd = [vercel_cli, "link", "--yes", "--project", project, "--token", token]
-    team = optional_env("VERCEL_TEAM")
+    team = optional_env("VERCEL_SCOPE") or optional_env("VERCEL_TEAM")
     if team:
         link_cmd.extend(["--team", team])
     run(link_cmd)

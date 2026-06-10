@@ -40,3 +40,5 @@ run_tg_bot.bat
 *.log
 tmp_ux_review/
 artifacts/
+.vercel
+supabase/.temp/
