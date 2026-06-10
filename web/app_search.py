@@ -21,7 +21,6 @@ from utils.normalize import (
     normalize_provider,
 )
 from utils.providers import provider_from_platforms, platform_to_provider_label
-from data_quality_admin import data_quality_bp
 from live_search_routes import live_search_bp
 from report_routes import report_bp
 from live_search.service import live_search as run_live_search
@@ -34,10 +33,14 @@ from status_api_routes import (
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-app.register_blueprint(data_quality_bp)
 app.register_blueprint(status_api_bp)
 app.register_blueprint(live_search_bp)
 app.register_blueprint(report_bp)
+
+if os.environ.get("ENABLE_CURATION_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
+    from data_quality_admin import data_quality_bp
+
+    app.register_blueprint(data_quality_bp)
 
 DEFAULT_API_CORS_ALLOWED_ORIGINS = (
     "https://soulib.apps.tossmini.com",

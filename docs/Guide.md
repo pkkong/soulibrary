@@ -10,7 +10,8 @@
 - 책 상세 화면도 검색 결과의 실시간 메타데이터와 외부 상태 조회를 기준으로 구성합니다.
 - 내 서재는 브라우저 로컬 저장소 기반의 사용자 보조 기능입니다.
 - 오류 신고는 GitHub Issues를 단일 저장소로 사용합니다.
-- 큐레이션, 가이드, 데이터 관리자, PostgreSQL 기반 검색은 현재 운영 기본 흐름이 아닙니다.
+- 공유 서재 영속 저장은 운영 PostgreSQL을 사용할 수 있지만, 검색 자체는 PostgreSQL에 의존하지 않습니다.
+- 큐레이션, 데이터 관리자, PostgreSQL 기반 검색은 현재 운영 기본 흐름이 아닙니다.
 
 ## 2) 기준 저장소와 작업 위치
 
@@ -33,11 +34,13 @@ GitHub main
 
 ## 3) 실행 구조
 
-운영 앱:
+운영 entrypoint:
 
 ```text
-web/app_cloudtype.py -> web/app_search.py
+.cloudtype/app.yaml -> Dockerfile -> web/app_search.py
 ```
+
+`.cloudtype/app.yaml`은 Dockerfile 배포를 선택하고, Dockerfile은 `gunicorn ... app_search:app`을 실행합니다. `web/app_cloudtype.py -> web/app_search.py`는 현재 실제 운영 설정이 아닙니다.
 
 주요 코드:
 
@@ -102,6 +105,8 @@ python scripts/smoke_test.py
 3. `python scripts/smoke_test.py`
 4. `cloudtype-github-actions/deploy@v1`로 Cloudtype 배포
 
+Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행합니다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0 범위가 아닙니다.
+
 필요한 GitHub Actions secret:
 
 ```text
@@ -135,7 +140,13 @@ Git에 올리지 않는 것:
 - 로그
 - 개인 토큰
 
-PostgreSQL, CSV 적재, 과거 크롤러 산출물은 레거시/예외 작업입니다. 필요할 때 별도 작업 브랜치와 별도 저장 위치를 정해서 다룹니다.
+PostgreSQL 관련 코드는 세 그룹으로 구분합니다.
+
+- 현재 운영 필요: 공유 서재 영속 저장처럼 production 기능을 지원하는 코드. 검색 자체를 PostgreSQL에 의존시키지 않습니다.
+- 선택적 필요: 관리자, 데이터 품질, 로컬 DB 점검, CSV/PostgreSQL 적재 작업.
+- 완전 레거시/삭제 후보: 미사용 entrypoint, 과거 SQLite 검색, 과거 DB rebuild 또는 SQLite -> PostgreSQL 마이그레이션 흐름.
+
+운영 경로와 유지/보류/삭제 후보는 [phase0_operating_inventory.md](phase0_operating_inventory.md)를 기준으로 확인합니다.
 
 ## 8) 오류 신고 운영
 
@@ -166,5 +177,7 @@ PostgreSQL, CSV 적재, 과거 크롤러 산출물은 레거시/예외 작업입
 - 큐레이션 관리자
 - 데이터 품질 관리자
 - 과거 DB dump/restore 절차
+- `web/app_cloudtype.py` 같은 미사용 entrypoint
+- 과거 SQLite 검색 앱과 DB rebuild 흐름
 
 이 기능을 다시 사용할 때는 먼저 현재 실시간 검색 구조와 충돌하지 않는지 검토합니다.

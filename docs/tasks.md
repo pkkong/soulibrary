@@ -11,10 +11,18 @@
 ## 현재 운영 구조
 
 - 기본 검색: DB 없는 실시간 검색
-- 운영 앱: `web/app_cloudtype.py -> web/app_search.py`
+- 운영 entrypoint: `.cloudtype/app.yaml -> Dockerfile -> web/app_search.py`
 - 신고 접수: GitHub Issues
 - 배포: GitHub Actions smoke test 통과 후 Cloudtype deploy action
 - 데이터 산출물: Git 미포함, 필요 시 별도 백업/작업 환경에서 생성
+- Phase 0 운영 경로 정리: 문서와 inventory만 갱신하며 Vercel 배포, DNS, workflow, Cloudtype 설정은 변경하지 않음
+- 운영 inventory: `docs/phase0_operating_inventory.md`
+
+## PostgreSQL/DB 코드 분류
+
+- 현재 운영 필요: 공유 서재 영속 저장처럼 production 기능을 지원하는 코드. 검색 자체는 DB 없는 실시간 검색을 유지한다.
+- 선택적 필요: 관리자, 데이터 품질, 로컬 DB 점검, CSV/PostgreSQL 적재 작업.
+- 완전 레거시/삭제 후보: 미사용 entrypoint, 과거 SQLite 검색, 과거 DB rebuild 또는 SQLite -> PostgreSQL 마이그레이션 흐름.
 
 ## 표준 작업 흐름
 
@@ -62,3 +70,4 @@
 2. 모바일에서 브랜치/PR/배포 상태를 확인하는 운영 흐름 고정
 3. 검색 상세 오류 신고가 들어오면 GitHub Issue 기준으로 재현, 수정, 고객용 처리 로그 작성
 4. 레거시 DB/큐레이션 코드는 실제 운영 필요성이 생길 때만 별도 정리
+5. Vercel 이전을 검토할 때는 배포/DNS/workflow를 바꾸기 전에 `docs/phase0_operating_inventory.md`의 재판단 항목을 먼저 확인

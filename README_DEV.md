@@ -10,7 +10,7 @@
 - 코드, 템플릿, 설정, 문서는 GitHub에 커밋합니다.
 - 로컬 DB, 크롤링 산출 CSV, 캐시, 로그, 개인 토큰은 GitHub에 올리지 않습니다.
 - DB 없는 실시간 검색을 기본 개발 모드로 봅니다.
-- DB/PostgreSQL은 과거 데이터 관리나 관리자 작업이 필요할 때만 붙입니다.
+- PostgreSQL은 공유 서재 영속 저장 같은 현재 운영 기능, 관리자/데이터 품질/로컬 DB 작업 같은 선택 기능, 과거 검색/SQLite rebuild 같은 레거시 후보를 구분해서 다룹니다.
 
 ## 에이전트 운영 방식
 
@@ -90,6 +90,8 @@ LIVE_SEARCH_LIBRARY_TIMEOUT=4.5
 LIVE_SEARCH_MAX_WORKERS=40
 ```
 
+PostgreSQL 환경변수는 DB 없는 실시간 검색에는 필요하지 않습니다. 현재 운영에서 필요한 경우는 공유 서재 영속 저장처럼 production 기능을 지원할 때이며, 관리자/데이터 품질/로컬 DB 작업은 선택적 작업으로 분리합니다. 과거 SQLite 검색, DB rebuild, SQLite -> PostgreSQL 마이그레이션 흐름은 기본 운영 경로가 아닌 레거시/삭제 후보입니다.
+
 PostgreSQL이 필요한 작업에서만 아래를 설정합니다.
 
 ```text
@@ -128,6 +130,16 @@ python scripts/search_console_report.py
 ## 배포
 
 `main`에 push 또는 merge되면 GitHub Actions가 먼저 smoke test를 실행합니다. smoke test가 통과하면 공식 Cloudtype deploy action이 `.cloudtype/app.yaml` 설정으로 운영 서비스를 갱신합니다.
+
+현재 운영 entrypoint는 아래 경로입니다.
+
+```text
+.cloudtype/app.yaml -> Dockerfile -> web/app_search.py
+```
+
+`.cloudtype/app.yaml`은 Dockerfile 배포를 선택하고, Dockerfile은 `gunicorn ... app_search:app`을 실행합니다. `web/app_cloudtype.py -> web/app_search.py`는 현재 실제 운영 설정이 아니므로 현재 entrypoint로 문서화하지 않습니다.
+
+Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행합니다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0 범위가 아닙니다. 운영 경로와 레거시/보류 항목은 [docs/phase0_operating_inventory.md](docs/phase0_operating_inventory.md)를 기준으로 확인합니다.
 
 자동배포에는 GitHub Actions secret 하나가 필요합니다.
 

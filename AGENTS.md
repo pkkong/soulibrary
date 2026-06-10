@@ -456,17 +456,27 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 - 기본 개발환경: GitHub Codespaces
 - 로컬 Mac mini: 예외적 개발/검증 환경
 - 기본 앱: `web/app_search.py`
-- 운영 앱: `web/app_cloudtype.py -> web/app_search.py`
+- 운영 entrypoint: `.cloudtype/app.yaml -> Dockerfile -> web/app_search.py`
 - 기본 검색: DB 없는 실시간 검색
 - 기본 검증: `python scripts/smoke_test.py`
 - 배포 흐름: `main` push 또는 merge 후 GitHub Actions smoke test 통과, 이후 Cloudtype 배포
+- Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행한다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0 범위가 아니다.
+- 운영 경로와 레거시/보류 항목의 기준 inventory는 `docs/phase0_operating_inventory.md`를 우선 확인한다.
+
+PostgreSQL 관련 코드는 아래 세 그룹으로 구분한다.
+
+- 현재 운영 필요: 공유 서재 영속 저장처럼 production 기능을 지원하는 코드. 단, 검색 자체를 PostgreSQL에 의존시키지 않는다.
+- 선택적 필요: 관리자, 데이터 품질, 로컬 DB 점검, CSV/PostgreSQL 적재처럼 별도 작업에서만 쓰는 코드.
+- 완전 레거시/삭제 후보: 미사용 entrypoint, 과거 SQLite 검색, 과거 DB rebuild 또는 SQLite -> PostgreSQL 마이그레이션 흐름.
 
 아래 항목은 현재 기본 운영 경로가 아니다.
 
 - 레거시 SQLite/PostgreSQL 기반 검색
+- `web/app_cloudtype.py` 같은 미사용 entrypoint
 - 전수 크롤링 운영
 - 큐레이션 운영
 - 로컬 DB/CSV 산출물 보관
+- 과거 DB rebuild 또는 dump/restore 운영 흐름
 
 위 항목을 수정하거나 되살리는 작업은 먼저 메인 채팅방에서 필요성, 범위, 운영 영향을 결정한 뒤 진행한다.
 
