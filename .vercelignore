@@ -1,0 +1,14 @@
+.venv/
+.secrets/
+.env
+.env.*
+apps-in-toss/
+crawler/
+data/
+docs/reports/
+automations/
+tmp_ux_review/
+artifacts/
+__pycache__/
+*.pyc
+.pytest_cache/

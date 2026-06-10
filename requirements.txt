@@ -1,11 +1,5 @@
 Flask
-google-api-python-client
-google-auth
-google-auth-oauthlib
 gunicorn>=25.1,<27
 lxml
-openpyxl
-pandas
 psycopg2-binary
 requests
-Scrapy

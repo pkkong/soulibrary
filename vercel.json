@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "flask",
+  "functions": {
+    "index.py": {
+      "excludeFiles": "{.venv/**,.secrets/**,apps-in-toss/**,crawler/**,node_modules/**,cache/**,docs/reports/**,**/__pycache__/**,**/*.pyc,.pytest_cache/**,.mypy_cache/**,.ruff_cache/**}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.py"
+    }
+  ]
+}

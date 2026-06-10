@@ -42,6 +42,14 @@ Code > Codespaces > Create codespace
 
 Codespaces가 열리면 `.devcontainer` 설정으로 Python 환경을 만들고 `requirements.txt`를 설치합니다.
 
+기본 사용자-facing Flask 런타임은 `requirements.txt`만 설치합니다. Cloudtype Docker와 Vercel 기본 배포도 이 파일을 기준으로 하며, DB 없는 실시간 검색, 공유 서재 fallback, 오류 신고, 블로그/상태 API에 필요한 최소 패키지만 둡니다.
+
+크롤러, CSV/PostgreSQL 적재, 데이터 품질 관리자, Search Console 분석 같은 data/admin 작업은 별도 보조 의존성이 필요합니다.
+
+```bash
+pip install -r requirements-data.txt
+```
+
 서버 실행:
 
 ```bash
@@ -164,6 +172,20 @@ docker run --rm -p 5000:5000 library-crawler
 ```
 
 클라우드 플랫폼이 `PORT`만 주는 경우에도 `app_search.py`가 `PORT`를 읽습니다. `LIBRARY_SEARCH_PORT`가 있으면 그 값을 우선합니다.
+
+Vercel은 루트 `index.py`가 기존 `web/app_search.py`의 Flask `app`을 그대로 export합니다. `vercel.json`은 모든 요청을 이 Flask 앱으로 보냅니다.
+
+Vercel Functions 파일시스템은 배포 번들이 읽기 전용이고 `/tmp`만 임시 쓰기 공간입니다. 따라서 공유 서재 링크를 현재처럼 유지하려면 Vercel production에는 아래 값을 둡니다.
+
+```text
+PUBLIC_BASE_URL=https://www.soulib.kr
+GITHUB_ISSUE_TOKEN=<Issues read/write token>
+GITHUB_ISSUE_REPO=pkkong/library_crawler
+SHARED_SHELVES_STORAGE=postgres
+DATABASE_URL=<PostgreSQL connection URL>
+```
+
+`DATABASE_URL` 대신 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` 조합을 쓸 수도 있습니다. Vercel에서는 공유 서재를 JSON 파일 fallback으로 운영하지 않습니다.
 
 ## 커밋 기준
 
