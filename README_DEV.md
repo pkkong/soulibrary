@@ -109,6 +109,7 @@ DB_PORT=5432
 DB_NAME=
 DB_USER=
 DB_PASSWORD=
+DB_SSLMODE=require
 ```
 
 공유 서재는 운영에서 기본값인 `SHARED_SHELVES_STORAGE=auto`를 사용합니다. `DATABASE_URL` 또는 `DB_HOST` 계열 env가 실제로 주입되면 PostgreSQL에 저장하고, 연결값이 없으면 로컬 JSON 저장으로 fallback합니다. 단, Vercel에서는 JSON 파일 fallback을 쓰지 않으므로 Supabase Postgres 연결값을 반드시 넣습니다. 로컬 smoke test나 DB 없는 개발에서는 `SHARED_SHELVES_STORAGE=json`과 `SHARED_SHELVES_FILE`을 사용할 수 있습니다.
@@ -184,7 +185,7 @@ GITHUB_ISSUE_REPO=pkkong/library_crawler
 DATABASE_URL=<Supabase Postgres pooler connection URL>
 ```
 
-Supabase는 서버리스 환경에서 pooler connection string을 사용합니다. `DATABASE_URL` 대신 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` 조합을 쓸 수도 있지만, Vercel에서는 공유 서재를 JSON 파일 fallback으로 운영하지 않습니다.
+Supabase는 서버리스 환경에서 pooler connection string을 사용합니다. `DATABASE_URL`은 query option까지 그대로 `psycopg2`에 전달하므로 Supabase가 제공하는 `sslmode` 값이 보존됩니다. `DATABASE_URL` 대신 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE` 조합을 쓸 수도 있지만, Vercel에서는 공유 서재를 JSON 파일 fallback으로 운영하지 않습니다.
 
 ## 커밋 기준
 

@@ -1,5 +1,4 @@
 import os
-from urllib.parse import urlparse
 
 try:
     import psycopg2
@@ -11,17 +10,6 @@ except Exception:
 
 def using_postgres():
     return bool(os.environ.get("DATABASE_URL") or os.environ.get("DB_HOST"))
-
-
-def _parse_database_url(url):
-    parsed = urlparse(url)
-    return {
-        "host": parsed.hostname,
-        "port": parsed.port or 5432,
-        "dbname": parsed.path.lstrip("/") if parsed.path else "",
-        "user": parsed.username,
-        "password": parsed.password,
-    }
 
 
 def _convert_placeholders(sql):
@@ -55,7 +43,7 @@ def get_db(_sqlite_path=None):
         raise RuntimeError("psycopg2 is required for PostgreSQL connections.")
     url = os.environ.get("DATABASE_URL")
     if url:
-        cfg = _parse_database_url(url)
+        conn = psycopg2.connect(url)
     else:
         cfg = {
             "host": os.environ.get("DB_HOST"),
@@ -64,5 +52,7 @@ def get_db(_sqlite_path=None):
             "user": os.environ.get("DB_USER", "root"),
             "password": os.environ.get("DB_PASSWORD", ""),
         }
-    conn = psycopg2.connect(**cfg)
+        if os.environ.get("DB_SSLMODE"):
+            cfg["sslmode"] = os.environ["DB_SSLMODE"]
+        conn = psycopg2.connect(**cfg)
     return PgConn(conn)

@@ -18,6 +18,7 @@ os.environ.setdefault("SHARED_SHELVES_STORAGE", "json")
 os.environ.setdefault("SHARED_SHELVES_FILE", str(ROOT_DIR / "data" / "_tmp_smoke_shared_shelves.json"))
 
 import app_search  # noqa: E402
+import db as db_module  # noqa: E402
 from app_search import app  # noqa: E402
 import blog_comments  # noqa: E402
 import report_routes  # noqa: E402
@@ -490,6 +491,37 @@ def main():
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = value
+
+    if db_module.psycopg2 is not None:
+        original_db_env = {name: os.environ.get(name) for name in ("DATABASE_URL", "DB_HOST")}
+        original_connect = db_module.psycopg2.connect
+        connect_calls = []
+
+        class DummyPgConnection:
+            def cursor(self, *args, **kwargs):
+                raise AssertionError("smoke test should not execute SQL through dummy connection")
+
+            def close(self):
+                return None
+
+        def fake_connect(*args, **kwargs):
+            connect_calls.append((args, kwargs))
+            return DummyPgConnection()
+
+        try:
+            os.environ["DATABASE_URL"] = "postgres://user:pass@example.supabase.co:6543/postgres?sslmode=require"
+            os.environ.pop("DB_HOST", None)
+            db_module.psycopg2.connect = fake_connect
+            db_module.get_db().close()
+        finally:
+            db_module.psycopg2.connect = original_connect
+            for name, value in original_db_env.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        if not connect_calls or connect_calls[0][0][0] != "postgres://user:pass@example.supabase.co:6543/postgres?sslmode=require":
+            raise AssertionError("DATABASE_URL was not passed directly to psycopg2.connect")
 
     original_find_complete_live_book = live_search_routes._find_complete_live_book
     seo_live_calls = []
