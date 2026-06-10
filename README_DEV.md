@@ -187,6 +187,53 @@ DATABASE_URL=<Supabase Postgres pooler connection URL>
 
 Supabase는 서버리스 환경에서 pooler connection string을 사용합니다. `DATABASE_URL`은 query option까지 그대로 `psycopg2`에 전달하므로 Supabase가 제공하는 `sslmode` 값이 보존됩니다. `DATABASE_URL` 대신 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE` 조합을 쓸 수도 있지만, Vercel에서는 공유 서재를 JSON 파일 fallback으로 운영하지 않습니다.
 
+### Cloudtype -> Vercel + Supabase 이전 실행
+
+실제 이전은 secret을 Git에 남기지 않고 `.secrets/migration.env`에만 둔 뒤 실행합니다.
+
+```bash
+VERCEL_TOKEN=
+SUPABASE_ACCESS_TOKEN=
+GITHUB_ISSUE_TOKEN=
+
+# 새 Supabase 프로젝트를 만들 때 필요합니다. 조직이 하나뿐이면 생략할 수 있습니다.
+SUPABASE_ORG_ID=
+SUPABASE_PROJECT_NAME=soulib
+SUPABASE_REGION=ap-northeast-2
+SUPABASE_SIZE=nano
+
+# 기존 Supabase 프로젝트/DB를 쓸 때는 SUPABASE_PROJECT_REF 또는 DATABASE_URL을 둡니다.
+SUPABASE_PROJECT_REF=
+SUPABASE_DB_PASSWORD=
+DATABASE_URL=
+
+VERCEL_PROJECT=soulib
+VERCEL_SCOPE=
+PUBLIC_BASE_URL=https://www.soulib.kr
+GITHUB_ISSUE_REPO=pkkong/library_crawler
+```
+
+실행:
+
+```bash
+python scripts/migrate_cloudtype_to_vercel.py
+```
+
+스크립트가 수행하는 작업:
+
+- Supabase 프로젝트 생성 또는 기존 `DATABASE_URL` 사용
+- `supabase/migrations/*.sql` 적용
+- Vercel project link
+- Vercel production env 설정
+- Vercel production deploy
+- 배포 URL에 대해 `python scripts/live_smoke.py <url>` 실행
+
+도메인 전환 전후에는 아래로 live check를 다시 실행합니다.
+
+```bash
+python scripts/live_smoke.py https://www.soulib.kr
+```
+
 ## 커밋 기준
 
 커밋 대상:
