@@ -128,7 +128,7 @@ DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
 LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
 DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
 SHARED_SHELVES_FILE = os.environ.get("SHARED_SHELVES_FILE", os.path.join(ROOT_DIR, "data", "shared_shelves.json"))
-SHARED_SHELVES_STORAGE = os.environ.get("SHARED_SHELVES_STORAGE", "json").strip().lower()
+SHARED_SHELVES_STORAGE = os.environ.get("SHARED_SHELVES_STORAGE", "auto").strip().lower()
 MAX_SHARED_SHELF_BOOKS = 200
 SHARED_SHELF_SLUG_LENGTH = 16
 LIB_DETAIL_TTL_SEC = int(os.environ.get("LIB_DETAIL_TTL", "300"))
@@ -182,6 +182,10 @@ def _shared_shelves_use_postgres():
         return True
     if SHARED_SHELVES_STORAGE == "json":
         return False
+    if SHARED_SHELVES_STORAGE != "auto":
+        raise RuntimeError(f"Unsupported SHARED_SHELVES_STORAGE value: {SHARED_SHELVES_STORAGE}")
+    if os.environ.get("VERCEL") and not using_postgres():
+        raise RuntimeError("Vercel shared shelves require DATABASE_URL or DB_HOST.")
     return using_postgres()
 
 

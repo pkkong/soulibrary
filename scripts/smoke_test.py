@@ -465,6 +465,32 @@ def main():
     if "shared-shelf-shell" not in shared_page.get_data(as_text=True):
         raise AssertionError("shared shelf page did not render expected markup")
 
+    original_shared_storage = app_search.SHARED_SHELVES_STORAGE
+    original_shared_env = {name: os.environ.get(name) for name in ("VERCEL", "DATABASE_URL", "DB_HOST")}
+    try:
+        app_search.SHARED_SHELVES_STORAGE = "auto"
+        os.environ["VERCEL"] = "1"
+        os.environ.pop("DATABASE_URL", None)
+        os.environ.pop("DB_HOST", None)
+        try:
+            app_search._shared_shelves_use_postgres()
+        except RuntimeError as exc:
+            if "Vercel shared shelves require" not in str(exc):
+                raise
+        else:
+            raise AssertionError("Vercel shared shelves used JSON fallback without PostgreSQL env")
+
+        os.environ["DATABASE_URL"] = "postgres://user:pass@example.supabase.co:5432/postgres"
+        if not app_search._shared_shelves_use_postgres():
+            raise AssertionError("shared shelves did not select PostgreSQL when DATABASE_URL was set")
+    finally:
+        app_search.SHARED_SHELVES_STORAGE = original_shared_storage
+        for name, value in original_shared_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
     original_find_complete_live_book = live_search_routes._find_complete_live_book
     seo_live_calls = []
 
