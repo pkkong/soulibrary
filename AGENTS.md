@@ -68,7 +68,7 @@
 - 블로그 글 신규 작성 또는 대폭 수정
 - 검색 결과, 상세, 내 서재, 오류 신고 같은 핵심 UX 변경
 - 버그 신고 재현과 원인 분석
-- 배포, GitHub Actions, Cloudtype, Search Console 자동화 변경
+- 배포, GitHub Actions, Vercel, Search Console 자동화 변경
 - 지시서/MD 운영 규칙 추가, 삭제, 재구성
 - 사용자가 반복적으로 지적한 품질 문제 재발 방지 작업
 
@@ -474,6 +474,7 @@ PostgreSQL 관련 코드는 아래 세 그룹으로 구분한다.
 
 - 레거시 SQLite/PostgreSQL 기반 검색
 - `web/app_cloudtype.py` 같은 미사용 entrypoint
+- Cloudtype 자동배포 경로
 - 전수 크롤링 운영
 - 큐레이션 운영
 - 로컬 DB/CSV 산출물 보관

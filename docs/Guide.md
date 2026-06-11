@@ -29,7 +29,7 @@ GitHub main
 -> Pull Request
 -> main merge
 -> GitHub Actions
--> Cloudtype 자동 배포
+-> Vercel production 자동 배포
 ```
 
 ## 3) 실행 구조
@@ -37,10 +37,10 @@ GitHub main
 운영 entrypoint:
 
 ```text
-.cloudtype/app.yaml -> Dockerfile -> web/app_search.py
+vercel.json -> index.py -> web/app_search.py
 ```
 
-`.cloudtype/app.yaml`은 Dockerfile 배포를 선택하고, Dockerfile은 `gunicorn ... app_search:app`을 실행합니다. `web/app_cloudtype.py -> web/app_search.py`는 현재 실제 운영 설정이 아닙니다.
+`index.py`는 기존 `web/app_search.py`의 Flask `app`을 그대로 export하고, `vercel.json`은 모든 요청을 이 Flask 앱으로 보냅니다. `.cloudtype/app.yaml`과 Dockerfile은 rollback/참고용으로 남아 있지만 현재 자동배포 경로가 아닙니다.
 
 주요 코드:
 
@@ -49,8 +49,9 @@ GitHub main
 - `web/report_routes.py`: 오류 신고 접수 및 GitHub Issues 연동
 - `web/templates/`: 화면 템플릿
 - `web/static/`: CSS, JS, 이미지
-- `.github/workflows/cloudtype-deploy.yml`: smoke test 후 Cloudtype 배포
-- `.cloudtype/app.yaml`: Cloudtype 앱 설정
+- `.github/workflows/vercel-deploy.yml`: smoke test 후 Vercel production 배포와 live smoke test
+- `vercel.json`, `index.py`: Vercel Flask entrypoint
+- `.cloudtype/app.yaml`: Cloudtype rollback/참고용 앱 설정
 - `.devcontainer/devcontainer.json`: Codespaces 개발환경
 
 ## 4) 로컬 또는 Codespaces 실행
@@ -103,21 +104,27 @@ python scripts/smoke_test.py
 1. Python 설치
 2. `requirements.txt` 설치
 3. `python scripts/smoke_test.py`
-4. `cloudtype-github-actions/deploy@v1`로 Cloudtype 배포
+4. Vercel production 배포
+5. `python scripts/live_smoke.py https://www.soulib.kr`
 
-Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행합니다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0 범위가 아닙니다.
+자세한 production 운영 기준은 [production_operations.md](production_operations.md)를 봅니다.
 
 필요한 GitHub Actions secret:
 
 ```text
-CLOUDTYPE_API_KEY
+VERCEL_TOKEN
+VERCEL_ORG_ID
+VERCEL_PROJECT_ID
 ```
 
-Cloudtype 런타임 secret/env:
+Vercel production runtime env:
 
 ```text
-GITHUB_ISSUE_TOKEN = Cloudtype secret soulib-report-issues
-GITHUB_ISSUE_REPO = pkkong/library_crawler
+PUBLIC_BASE_URL=https://www.soulib.kr
+GITHUB_ISSUE_TOKEN=<Issues read/write token>
+GITHUB_ISSUE_REPO=pkkong/library_crawler
+DATABASE_URL=<Supabase Postgres pooler connection URL>
+SHARED_SHELVES_STORAGE=auto
 ```
 
 ## 7) 데이터와 DB 원칙
@@ -146,7 +153,7 @@ PostgreSQL 관련 코드는 세 그룹으로 구분합니다.
 - 선택적 필요: 관리자, 데이터 품질, 로컬 DB 점검, CSV/PostgreSQL 적재 작업.
 - 완전 레거시/삭제 후보: 미사용 entrypoint, 과거 SQLite 검색, 과거 DB rebuild 또는 SQLite -> PostgreSQL 마이그레이션 흐름.
 
-운영 경로와 유지/보류/삭제 후보는 [phase0_operating_inventory.md](phase0_operating_inventory.md)를 기준으로 확인합니다.
+현재 production 운영은 [production_operations.md](production_operations.md)를 기준으로 확인합니다. 레거시 유지/보류/삭제 후보 분류는 [phase0_operating_inventory.md](phase0_operating_inventory.md)를 참고합니다.
 
 ## 8) 오류 신고 운영
 

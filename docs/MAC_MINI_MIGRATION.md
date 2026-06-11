@@ -10,13 +10,12 @@ https://github.com/pkkong/library_crawler
 
 ## 1. 회사 노트북에서 확인할 것
 
-현재 상태는 확인 완료했습니다.
+현재 상태는 GitHub에서 확인합니다.
 
 ```text
 branch: main
 remote: https://github.com/pkkong/library_crawler.git
 status: main == origin/main
-latest commit: 0b34830 Use relevant SeoulOn blog visuals
 ```
 
 즉, Mac mini는 GitHub에서 `main`을 받으면 됩니다.
@@ -87,12 +86,12 @@ http://127.0.0.1:5001
 아래 값들은 회사 노트북 파일에서 복사하지 않습니다.
 
 - GitHub 토큰
-- Cloudtype API Key
+- Vercel token
 - DB 비밀번호
 - `.env`
 - 로컬 DB, CSV, JSON 캐시
 
-운영 배포에 필요한 값은 GitHub Secrets와 Cloudtype Environment variables에 이미 있어야 합니다.
+운영 배포에 필요한 값은 GitHub Actions secrets, Vercel production env, Supabase에 이미 있어야 합니다.
 Mac mini 로컬 테스트는 DB 없이도 가능합니다.
 
 로컬에서 오류 신고와 블로그 댓글까지 직접 테스트하려면 Mac mini의 `.env`에만 아래 값을 따로 넣습니다.

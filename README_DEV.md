@@ -42,7 +42,7 @@ Code > Codespaces > Create codespace
 
 Codespaces가 열리면 `.devcontainer` 설정으로 Python 환경을 만들고 `requirements.txt`를 설치합니다.
 
-기본 사용자-facing Flask 런타임은 `requirements.txt`만 설치합니다. Cloudtype Docker와 Vercel 기본 배포도 이 파일을 기준으로 하며, DB 없는 실시간 검색, 공유 서재 fallback, 오류 신고, 블로그/상태 API에 필요한 최소 패키지만 둡니다.
+기본 사용자-facing Flask 런타임은 `requirements.txt`만 설치합니다. Vercel production 배포와 Cloudtype rollback용 Docker 경로 모두 이 파일을 기준으로 하며, DB 없는 실시간 검색, 공유 서재 fallback, 오류 신고, 블로그/상태 API에 필요한 최소 패키지만 둡니다.
 
 크롤러, CSV/PostgreSQL 적재, 데이터 품질 관리자, Search Console 분석 같은 data/admin 작업은 별도 보조 의존성이 필요합니다.
 
@@ -148,7 +148,7 @@ vercel.json -> index.py -> web/app_search.py
 
 `index.py`는 기존 `web/app_search.py`의 Flask `app`을 그대로 export하고, `vercel.json`은 모든 요청을 이 Flask 앱으로 보냅니다. `.cloudtype/app.yaml`과 Dockerfile 경로는 rollback/참고용으로 남아 있지만 현재 자동배포 경로가 아닙니다.
 
-Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행합니다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0 범위가 아닙니다. 운영 경로와 레거시/보류 항목은 [docs/phase0_operating_inventory.md](docs/phase0_operating_inventory.md)를 기준으로 확인합니다.
+Phase 0 운영 경로 정리는 Cloudtype 시절 inventory 기록입니다. 현재 production 운영 기준은 [docs/production_operations.md](docs/production_operations.md)를 우선 확인하고, 레거시/보류 항목 분류는 [docs/phase0_operating_inventory.md](docs/phase0_operating_inventory.md)를 참고합니다.
 
 자동배포에는 GitHub Actions secret 세 개가 필요합니다.
 
@@ -192,9 +192,9 @@ DATABASE_URL=<Supabase Postgres pooler connection URL>
 
 Supabase는 서버리스 환경에서 pooler connection string을 사용합니다. `DATABASE_URL`은 query option까지 그대로 `psycopg2`에 전달하므로 Supabase가 제공하는 `sslmode` 값이 보존됩니다. `DATABASE_URL` 대신 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE` 조합을 쓸 수도 있지만, Vercel에서는 공유 서재를 JSON 파일 fallback으로 운영하지 않습니다.
 
-### Cloudtype -> Vercel + Supabase 이전 실행
+### Cloudtype -> Vercel + Supabase 이전 실행 기록
 
-실제 이전은 secret을 Git에 남기지 않고 `.secrets/migration.env`에만 둔 뒤 실행합니다.
+이 절차는 이미 수행된 이전 작업의 재실행/복구용 기록입니다. secret을 Git에 남기지 않고 `.secrets/migration.env`에만 둔 뒤 실행합니다.
 
 ```bash
 VERCEL_TOKEN=

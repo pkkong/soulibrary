@@ -1,5 +1,21 @@
 # 릴리즈 노트
 
+## 2026-06-11 - Vercel + Supabase production 이전
+
+### 이번 버전에서 바뀐 점
+- production 도메인 `https://www.soulib.kr`을 Vercel로 이전했다.
+- Vercel entrypoint는 `vercel.json -> index.py -> web/app_search.py`로 고정했다.
+- 공유 서재 영속 저장은 Supabase Postgres `shared_shelves` 테이블을 사용한다.
+- GitHub Actions 자동배포를 Cloudtype deploy에서 Vercel production deploy로 교체했다.
+- 자동배포는 smoke test 후 Vercel deploy를 실행하고, `https://www.soulib.kr` live smoke test까지 확인한다.
+- Cloudtype 설정은 rollback/참고용으로 남기고 현재 자동배포 경로에서는 제외했다.
+
+### 배포 확인
+- DNS: `www.soulib.kr -> 76.76.21.21`
+- HTTPS: `HTTP/2 200`, `server: Vercel`
+- GitHub Actions `Deploy to Vercel` workflow 성공
+- `python scripts/live_smoke.py https://www.soulib.kr` 통과
+
 ## 2026-05-19 - 내 서재 UX 정리
 
 ### 이번 버전에서 바뀐 점
