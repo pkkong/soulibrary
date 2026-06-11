@@ -6,7 +6,7 @@ import requests
 
 
 COMMENT_TITLE_PREFIX = "[블로그댓글]"
-DEFAULT_GITHUB_REPO = "pkkong/library_crawler"
+DEFAULT_GITHUB_REPO = "pkkong/soulibrary"
 KST = timezone(timedelta(hours=9), "Asia/Seoul")
 MAX_COMMENT_LEN = 700
 MAX_AUTHOR_LEN = 40

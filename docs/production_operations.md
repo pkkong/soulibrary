@@ -6,7 +6,7 @@
 
 - 운영 URL: `https://www.soulib.kr`
 - 기본 Vercel URL: `https://soulib.vercel.app`
-- 기준 저장소: GitHub `pkkong/library_crawler`
+- 기준 저장소: GitHub `pkkong/soulibrary`
 - production branch: `main`
 - 운영 entrypoint: `vercel.json -> index.py -> web/app_search.py`
 - 기본 검색: DB 없는 실시간 검색
@@ -44,7 +44,7 @@ Vercel production에는 아래 값이 필요합니다.
 ```text
 PUBLIC_BASE_URL=https://www.soulib.kr
 GITHUB_ISSUE_TOKEN=<Issues read/write token>
-GITHUB_ISSUE_REPO=pkkong/library_crawler
+GITHUB_ISSUE_REPO=pkkong/soulibrary
 DATABASE_URL=<Supabase Postgres pooler connection URL>
 SHARED_SHELVES_STORAGE=auto
 ```

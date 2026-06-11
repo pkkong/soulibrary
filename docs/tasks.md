@@ -4,7 +4,7 @@
 
 ## 현재 목표
 
-- 모든 작업은 GitHub `pkkong/library_crawler`를 기준으로 이어갑니다.
+- 모든 작업은 GitHub `pkkong/soulibrary`를 기준으로 이어갑니다.
 - 집 PC, 회사 PC, 모바일은 GitHub/Codex/Codespaces에 접속하는 단말로 사용합니다.
 - 로컬 PC에 프로젝트 원본이나 대용량 데이터 산출물을 계속 보관하지 않습니다.
 

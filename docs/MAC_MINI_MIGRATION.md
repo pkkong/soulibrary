@@ -3,7 +3,7 @@
 이 프로젝트의 기준 원본은 회사 노트북 폴더가 아니라 GitHub 저장소입니다.
 
 ```text
-https://github.com/pkkong/library_crawler
+https://github.com/pkkong/soulibrary
 ```
 
 회사 노트북에서 파일을 복사하지 말고, Mac mini에서 GitHub 저장소를 새로 내려받아 시작하세요.
@@ -14,7 +14,7 @@ https://github.com/pkkong/library_crawler
 
 ```text
 branch: main
-remote: https://github.com/pkkong/library_crawler.git
+remote: https://github.com/pkkong/soulibrary.git
 status: main == origin/main
 ```
 
@@ -48,8 +48,8 @@ Mac mini 터미널에서 실행합니다.
 ```bash
 mkdir -p ~/Projects
 cd ~/Projects
-git clone https://github.com/pkkong/library_crawler.git
-cd library_crawler
+git clone https://github.com/pkkong/soulibrary.git
+cd soulibrary
 ```
 
 ## 4. 자동 세팅
@@ -98,7 +98,7 @@ Mac mini 로컬 테스트는 DB 없이도 가능합니다.
 
 ```text
 GITHUB_ISSUE_TOKEN=
-GITHUB_ISSUE_REPO=pkkong/library_crawler
+GITHUB_ISSUE_REPO=pkkong/soulibrary
 ```
 
 ## 7. 회사 노트북 정리 기준
@@ -110,7 +110,7 @@ python scripts/smoke_test.py
 bash scripts/run_mac_local.sh
 ```
 
-브라우저에서 `http://127.0.0.1:5001` 접속까지 확인되면 회사 노트북의 `library_crawler` 폴더는 백업 후 삭제해도 됩니다.
+브라우저에서 `http://127.0.0.1:5001` 접속까지 확인되면 회사 노트북의 기존 프로젝트 폴더는 백업 후 삭제해도 됩니다.
 
 삭제 전에 마지막으로 회사 노트북에서 확인합니다.
 

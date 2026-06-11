@@ -1,6 +1,6 @@
 # Agent Operating Model
 
-이 문서는 `library_crawler` 프로젝트에서 Codex 메인 채팅방과 서브에이전트를 어떻게 운영할지 고정한 지침입니다.
+이 문서는 `soulibrary` 프로젝트에서 Codex 메인 채팅방과 서브에이전트를 어떻게 운영할지 고정한 지침입니다.
 
 ## 기본 원칙
 
@@ -452,7 +452,7 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 
 이 프로젝트의 현재 기본 운영 기준은 다음과 같다.
 
-- 기준 저장소: GitHub `pkkong/library_crawler`
+- 기준 저장소: GitHub `pkkong/soulibrary`
 - 기본 개발환경: GitHub Codespaces
 - 로컬 Mac mini: 예외적 개발/검증 환경
 - 기본 앱: `web/app_search.py`

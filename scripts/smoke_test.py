@@ -380,7 +380,7 @@ def main():
                     "number": 301,
                     "title": "[블로그댓글] soulib-guide - 좋은 글입니다.",
                     "body": "## 이름\n테스터\n\n## 댓글 내용\n좋은 글입니다.",
-                    "html_url": "https://github.com/pkkong/library_crawler/issues/301",
+                    "html_url": "https://github.com/pkkong/soulibrary/issues/301",
                     "created_at": "2026-05-14T08:17:00Z",
                 }
             ]
@@ -394,7 +394,7 @@ def main():
                 "number": 302,
                 "title": "[블로그댓글] soulib-guide - 댓글 테스트입니다.",
                 "body": "## 이름\n독자\n\n## 댓글 내용\n댓글 테스트입니다.",
-                "html_url": "https://github.com/pkkong/library_crawler/issues/302",
+                "html_url": "https://github.com/pkkong/soulibrary/issues/302",
                 "created_at": "2026-05-14T08:18:00Z",
             }
 
@@ -415,7 +415,7 @@ def main():
         "GITHUB_ISSUE_REPO": os.environ.get("GITHUB_ISSUE_REPO"),
     }
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
-    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
+    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/soulibrary"
     blog_comments.requests.get = fake_blog_get
     blog_comments.requests.post = fake_blog_post
     app_search.get_blog_comments = blog_comments.get_blog_comments
@@ -724,7 +724,7 @@ def main():
             "number": 2,
             "title": "[오류신고] 대출 상태 - 기존 신고",
             "body": "## 신고 내용\n기존 신고 내용\n\n## 문제가 있던 주소\nhttps://example.com",
-            "html_url": "https://github.com/pkkong/library_crawler/issues/2",
+            "html_url": "https://github.com/pkkong/soulibrary/issues/2",
             "state": "closed",
             "created_at": "2026-05-14T08:17:00Z",
             "closed_at": "2026-05-14T09:00:00Z",
@@ -1250,8 +1250,8 @@ def main():
                     "number": 124,
                     "title": "[오류신고] 대출 상태 - 해결된 신고입니다.",
                     "body": "## 신고 내용\n해결된 신고입니다.",
-                    "html_url": "https://github.com/pkkong/library_crawler/issues/124",
-                    "comments_url": "https://api.github.com/repos/pkkong/library_crawler/issues/124/comments",
+                    "html_url": "https://github.com/pkkong/soulibrary/issues/124",
+                    "comments_url": "https://api.github.com/repos/pkkong/soulibrary/issues/124/comments",
                     "comments": 1,
                     "state": "closed",
                     "created_at": "2026-05-14T08:18:00Z",
@@ -1262,7 +1262,7 @@ def main():
                     "number": 122,
                     "title": "[오류신고] 오류 - 기존 신고 내용입니다.",
                     "body": "## 신고 내용\n기존 신고 내용입니다.\n\n## 문제가 있던 주소\nhttps://example.com/search",
-                    "html_url": "https://github.com/pkkong/library_crawler/issues/122",
+                    "html_url": "https://github.com/pkkong/soulibrary/issues/122",
                     "state": "open",
                     "created_at": "2026-05-14T08:17:00Z",
                 },
@@ -1301,7 +1301,7 @@ def main():
                 "number": 123,
                 "title": self.payload.get("title") or "[오류신고] 오류 - 자동 테스트 신고 내용입니다.",
                 "body": self.payload.get("body") or "## 신고 내용\n자동 테스트 신고 내용입니다.",
-                "html_url": "https://github.com/pkkong/library_crawler/issues/123",
+                "html_url": "https://github.com/pkkong/soulibrary/issues/123",
                 "state": "open",
                 "created_at": "2026-05-14T08:17:00Z",
             }
@@ -1313,9 +1313,9 @@ def main():
             raise RuntimeError("fake issue creation failure")
 
     def fake_issue_get(url, headers=None, params=None, timeout=None):
-        if url == "https://api.github.com/repos/pkkong/library_crawler/issues/124/comments":
+        if url == "https://api.github.com/repos/pkkong/soulibrary/issues/124/comments":
             return FakeIssueCommentsResponse()
-        if url != "https://api.github.com/repos/pkkong/library_crawler/issues":
+        if url != "https://api.github.com/repos/pkkong/soulibrary/issues":
             raise AssertionError(f"unexpected issue list url: {url}")
         if not params or params.get("state") != "all":
             raise AssertionError(f"unexpected issue list params: {params}")
@@ -1325,7 +1325,7 @@ def main():
 
     def fake_issue_post(url, headers=None, json=None, timeout=None):
         issue_post_calls["count"] += 1
-        if url != "https://api.github.com/repos/pkkong/library_crawler/issues":
+        if url != "https://api.github.com/repos/pkkong/soulibrary/issues":
             raise AssertionError(f"unexpected issue url: {url}")
         body = (json or {}).get("body", "")
         if "저장 실패 테스트입니다." in body:
@@ -1362,7 +1362,7 @@ def main():
         raise AssertionError("reports API leaked internal report-store details")
 
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
-    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
+    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/soulibrary"
     report_routes.requests.get = fake_issue_get
     reports_shell = assert_response(client, "/reports")
     reports_body = reports_shell.get_data(as_text=True)
@@ -1467,7 +1467,7 @@ def main():
 
     report_routes.requests.get = fake_issue_get
     os.environ["GITHUB_ISSUE_TOKEN"] = "smoke-test-token"
-    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/library_crawler"
+    os.environ["GITHUB_ISSUE_REPO"] = "pkkong/soulibrary"
     try:
         saved = assert_response(client, "/reports?saved=1")
     finally:

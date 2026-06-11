@@ -15,7 +15,7 @@
 
 ## 2) 기준 저장소와 작업 위치
 
-- 기준 원본: GitHub `pkkong/library_crawler`
+- 기준 원본: GitHub `pkkong/soulibrary`
 - 기준 브랜치: `main`
 - 기본 작업 환경: GitHub Codespaces 또는 Codex Cloud
 - 집 PC, 회사 PC, 모바일은 작업 단말입니다. 프로젝트 원본을 각 PC에 따로 보관하는 구조가 아닙니다.
@@ -121,7 +121,7 @@ Vercel production runtime env:
 ```text
 PUBLIC_BASE_URL=https://www.soulib.kr
 GITHUB_ISSUE_TOKEN=<Issues read/write token>
-GITHUB_ISSUE_REPO=pkkong/library_crawler
+GITHUB_ISSUE_REPO=pkkong/soulibrary
 DATABASE_URL=<Supabase Postgres pooler connection URL>
 SHARED_SHELVES_STORAGE=auto
 ```

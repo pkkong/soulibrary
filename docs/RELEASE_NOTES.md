@@ -1,5 +1,18 @@
 # 릴리즈 노트
 
+## 2026-06-11 - Public repository 정리
+
+### 이번 버전에서 바뀐 점
+- GitHub 기준 저장소명을 `pkkong/soulibrary`로 정리했다.
+- 루트 README를 이력서/공개 저장소용 서비스 소개 문서로 재작성했다.
+- 오류 신고와 블로그 댓글의 기본 GitHub Issue 저장소를 `pkkong/soulibrary`로 바꿨다.
+- SQLite 기반 과거 Flask entrypoint, Cloudtype one-off migration runner, 임시 문서 패치 스크립트, 오래된 cleanup report를 제거했다.
+- 공개 저장소 유지 기준과 보류한 레거시 항목을 `docs/public_repository_inventory.md`에 남겼다.
+
+### 검증
+- `.venv/bin/python scripts/smoke_test.py` 통과
+- `git diff --check` 통과
+
 ## 2026-06-11 - Vercel + Supabase production 이전
 
 ### 이번 버전에서 바뀐 점

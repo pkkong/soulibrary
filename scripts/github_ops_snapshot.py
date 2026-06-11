@@ -20,7 +20,7 @@ from urllib.request import Request, urlopen
 
 
 API_ROOT = "https://api.github.com"
-DEFAULT_REPO = "pkkong/library_crawler"
+DEFAULT_REPO = "pkkong/soulibrary"
 DEFAULT_BRANCH = "main"
 BLOG_COMMENT_PREFIX = "[블로그댓글]"
 

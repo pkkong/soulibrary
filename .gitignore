@@ -12,6 +12,7 @@ __pycache__/
 .venv/
 venv/
 .vscode/
+.tmp_*
 
 # Local data outputs
 data/*
@@ -42,3 +43,10 @@ tmp_ux_review/
 artifacts/
 .vercel
 supabase/.temp/
+docs/reports/
+
+# Frontend build outputs
+dist/
+*.ait
+.granite/
+*.tsbuildinfo
