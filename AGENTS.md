@@ -262,6 +262,7 @@
 
 - `scripts/smoke_test.py`
 - `.github/workflows/`
+- `vercel.json`
 - `Dockerfile`
 - `.cloudtype/`
 - 배포 체크리스트 문서
@@ -271,7 +272,7 @@
 - smoke test 보강
 - 재현 시나리오 작성
 - GitHub Actions 실패 분석
-- Cloudtype 배포 전 점검
+- Vercel 배포와 live smoke test 점검
 - 로컬 실행 검증 절차 정리
 
 ### Instruction Steward Worker
@@ -307,7 +308,7 @@
 대표 작업:
 
 - GitHub Issues의 실제 오류 신고 확인
-- GitHub Actions와 Cloudtype 배포 상태 점검
+- GitHub Actions와 Vercel 배포/도메인 상태 점검
 - Search Console 분석 가능 여부 확인
 - 자동 수정 가능한 저위험 이슈와 사람 판단이 필요한 이슈 구분
 
@@ -456,11 +457,11 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 - 기본 개발환경: GitHub Codespaces
 - 로컬 Mac mini: 예외적 개발/검증 환경
 - 기본 앱: `web/app_search.py`
-- 운영 entrypoint: `.cloudtype/app.yaml -> Dockerfile -> web/app_search.py`
+- 운영 entrypoint: `vercel.json -> index.py -> web/app_search.py`
 - 기본 검색: DB 없는 실시간 검색
 - 기본 검증: `python scripts/smoke_test.py`
-- 배포 흐름: `main` push 또는 merge 후 GitHub Actions smoke test 통과, 이후 Cloudtype 배포
-- Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행한다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0 범위가 아니다.
+- 배포 흐름: `main` push 또는 merge 후 GitHub Actions smoke test 통과, 이후 Vercel production 배포와 `https://www.soulib.kr` live smoke test
+- Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행했다. 현재는 Vercel + Supabase 운영 경로가 production 기준이다.
 - 운영 경로와 레거시/보류 항목의 기준 inventory는 `docs/phase0_operating_inventory.md`를 우선 확인한다.
 
 PostgreSQL 관련 코드는 아래 세 그룹으로 구분한다.

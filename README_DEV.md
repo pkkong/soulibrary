@@ -82,7 +82,7 @@ Codespaces에서는 포트 `5001`이 자동 포워딩됩니다. 모바일이나 
 → commit/push
 → main 반영
 → GitHub Actions smoke test 통과
-→ Cloudtype 배포 트리거 확인
+→ Vercel production 배포와 live smoke test 통과
 ```
 
 ## 환경변수
@@ -138,31 +138,36 @@ python scripts/search_console_report.py
 
 ## 배포
 
-`main`에 push 또는 merge되면 GitHub Actions가 먼저 smoke test를 실행합니다. smoke test가 통과하면 공식 Cloudtype deploy action이 `.cloudtype/app.yaml` 설정으로 운영 서비스를 갱신합니다.
+`main`에 push 또는 merge되면 GitHub Actions가 먼저 smoke test를 실행합니다. smoke test가 통과하면 Vercel CLI가 production 배포를 실행하고, `https://www.soulib.kr` 기준 live smoke test를 다시 실행합니다.
 
 현재 운영 entrypoint는 아래 경로입니다.
 
 ```text
-.cloudtype/app.yaml -> Dockerfile -> web/app_search.py
+vercel.json -> index.py -> web/app_search.py
 ```
 
-`.cloudtype/app.yaml`은 Dockerfile 배포를 선택하고, Dockerfile은 `gunicorn ... app_search:app`을 실행합니다. `web/app_cloudtype.py -> web/app_search.py`는 현재 실제 운영 설정이 아니므로 현재 entrypoint로 문서화하지 않습니다.
+`index.py`는 기존 `web/app_search.py`의 Flask `app`을 그대로 export하고, `vercel.json`은 모든 요청을 이 Flask 앱으로 보냅니다. `.cloudtype/app.yaml`과 Dockerfile 경로는 rollback/참고용으로 남아 있지만 현재 자동배포 경로가 아닙니다.
 
 Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행합니다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0 범위가 아닙니다. 운영 경로와 레거시/보류 항목은 [docs/phase0_operating_inventory.md](docs/phase0_operating_inventory.md)를 기준으로 확인합니다.
 
-자동배포에는 GitHub Actions secret 하나가 필요합니다.
+자동배포에는 GitHub Actions secret 세 개가 필요합니다.
 
 ```text
-CLOUDTYPE_API_KEY
+VERCEL_TOKEN
+VERCEL_ORG_ID
+VERCEL_PROJECT_ID
 ```
 
-이 키는 Cloudtype API 호출에 사용합니다. Cloudtype 서비스는 Git 저장소 `https://github.com/pkkong/library_crawler.git`의 `main` 브랜치를 바라봐야 합니다.
+`VERCEL_TOKEN`은 `soulib-github-actions-deploy` 같은 전용 deploy token을 사용합니다. `VERCEL_ORG_ID`와 `VERCEL_PROJECT_ID`는 Vercel project link 정보와 같아야 합니다.
 
-오류 신고는 GitHub Issues를 단일 저장소로 사용합니다. Cloudtype에는 아래 런타임 secret/env가 유지되어야 합니다.
+오류 신고는 GitHub Issues를 단일 저장소로 사용합니다. Vercel production에는 아래 런타임 secret/env가 유지되어야 합니다.
 
 ```text
-GITHUB_ISSUE_TOKEN = Cloudtype secret soulib-report-issues
-GITHUB_ISSUE_REPO = pkkong/library_crawler
+PUBLIC_BASE_URL=https://www.soulib.kr
+GITHUB_ISSUE_TOKEN=<Issues read/write token>
+GITHUB_ISSUE_REPO=pkkong/library_crawler
+DATABASE_URL=<Supabase Postgres pooler connection URL>
+SHARED_SHELVES_STORAGE=auto
 ```
 
 Docker 기본 실행은 DB 없는 검색 앱입니다.

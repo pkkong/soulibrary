@@ -11,11 +11,11 @@
 ## 현재 운영 구조
 
 - 기본 검색: DB 없는 실시간 검색
-- 운영 entrypoint: `.cloudtype/app.yaml -> Dockerfile -> web/app_search.py`
+- 운영 entrypoint: `vercel.json -> index.py -> web/app_search.py`
 - 신고 접수: GitHub Issues
-- 배포: GitHub Actions smoke test 통과 후 Cloudtype deploy action
+- 배포: GitHub Actions smoke test 통과 후 Vercel production deploy, 이후 `https://www.soulib.kr` live smoke test
 - 데이터 산출물: Git 미포함, 필요 시 별도 백업/작업 환경에서 생성
-- Phase 0 운영 경로 정리: 문서와 inventory만 갱신하며 Vercel 배포, DNS, workflow, Cloudtype 설정은 변경하지 않음
+- Phase 0 운영 경로 정리: 문서와 inventory만 갱신한 이전 단계. 현재 production은 Vercel + Supabase 기준
 - 운영 inventory: `docs/phase0_operating_inventory.md`
 
 ## PostgreSQL/DB 코드 분류
@@ -39,7 +39,7 @@
 -> PR
 -> main merge
 -> GitHub Actions 성공 확인
--> Cloudtype 반영 확인
+-> Vercel production 배포와 `https://www.soulib.kr` live smoke test 확인
 ```
 
 ## 작업 유형별 운영 메모
@@ -70,4 +70,4 @@
 2. 모바일에서 브랜치/PR/배포 상태를 확인하는 운영 흐름 고정
 3. 검색 상세 오류 신고가 들어오면 GitHub Issue 기준으로 재현, 수정, 고객용 처리 로그 작성
 4. 레거시 DB/큐레이션 코드는 실제 운영 필요성이 생길 때만 별도 정리
-5. Vercel 이전을 검토할 때는 배포/DNS/workflow를 바꾸기 전에 `docs/phase0_operating_inventory.md`의 재판단 항목을 먼저 확인
+5. Vercel + Supabase 운영 기준에서 Cloudtype 관련 항목은 rollback 필요성이 있을 때만 별도 판단
