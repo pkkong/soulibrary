@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Soulib live report page
+    url: https://www.soulib.kr/reports
+    about: Report user-facing search or status issues from the production app.

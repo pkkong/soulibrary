@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a Soulib search, detail, shelf, or deployment issue.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue. Do not include tokens, credentials, private URLs, or personal data.
+  - type: input
+    id: page
+    attributes:
+      label: Page or route
+      description: "Example: /search, /book, /reports, Apps in Toss"
+      placeholder: /search
+  - type: input
+    id: query
+    attributes:
+      label: Search query or book title
+      placeholder: 파이썬
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, device, app surface, or production/local context.
+      placeholder: iPhone Safari, Chrome desktop, Apps in Toss, local Flask
+  - type: textarea
+    id: verification
+    attributes:
+      label: Notes
+      description: Logs or screenshots are useful, but remove secrets before uploading.

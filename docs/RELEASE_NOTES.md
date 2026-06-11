@@ -1,5 +1,14 @@
 # 릴리즈 노트
 
+## 2026-06-11 - Public GitHub surface 정리
+
+### 이번 버전에서 바뀐 점
+- GitHub repository About 영역에 description, homepage, topics를 설정했다.
+- 루트 README에 배포/production/Python/Vercel badge와 운영 상태 설명을 추가했다.
+- `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, PR template, issue template을 추가했다.
+- `apps-in-toss/README.md`와 `data/README.md`를 공개 GitHub 디렉터리 페이지 기준으로 정돈했다.
+- portfolio 공개 목적의 `All rights reserved` 라이선스 파일을 추가했다.
+
 ## 2026-06-11 - Public repository 정리
 
 ### 이번 버전에서 바뀐 점
@@ -108,7 +117,7 @@
 - 실시간 검색은 전체 응답 대기를 줄이기 위해 도서관별 timeout과 전체 timeout을 둔다.
 - 오류 신고는 GitHub Issues를 단일 저장소로 사용한다. DB/JSONL 파일 fallback은 사용하지 않는다.
 - UX/UI 기준은 `docs/UX_UI_Guide.md`에 정리했다.
-- GitHub `main` push 시 smoke test 후 공식 Cloudtype deploy action으로 자동 배포하는 workflow를 사용한다.
+- 당시 GitHub `main` push 시 smoke test 후 공식 Cloudtype deploy action으로 자동 배포하는 workflow를 사용했다.
 
 ## 2026-05-18 - GitHub 중심 작업환경 정리
 
@@ -116,7 +125,7 @@
 - 프로젝트 기준을 로컬 PC가 아니라 GitHub `main`으로 정리했다.
 - 기본 작업 환경을 GitHub Codespaces/Codex Cloud로 문서화했다.
 - `data/`에는 `README.md`만 남기고, 크롤링 CSV/JSON/DB 산출물은 Git에서 제외했다.
-- 배포 설명을 과거 수동/우회 배포 방식에서 공식 Cloudtype deploy action 기준으로 고쳤다.
+- 당시 배포 설명을 과거 수동/우회 배포 방식에서 공식 Cloudtype deploy action 기준으로 고쳤다.
 - 오류 신고는 GitHub Issues를 단일 저장소로 사용하는 것으로 정리했다.
 
 ### 배포 확인

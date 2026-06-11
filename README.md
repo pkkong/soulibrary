@@ -2,11 +2,20 @@
 
 서울 공공 전자도서관을 한 번에 검색하는 모바일 우선 웹 서비스입니다.
 
+[![Deploy to Vercel](https://github.com/pkkong/soulibrary/actions/workflows/vercel-deploy.yml/badge.svg)](https://github.com/pkkong/soulibrary/actions/workflows/vercel-deploy.yml)
+[![Production](https://img.shields.io/badge/production-www.soulib.kr-111827)](https://www.soulib.kr)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB)](https://www.python.org/)
+[![Vercel](https://img.shields.io/badge/runtime-Vercel-black)](https://vercel.com/)
+
 - Production: https://www.soulib.kr
 - Repository: https://github.com/pkkong/soulibrary
 - Runtime: Vercel Serverless Functions + Flask
 - Persistence: Supabase Postgres for shared shelves
 - Search: live connectors, no prebuilt search database required
+
+## Status
+
+Soulib is running in production on Vercel. `main` pushes run smoke tests, deploy to Vercel, and then run a live smoke test against `https://www.soulib.kr`.
 
 ## What It Does
 
@@ -34,6 +43,10 @@ GitHub main
 ```
 
 현재 production entrypoint는 `vercel.json -> index.py -> web/app_search.py`입니다. Cloudtype 설정과 SQLite 기반 검색 앱은 운영 경로에서 제거했습니다.
+
+## Why Live Search
+
+전자도서관 보유 정보와 대출 상태는 플랫폼별로 자주 달라집니다. Soulib은 과거처럼 로컬 SQLite 검색 DB를 먼저 만들지 않고, 검색 시점에 공급사 커넥터를 호출해 결과를 묶습니다. 이 구조는 배포를 가볍게 유지하고, Vercel에서도 같은 검색 동작을 재현하기 쉽게 만듭니다.
 
 ## Tech Stack
 
@@ -83,6 +96,14 @@ Crawler and data-admin scripts are kept as optional tooling. They are not part o
 This repository is safe to run without private data. Local `.env`, `.secrets/`, database files, crawler outputs, logs, and build artifacts are ignored.
 
 Production secrets must live only in GitHub Actions, Vercel, Supabase, or local ignored files. Do not commit tokens, service-account JSON, SQLite databases, CSV exports, or generated crawl output.
+
+## Contributing And Issues
+
+This is a production service repository, not a general-purpose library package. Issues and pull requests should stay focused on the live search experience, deployment safety, documentation, and Apps in Toss client behavior.
+
+- Bug reports: use the GitHub issue template and include the search query or URL.
+- Security or credential issues: follow [SECURITY.md](SECURITY.md).
+- Local setup and verification: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## More Docs
 
