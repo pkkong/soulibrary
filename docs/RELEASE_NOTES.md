@@ -8,7 +8,7 @@
 - 공유 서재 영속 저장은 Supabase Postgres `shared_shelves` 테이블을 사용한다.
 - GitHub Actions 자동배포를 Cloudtype deploy에서 Vercel production deploy로 교체했다.
 - 자동배포는 smoke test 후 Vercel deploy를 실행하고, `https://www.soulib.kr` live smoke test까지 확인한다.
-- Cloudtype 설정은 rollback/참고용으로 남기고 현재 자동배포 경로에서는 제외했다.
+- Cloudtype 자동배포와 서비스 설정을 현재 운영 경로에서 제외했다.
 
 ### 배포 확인
 - DNS: `www.soulib.kr -> 76.76.21.21`

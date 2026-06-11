@@ -4,7 +4,7 @@
 
 Phase 0의 범위는 문서와 inventory 정리입니다. Vercel 배포, DNS, GitHub Actions workflow, Cloudtype 설정 변경은 Phase 0에서 수행하지 않습니다.
 
-현재 production은 Phase 0 이후 Vercel + Supabase로 이전되었습니다. 현재 운영 기준은 [production_operations.md](production_operations.md)를 우선 확인합니다. 이 문서는 Phase 0 당시 Cloudtype 운영 경로와 레거시 분류를 보존하는 기록입니다.
+현재 production은 Phase 0 이후 Vercel + Supabase로 이전되었습니다. 현재 운영 기준은 [production_operations.md](production_operations.md)를 우선 확인합니다. 이 문서는 Phase 0 당시 Cloudtype 운영 경로와 레거시 분류를 보존하는 기록입니다. Cloudtype 서비스는 해지 대상이므로 현재 rollback 경로로 보지 않습니다.
 
 ## Phase 0 당시 운영 경로
 
@@ -68,7 +68,7 @@ production 기능을 지원하므로 유지 대상입니다.
 
 ### Phase 0 당시 유지
 
-- `.cloudtype/app.yaml -> Dockerfile -> web/app_search.py` 운영 entrypoint. 현재는 rollback/참고용입니다.
+- `.cloudtype/app.yaml -> Dockerfile -> web/app_search.py` 운영 entrypoint. 현재는 과거 운영 기록입니다.
 - DB 없는 실시간 검색 경로.
 - 오류 신고 GitHub Issues 연동.
 - 공유 서재 영속 저장을 위한 PostgreSQL fallback/auto 경로.
@@ -103,9 +103,9 @@ Phase 0 이후 Vercel 이전을 진행하면서 아래 항목을 재판단했습
 - GitHub Actions workflow는 Vercel production deploy와 `https://www.soulib.kr` live smoke test를 실행합니다.
 - `www.soulib.kr` DNS는 Gabia에서 Vercel A record로 연결합니다.
 - DB 없는 실시간 검색 원칙은 유지합니다.
-- Cloudtype은 현재 자동배포 경로가 아니며 rollback/참고용으로만 남깁니다.
+- Cloudtype은 현재 자동배포 경로가 아니며 해지 대상입니다.
 
-## Phase 0 완료 기준
+## Phase 0 당시 완료 기준
 
 - 운영 entrypoint 문서가 `.cloudtype/app.yaml -> Dockerfile -> web/app_search.py`로 정정되어 있습니다.
 - DB 없는 실시간 검색이 기본 운영 경로로 유지되어 있습니다.

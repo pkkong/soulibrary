@@ -264,7 +264,6 @@
 - `.github/workflows/`
 - `vercel.json`
 - `Dockerfile`
-- `.cloudtype/`
 - 배포 체크리스트 문서
 
 대표 작업:
@@ -475,6 +474,7 @@ PostgreSQL 관련 코드는 아래 세 그룹으로 구분한다.
 - 레거시 SQLite/PostgreSQL 기반 검색
 - `web/app_cloudtype.py` 같은 미사용 entrypoint
 - Cloudtype 자동배포 경로
+- `.cloudtype/` Cloudtype 서비스 설정
 - 전수 크롤링 운영
 - 큐레이션 운영
 - 로컬 DB/CSV 산출물 보관

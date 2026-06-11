@@ -13,7 +13,7 @@
 - 공유 서재 영속 저장: Supabase Postgres `shared_shelves`
 - 신고 접수: GitHub Issues
 
-Cloudtype 설정 파일과 Dockerfile은 rollback/참고용으로 남아 있지만, 현재 자동배포 경로가 아닙니다.
+Dockerfile은 로컬/컨테이너 실행 참고용으로 남아 있지만, 현재 자동배포 경로가 아닙니다. Cloudtype 서비스는 해지 대상이므로 rollback 경로로 보지 않습니다.
 
 ## 배포 흐름
 
@@ -146,10 +146,10 @@ Supabase DB password를 교체할 때:
 
 ## Rollback
 
-Cloudtype은 현재 자동배포 대상이 아닙니다. rollback이 필요하면 먼저 아래를 결정합니다.
+Cloudtype은 해지 대상이며 현재 rollback 경로가 아닙니다. 장애 대응은 Vercel 안에서 처리하는 것을 기본으로 합니다.
 
-- DNS를 Cloudtype으로 되돌릴지, Vercel 배포만 이전 deployment로 rollback할지
+- Vercel 이전 deployment로 rollback할지
+- Vercel env 수정 후 재배포할지
 - 공유 서재 저장소를 Supabase에 유지할지
-- GitHub Actions workflow를 일시적으로 Cloudtype deploy로 되돌릴지
 
-대부분의 장애는 DNS rollback보다 Vercel 이전 deployment rollback 또는 env 수정 후 재배포가 더 작고 빠릅니다.
+대부분의 장애는 DNS 변경보다 Vercel 이전 deployment rollback 또는 env 수정 후 재배포가 더 작고 빠릅니다. Cloudtype으로 되돌리는 계획은 기본 운영 절차가 아닙니다.

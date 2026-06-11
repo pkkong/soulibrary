@@ -40,7 +40,7 @@ GitHub main
 vercel.json -> index.py -> web/app_search.py
 ```
 
-`index.py`는 기존 `web/app_search.py`의 Flask `app`을 그대로 export하고, `vercel.json`은 모든 요청을 이 Flask 앱으로 보냅니다. `.cloudtype/app.yaml`과 Dockerfile은 rollback/참고용으로 남아 있지만 현재 자동배포 경로가 아닙니다.
+`index.py`는 기존 `web/app_search.py`의 Flask `app`을 그대로 export하고, `vercel.json`은 모든 요청을 이 Flask 앱으로 보냅니다. Dockerfile은 로컬/컨테이너 실행 참고용이며 현재 자동배포 경로가 아닙니다. Cloudtype 서비스는 해지 대상이므로 `.cloudtype/` 설정은 유지하지 않습니다.
 
 주요 코드:
 
@@ -51,7 +51,6 @@ vercel.json -> index.py -> web/app_search.py
 - `web/static/`: CSS, JS, 이미지
 - `.github/workflows/vercel-deploy.yml`: smoke test 후 Vercel production 배포와 live smoke test
 - `vercel.json`, `index.py`: Vercel Flask entrypoint
-- `.cloudtype/app.yaml`: Cloudtype rollback/참고용 앱 설정
 - `.devcontainer/devcontainer.json`: Codespaces 개발환경
 
 ## 4) 로컬 또는 Codespaces 실행
