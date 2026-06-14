@@ -1,284 +1,387 @@
 <!doctype html>
 <html lang="ko">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=1932, initial-scale=1" />
-    <title>서울 전자책 찾기 썸네일</title>
+    <title>전자도서관 통합검색 앱인토스 썸네일</title>
     <style>
       :root {
-        color: #1d1d1f;
-        background: #ffffff;
+        --ink: #111827;
+        --muted: #4b5563;
+        --soft: #f5f7fb;
+        --line: #e5e7eb;
+        --blue: #3182f6;
+        --blue-dark: #1d4ed8;
+        --green: #087f5b;
+        --orange: #b45309;
         font-family:
-          Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", system-ui, sans-serif;
+          "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        color: var(--ink);
       }
 
       * {
         box-sizing: border-box;
       }
 
+      html,
       body {
         width: 1932px;
         height: 828px;
         margin: 0;
         overflow: hidden;
-        background:
-          radial-gradient(circle at 18% 18%, rgba(242, 242, 247, 0.95), rgba(255, 255, 255, 0) 34%),
-          linear-gradient(90deg, #ffffff 0%, #fbfbfd 100%);
+        background: #f6f8fc;
+      }
+
+      body {
+        position: relative;
       }
 
       .canvas {
-        display: grid;
-        grid-template-columns: 720px 1fr;
-        gap: 92px;
+        position: relative;
         width: 100%;
         height: 100%;
-        padding: 92px 118px;
+        display: grid;
+        grid-template-columns: 732px 1fr;
+        gap: 82px;
+        padding: 70px 96px 64px 116px;
+        background:
+          linear-gradient(120deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 252, 255, 0.94) 45%, rgba(235, 243, 255, 0.9) 100%),
+          radial-gradient(900px 520px at 78% 18%, rgba(49, 130, 246, 0.22), transparent 68%),
+          radial-gradient(640px 460px at 10% 86%, rgba(8, 127, 91, 0.1), transparent 70%);
+      }
+
+      .copy {
+        align-self: center;
+        min-width: 0;
       }
 
       .brand {
         display: flex;
-        flex-direction: column;
-        justify-content: center;
-        min-width: 0;
-      }
-
-      .logo-row {
-        display: flex;
         align-items: center;
-        gap: 28px;
-        margin-bottom: 46px;
+        gap: 22px;
+        margin-bottom: 48px;
       }
 
       .logo {
-        width: 128px;
-        height: 128px;
-        border-radius: 0;
+        width: 104px;
+        height: 104px;
+        border-radius: 24px;
+        background: #ffffff;
+        border: 1px solid rgba(17, 24, 39, 0.08);
+        box-shadow: 0 14px 32px rgba(17, 24, 39, 0.12);
+        padding: 12px;
       }
 
-      .label {
-        color: #6e6e73;
-        font-size: 30px;
-        font-weight: 800;
-        line-height: 1.2;
+      .logo img {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
+      }
+
+      .brand-text {
+        display: grid;
+        gap: 6px;
+      }
+
+      .brand-name {
+        font-size: 35px;
+        line-height: 1.1;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .brand-sub {
+        color: #64748b;
+        font-size: 23px;
+        font-weight: 700;
+        letter-spacing: 0;
       }
 
       h1 {
         margin: 0;
-        color: #1d1d1f;
-        font-size: 82px;
-        font-weight: 900;
-        letter-spacing: 0;
+        max-width: 720px;
+        color: var(--ink);
+        font-size: 83px;
         line-height: 1.08;
+        font-weight: 950;
+        letter-spacing: 0;
       }
 
       .subtitle {
-        width: 620px;
         margin: 32px 0 0;
-        color: #515154;
+        max-width: 650px;
+        color: var(--muted);
         font-size: 34px;
+        line-height: 1.42;
         font-weight: 700;
         letter-spacing: 0;
-        line-height: 1.42;
       }
 
-      .keyword-row {
+      .chips {
         display: flex;
         flex-wrap: wrap;
         gap: 14px;
-        width: 620px;
         margin-top: 42px;
       }
 
-      .keyword {
-        min-height: 52px;
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 58px;
         padding: 0 22px;
         border-radius: 999px;
-        background: #f2f2f7;
-        color: #515154;
+        background: #ffffff;
+        border: 1px solid rgba(49, 130, 246, 0.2);
+        color: #1e40af;
         font-size: 24px;
         font-weight: 850;
-        line-height: 52px;
+        box-shadow: 0 8px 20px rgba(49, 130, 246, 0.08);
+      }
+
+      .stage {
+        position: relative;
+        align-self: center;
+        height: 694px;
+        min-width: 0;
+      }
+
+      .book-stack {
+        position: absolute;
+        left: 0;
+        bottom: 42px;
+        width: 286px;
+        height: 390px;
+      }
+
+      .book {
+        position: absolute;
+        width: 182px;
+        height: 262px;
+        border-radius: 18px 24px 24px 18px;
+        border: 1px solid rgba(17, 24, 39, 0.08);
+        box-shadow: 0 22px 42px rgba(17, 24, 39, 0.16);
+      }
+
+      .book::before {
+        content: "";
+        position: absolute;
+        top: 18px;
+        bottom: 18px;
+        left: 22px;
+        width: 2px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.55);
+      }
+
+      .book::after {
+        content: "";
+        position: absolute;
+        right: 22px;
+        bottom: 26px;
+        width: 72px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.75);
+        box-shadow: 0 -22px 0 rgba(255, 255, 255, 0.42);
+      }
+
+      .book.one {
+        left: 20px;
+        top: 86px;
+        transform: rotate(-8deg);
+        background: linear-gradient(145deg, #1d4ed8, #60a5fa);
+      }
+
+      .book.two {
+        left: 90px;
+        top: 26px;
+        transform: rotate(5deg);
+        background: linear-gradient(145deg, #087f5b, #74c69d);
+      }
+
+      .book.three {
+        left: 44px;
+        top: 154px;
+        transform: rotate(2deg);
+        background: linear-gradient(145deg, #334155, #94a3b8);
+      }
+
+      .phone {
+        position: absolute;
+        right: 18px;
+        top: 0;
+        width: 598px;
+        height: 694px;
+        border-radius: 52px;
+        padding: 16px;
+        background: #111827;
+        box-shadow: 0 42px 86px rgba(15, 23, 42, 0.28);
       }
 
       .screen {
-        align-self: center;
-        width: 762px;
-        padding: 28px;
-        border: 1px solid #f2f2f7;
-        border-radius: 36px;
-        background: #ffffff;
-        box-shadow: 0 24px 60px rgba(29, 29, 31, 0.1);
+        width: 100%;
+        height: 100%;
         overflow: hidden;
+        border-radius: 40px;
+        background: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .safe {
+        height: 30px;
+      }
+
+      .search-top {
+        padding: 14px 18px 11px;
+        border-bottom: 1px solid #f1f3f5;
+        background: rgba(255, 255, 255, 0.96);
       }
 
       .search-row {
         display: grid;
-        grid-template-columns: 1fr 74px;
-        gap: 16px;
-        align-items: center;
-      }
-
-      .searchbar,
-      .filter {
-        height: 74px;
-        border-radius: 24px;
-        background: #f2f2f7;
+        grid-template-columns: 1fr 48px;
+        gap: 10px;
       }
 
       .searchbar {
-        display: grid;
-        grid-template-columns: 42px minmax(0, 1fr) 62px;
+        height: 48px;
+        border-radius: 16px;
+        background: #f2f4f7;
+        display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 0 8px 0 24px;
-        color: #8e8e93;
+        gap: 10px;
+        padding: 0 15px;
+        color: #6b7280;
+        font-size: 19px;
+        font-weight: 750;
       }
 
       .magnify {
-        width: 25px;
-        height: 25px;
-        border: 3px solid currentColor;
-        border-radius: 999px;
+        width: 18px;
+        height: 18px;
+        border: 2.5px solid currentColor;
+        border-radius: 50%;
         position: relative;
+        flex: 0 0 auto;
       }
 
       .magnify::after {
         content: "";
         position: absolute;
-        right: -10px;
-        bottom: -8px;
-        width: 13px;
-        height: 3px;
+        right: -8px;
+        bottom: -6px;
+        width: 9px;
+        height: 2.5px;
         border-radius: 999px;
         background: currentColor;
         transform: rotate(45deg);
       }
 
-      .query {
-        color: #1d1d1f;
-        font-size: 28px;
-        font-weight: 800;
-      }
-
-      .submit {
-        display: grid;
-        place-items: center;
-        width: 58px;
-        height: 58px;
-        border-radius: 999px;
-        background: #1d1d1f;
-        color: #ffffff;
-      }
-
-      .submit .magnify {
-        width: 21px;
-        height: 21px;
-        border-width: 2.5px;
-      }
-
       .filter {
-        display: grid;
-        place-items: center;
-        color: #6e6e73;
-      }
-
-      .filter-lines,
-      .filter-lines::before,
-      .filter-lines::after {
-        display: block;
-        width: 28px;
-        height: 3px;
+        width: 48px;
+        height: 48px;
         border-radius: 999px;
-        background: currentColor;
-      }
-
-      .filter-lines {
+        background: #f2f4f7;
         position: relative;
       }
 
-      .filter-lines::before,
-      .filter-lines::after {
+      .filter::before,
+      .filter::after {
         content: "";
         position: absolute;
-        left: 5px;
+        left: 14px;
+        right: 14px;
+        height: 2px;
+        border-radius: 999px;
+        background: #6b7280;
       }
 
-      .filter-lines::before {
-        top: -10px;
-        width: 18px;
+      .filter::before {
+        top: 18px;
+        box-shadow: 0 12px 0 #6b7280;
       }
 
-      .filter-lines::after {
-        top: 10px;
-        width: 12px;
+      .filter::after {
+        top: 30px;
+        left: 21px;
       }
 
       .toggle-row {
         display: flex;
         align-items: center;
-        gap: 16px;
-        margin: 18px 0 28px;
-        color: #1d1d1f;
-        font-size: 22px;
+        gap: 8px;
+        margin-top: 12px;
+        color: #374151;
+        font-size: 15px;
         font-weight: 700;
       }
 
       .toggle {
-        width: 58px;
-        height: 32px;
+        width: 38px;
+        height: 22px;
         border-radius: 999px;
-        background: #e5e5ea;
+        background: #e5e7eb;
         position: relative;
       }
 
       .toggle::after {
         content: "";
         position: absolute;
-        top: 4px;
-        left: 4px;
-        width: 24px;
-        height: 24px;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
         border-radius: 999px;
         background: #ffffff;
       }
 
+      .content {
+        padding: 16px 18px 78px;
+      }
+
       .status {
-        margin-bottom: 18px;
-        color: #6e6e73;
-        font-size: 22px;
-        font-weight: 750;
-      }
-
-      .list {
-        display: grid;
-        gap: 16px;
-      }
-
-      .row {
-        display: grid;
-        grid-template-columns: 92px minmax(0, 1fr) 56px;
-        gap: 20px;
-        min-height: 134px;
+        display: flex;
+        justify-content: space-between;
         align-items: center;
-        padding: 16px;
-        border: 1px solid #f2f2f7;
-        border-radius: 24px;
+        margin-bottom: 12px;
+        color: #6b7280;
+        font-size: 15px;
+        font-weight: 760;
+      }
+
+      .result-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .result {
+        display: grid;
+        grid-template-columns: 76px 1fr 38px;
+        gap: 13px;
+        align-items: center;
+        min-height: 112px;
+        padding: 13px;
+        border-radius: 20px;
         background: #ffffff;
+        border: 1px solid #edf0f5;
+        box-shadow: 0 8px 20px rgba(17, 24, 39, 0.06);
       }
 
       .cover {
-        width: 92px;
-        height: 118px;
-        border-radius: 13px;
-        background:
-          linear-gradient(145deg, rgba(29, 29, 31, 0.92), rgba(11, 142, 101, 0.78)),
-          #1d1d1f;
+        width: 76px;
+        height: 98px;
+        border-radius: 12px;
+        background: linear-gradient(145deg, #2563eb, #93c5fd);
+        box-shadow: inset 8px 0 0 rgba(255, 255, 255, 0.18);
       }
 
       .cover.green {
-        background:
-          linear-gradient(145deg, rgba(11, 142, 101, 0.9), rgba(29, 29, 31, 0.76)),
-          #0b8e65;
+        background: linear-gradient(145deg, #087f5b, #74c69d);
+      }
+
+      .cover.dark {
+        background: linear-gradient(145deg, #111827, #64748b);
       }
 
       .meta {
@@ -287,154 +390,248 @@
 
       .title {
         overflow: hidden;
-        color: #1d1d1f;
-        font-size: 25px;
-        font-weight: 900;
+        color: #111827;
+        font-size: 18px;
         line-height: 1.24;
+        font-weight: 900;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
       .author {
         overflow: hidden;
-        margin-top: 9px;
-        color: #515154;
-        font-size: 20px;
+        margin-top: 6px;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.25;
         font-weight: 700;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      .chips {
+      .badges {
         display: flex;
-        gap: 8px;
-        margin-top: 10px;
+        gap: 6px;
+        margin-top: 9px;
+        min-width: 0;
       }
 
-      .count,
-      .chip {
-        min-height: 30px;
+      .badge {
+        height: 25px;
+        padding: 0 9px;
         border-radius: 999px;
-        font-size: 16px;
-        font-weight: 900;
-        line-height: 30px;
+        background: #f2f4f7;
+        color: #4b5563;
+        font-size: 12px;
+        line-height: 25px;
+        font-weight: 850;
       }
 
-      .count {
-        color: #0b8e65;
+      .badge.count {
+        background: #e8f7ef;
+        color: var(--green);
       }
 
-      .chip {
-        padding: 0 10px;
-        color: #515154;
-        background: #f2f2f7;
-      }
-
-      .shelf {
-        display: grid;
-        place-items: center;
-        width: 50px;
-        height: 50px;
+      .save {
+        width: 38px;
+        height: 38px;
         border-radius: 999px;
-        background: #f2f2f7;
-        color: #6e6e73;
-      }
-
-      .bookmark {
-        width: 23px;
-        height: 28px;
-        border: 3px solid currentColor;
-        border-radius: 4px 4px 6px 6px;
-        border-bottom-color: transparent;
+        background: #f2f4f7;
         position: relative;
       }
 
-      .bookmark::after {
+      .save::before {
         content: "";
         position: absolute;
-        left: 5px;
-        bottom: -7px;
-        width: 9px;
-        height: 9px;
-        border-left: 3px solid currentColor;
-        border-bottom: 3px solid currentColor;
-        transform: rotate(-45deg);
-        background: #f2f2f7;
+        left: 12px;
+        top: 9px;
+        width: 14px;
+        height: 18px;
+        border: 2px solid #6b7280;
+        border-bottom-color: transparent;
+        border-radius: 3px 3px 5px 5px;
+      }
+
+      .detail-card {
+        margin-top: 14px;
+        padding: 15px;
+        border-radius: 22px;
+        background: #f9fafb;
+        border: 1px solid #edf0f5;
+      }
+
+      .detail-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      .lib-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        height: 38px;
+        border-top: 1px solid #eceff3;
+        color: #374151;
+        font-size: 14px;
+        font-weight: 760;
+      }
+
+      .lib-row:first-of-type {
+        border-top: 0;
+      }
+
+      .lib-status {
+        height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        line-height: 24px;
+        font-weight: 900;
+      }
+
+      .available {
+        color: #087f5b;
+        background: #e8f7ef;
+      }
+
+      .reserved {
+        color: var(--orange);
+        background: #fff4e6;
+      }
+
+      .bottom-nav {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        height: 62px;
+        border-radius: 0 0 36px 36px;
+        background: rgba(255, 255, 255, 0.96);
+        border-top: 1px solid #edf0f5;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        align-items: center;
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .nav-item {
+        display: grid;
+        gap: 5px;
+        justify-items: center;
+      }
+
+      .nav-dot {
+        width: 20px;
+        height: 20px;
+        border-radius: 8px;
+        background: #d1d5db;
+      }
+
+      .nav-item.active {
+        color: var(--blue);
+      }
+
+      .nav-item.active .nav-dot {
+        background: #eaf3ff;
+        box-shadow: inset 0 0 0 6px var(--blue);
       }
     </style>
   </head>
   <body>
     <main class="canvas">
-      <section class="brand">
-        <div class="logo-row">
-          <img class="logo" src="app-logo-600.png" alt="" />
-          <div class="label">서울 공공 전자책</div>
+      <section class="copy" aria-label="앱 소개">
+        <div class="brand">
+          <div class="logo">
+            <img src="app-logo-600.png" alt="" />
+          </div>
+          <div class="brand-text">
+            <div class="brand-name">전자도서관 통합검색</div>
+            <div class="brand-sub">Soulib · 공공 전자도서관 통합 검색</div>
+          </div>
         </div>
-        <h1>웹에서 쓰던 검색 경험을<br />토스 안에서도 그대로</h1>
-        <p class="subtitle">책 제목이나 저자명으로 서울 공공 전자도서관 제공처를 빠르게 확인하세요.</p>
-        <div class="keyword-row" aria-hidden="true">
-          <span class="keyword">검색바</span>
-          <span class="keyword">필터</span>
-          <span class="keyword">내 서재</span>
-          <span class="keyword">오류 신고</span>
+        <h1>서울 공공 전자책을<br />한 번에 검색</h1>
+        <p class="subtitle">책 제목이나 저자명으로 전자책 제공 여부와 대여 상태를 빠르게 확인하세요.</p>
+        <div class="chips" aria-hidden="true">
+          <span class="chip">실시간 검색</span>
+          <span class="chip">도서관별 상태</span>
+          <span class="chip">내 서재</span>
+          <span class="chip">여러 서재</span>
         </div>
       </section>
 
-      <section class="screen" aria-label="앱 화면 예시">
-        <div class="search-row">
-          <div class="searchbar">
-            <div class="magnify"></div>
-            <div class="query">달러구트</div>
-            <div class="submit"><div class="magnify"></div></div>
+      <section class="stage" aria-label="앱 화면 예시">
+        <div class="book-stack" aria-hidden="true">
+          <span class="book three"></span>
+          <span class="book one"></span>
+          <span class="book two"></span>
+        </div>
+
+        <div class="phone">
+          <div class="screen">
+            <div class="safe"></div>
+            <div class="search-top">
+              <div class="search-row">
+                <div class="searchbar">
+                  <span class="magnify"></span>
+                  <span>달러구트 꿈 백화점</span>
+                </div>
+                <div class="filter"></div>
+              </div>
+              <div class="toggle-row">
+                <span class="toggle"></span>
+                <span>결과 내 재검색</span>
+              </div>
+            </div>
+            <div class="content">
+              <div class="status">
+                <span>검색 결과 4권</span>
+              </div>
+              <div class="result-list">
+                <article class="result">
+                  <div class="cover green"></div>
+                  <div class="meta">
+                    <div class="title">달러구트 꿈 백화점. 2</div>
+                    <div class="author">이미예 · 팩토리나인</div>
+                  </div>
+                  <div class="save"></div>
+                </article>
+                <article class="result">
+                  <div class="cover"></div>
+                  <div class="meta">
+                    <div class="title">달러구트 꿈 백화점</div>
+                    <div class="author">이미예 · 북닻</div>
+                  </div>
+                  <div class="save"></div>
+                </article>
+              </div>
+
+              <section class="detail-card">
+                <div class="detail-head">
+                  <span>전자도서관별 대출 상태</span>
+                  <span>상세에서 확인</span>
+                </div>
+                <div class="lib-row">
+                  <span>강남구 전자도서관</span>
+                  <span class="lib-status available">대출가능</span>
+                </div>
+                <div class="lib-row">
+                  <span>서울도서관</span>
+                  <span class="lib-status reserved">예약 1</span>
+                </div>
+              </section>
+            </div>
+            <nav class="bottom-nav" aria-hidden="true">
+              <span class="nav-item active"><span class="nav-dot"></span><span>검색</span></span>
+              <span class="nav-item"><span class="nav-dot"></span><span>내 서재</span></span>
+            </nav>
           </div>
-          <div class="filter"><span class="filter-lines"></span></div>
-        </div>
-        <div class="toggle-row">
-          <span class="toggle"></span>
-          <span>결과 내 재검색</span>
-        </div>
-        <div class="status">'달러구트' 검색 결과 4권</div>
-        <div class="list">
-          <article class="row">
-            <div class="cover green"></div>
-            <div class="meta">
-              <div class="title">달러구트 꿈 백화점. 2</div>
-              <div class="author">이미예 · 팩토리나인</div>
-              <div class="chips">
-                <span class="count">30곳 제공</span>
-                <span class="chip">교보</span>
-                <span class="chip">기타</span>
-                <span class="chip">YES24</span>
-              </div>
-            </div>
-            <div class="shelf"><span class="bookmark"></span></div>
-          </article>
-          <article class="row">
-            <div class="cover"></div>
-            <div class="meta">
-              <div class="title">달러구트 꿈 백화점</div>
-              <div class="author">이미예 · 북닻</div>
-              <div class="chips">
-                <span class="count">29곳 제공</span>
-                <span class="chip">교보</span>
-                <span class="chip">기타</span>
-                <span class="chip">YES24</span>
-              </div>
-            </div>
-            <div class="shelf"><span class="bookmark"></span></div>
-          </article>
-          <article class="row">
-            <div class="cover green"></div>
-            <div class="meta">
-              <div class="title">내 서재에 담아 다시 확인</div>
-              <div class="author">관심 있는 전자책 저장</div>
-              <div class="chips">
-                <span class="count">저장됨</span>
-                <span class="chip">내 서재</span>
-              </div>
-            </div>
-            <div class="shelf"><span class="bookmark"></span></div>
-          </article>
         </div>
       </section>
     </main>

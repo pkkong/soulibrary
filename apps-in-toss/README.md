@@ -54,3 +54,5 @@ npm run build
 - 상세 화면과 도서관별 상태 표시
 - 서재 선택 모달
 - 내 서재 저장/조회
+
+작업 이력과 Codex 환경의 `npm`/`npx` 우회 검증 절차는 [../docs/apps_in_toss_conversion_agent_guide.md](../docs/apps_in_toss_conversion_agent_guide.md)를 봅니다.

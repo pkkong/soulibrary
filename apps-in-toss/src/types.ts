@@ -7,6 +7,8 @@ export type BookCounts = {
   total?: number;
 };
 
+export type LibraryStatusKind = 'kyobo' | 'dobong' | 'yes24' | 'bookcube' | 'gangnam' | 'eunpyeong' | 'seoul' | 'sen' | '';
+
 export type LibraryItem = {
   code?: string;
   name?: string;
@@ -17,6 +19,17 @@ export type LibraryItem = {
   homepage_url?: string;
   detail_url?: string;
   status_label?: string;
+  status_kind?: LibraryStatusKind;
+  status_supported?: boolean;
+
+  brcd?: string;
+  goods_id?: string;
+  content_id?: string;
+  ctts_dvsn_code?: string;
+  ctgr_id?: string;
+  sntn_auth_code?: string;
+  product_cd?: string;
+  category_id?: string;
 };
 
 export type SearchBook = {
@@ -57,34 +70,11 @@ export type ShelfBook = SearchBook & {
   savedAt: string;
 };
 
-export type RecentReportsResponse = {
-  html?: string;
-  count_label?: string;
-  unavailable?: boolean;
-};
-
-export type ReportPayload = {
-  category: string;
-  message: string;
-  page_url?: string;
-};
-
-export type ReportSummary = {
-  id?: number;
-  category?: string;
-  message?: string;
-  page_url?: string;
-  issue_number?: number | null;
-  issue_url?: string;
-  status?: string;
-  status_label?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type CreateReportResponse = {
-  ok?: boolean;
-  message?: string;
-  report?: ReportSummary | null;
-  error?: string;
+export type BookShelf = {
+  id: string;
+  name: string;
+  books: ShelfBook[];
+  createdAt: string;
+  updatedAt: string;
+  isDefault?: boolean;
 };

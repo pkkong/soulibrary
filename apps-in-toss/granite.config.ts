@@ -3,7 +3,7 @@ import { defineConfig } from '@apps-in-toss/web-framework/config';
 export default defineConfig({
   appName: 'soulib',
   brand: {
-    displayName: '서울 전자책 찾기',
+    displayName: '전자도서관 통합검색',
     primaryColor: '#3182F6',
     icon: 'https://www.soulib.kr/static/img/app-icon-600.png',
   },

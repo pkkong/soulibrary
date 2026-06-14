@@ -1,5 +1,21 @@
 # 릴리즈 노트
 
+## 2026-06-14 - Apps in Toss source 정리
+
+### 이번 버전에서 바뀐 점
+- Apps in Toss 클라이언트 변경분을 Vercel/public repo 정리와 분리된 release-candidate 변경으로 정리했다.
+- 홈, 검색, 상세, 내 서재 흐름을 기존 Soulib 웹앱에 맞춰 보존하고, 하단 메뉴를 `홈 / 검색 / 서재` 중심으로 정리했다.
+- 상세 화면에서 도서관별 상태 조회를 앱 안에서 확인할 수 있게 정리했다.
+- 앱인토스 전용 여러 서재 관리와 서재 선택 sheet를 정리했다.
+- 앱명과 콘솔 제출 문서를 `전자도서관 통합검색` 기준으로 맞췄다.
+- 미커밋으로 남았던 원인과 Codex 환경의 `npm`/`npx` 우회 검증 절차를 `docs/apps_in_toss_conversion_agent_guide.md`에 문서화했다.
+
+### 검증
+- Apps in Toss typecheck 통과
+- Apps in Toss Vite production build 통과
+- 임시 `npx` shim 기반 `ait build` 통과
+- 모바일 390px 기준 홈, 검색, 상세, 서재 저장/조회 브라우저 검증 통과
+
 ## 2026-06-11 - Public GitHub surface 정리
 
 ### 이번 버전에서 바뀐 점
