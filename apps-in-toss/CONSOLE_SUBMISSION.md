@@ -66,11 +66,40 @@ Last updated: 2026-06-14
 ## Release Bundle
 
 - AIT bundle: `apps-in-toss/soulib.ait`
+- Last recorded uploaded deploymentId: `019eb19c-b150-7583-ba60-0b8f10c50745`
+- Latest local build deploymentId: `019ec39d-efa6-7959-a3b4-7b49cab568ce`
 - Build command:
 
 ```sh
 PATH=/tmp/node-v22.22.3-darwin-arm64/bin:$PATH npm run build
 ```
+
+## Console Launch State
+
+The actual release state is determined by the Apps in Toss console, not by this file.
+
+User console confirmation rule:
+
+1. Open the app in the Apps in Toss console.
+2. Check the release/launch page status.
+3. If the console shows `출시됨` or an equivalent launched state, treat the app as launched for operations.
+4. If the console also shows a deploymentId, record which deploymentId is launched.
+5. If the console does not show a deploymentId, do not infer one from local files.
+
+Do not keep a separate pending console action open after the console is confirmed launched. At that point this document is only a field/reference checklist for future updates.
+
+## Upload Decision
+
+No new upload is required only for documentation cleanup.
+
+Upload a new `apps-in-toss/soulib.ait` bundle if:
+
+- the intended launched version is the latest local build and the console still points to an older uploaded deployment;
+- source, UI, metadata, app assets, or Toss review requirements changed after the currently launched deployment;
+- the console is not launched yet and requires a bundle for review;
+- the previously uploaded bundle fails private-scheme testing or review.
+
+If the console is already launched and there has been no intended product change since that launched version, do not upload again just because the local build has deploymentId `019ec39d-efa6-7959-a3b4-7b49cab568ce`.
 
 ## Privacy Notes
 
@@ -82,4 +111,4 @@ PATH=/tmp/node-v22.22.3-darwin-arm64/bin:$PATH npm run build
 
 None.
 
-The app information fields are complete. The latest source has been verified locally. Upload the latest `apps-in-toss/soulib.ait` bundle before requesting review if the console still points to an older deploymentId.
+The app information fields are complete. The latest source has been verified locally. Request review or upload again only if the user console check shows that the app is not launched yet, the console points to the wrong deployment for the intended release, or Toss review requires a revised bundle.
