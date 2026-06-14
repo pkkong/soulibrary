@@ -25,6 +25,16 @@ Soulib은 현재 공개 저장소로 운영해도 되는 구조를 목표로 정
 - `crawler/scrapy`: 비어 있던 파일.
 - `scripts/migrate_cloudtype_to_vercel.py`: 완료된 one-off migration runner.
 - `docs/reports/*`: 과거 cleanup/stage report 산출물.
+- `run_search.bat`: Windows 로컬 검색 launcher. 현재 운영 entrypoint가 아니므로 과거 제거됨.
+- `run_data_admin.bat`: Windows 로컬 데이터 관리자 launcher. 현재 Vercel + Supabase 운영과 무관하므로 과거 제거됨.
+- `run_curation_admin.bat`: Windows 로컬 큐레이션 관리자 launcher. 현재 운영 entrypoint가 아니므로 과거 제거됨.
+- `run_tg_bot.example.bat`: Windows Telegram crawler bot 예시 launcher. 현재 운영 자동화가 아니므로 과거 제거됨.
+- `scripts/build_sqlite.py`, `scripts/build_library_split.py`: SQLite 기반 과거 검색 DB 빌드 흐름이므로 과거 제거됨.
+- `scripts/migrate_sqlite_to_postgres.py`, `scripts/migrate_split_to_postgres.py`: SQLite/split DB에서 PostgreSQL로 옮기던 과거 마이그레이션 흐름이므로 과거 제거됨.
+- `scripts/rebuild_search_db_local.py`: 로컬 전체 검색 DB rebuild 흐름이므로 과거 제거됨. 데이터 품질 관리자에서는 해당 전체 rebuild operation도 함께 제거했습니다.
+- `web/static/js/ai_search.js`: 1바이트 정적 JS 파일이며 참조가 없어 과거 제거됨.
+- `web/templates/admin.html`: 현재 route map에 없는 과거 `/admin` 화면이며 내부 admin API도 없어 과거 제거됨.
+- `web/templates/guide.html`: 현재 route map과 `render_template` 참조가 없는 과거 `/guide` 화면이므로 과거 제거됨.
 
 ## 유지한 항목
 
@@ -33,7 +43,7 @@ Soulib은 현재 공개 저장소로 운영해도 되는 구조를 목표로 정
 - `web/report_routes.py`, `web/blog_comments.py`: GitHub Issues 연동.
 - `supabase/migrations/`: 공유 서재 영속 저장 schema.
 - `apps-in-toss/`: Toss miniapp client.
-- `crawler/`, data/admin scripts: 현재 production 검색 경로는 아니지만, 데이터 점검과 향후 작업용으로 보류.
+- `crawler/`, 남은 data/admin scripts: 현재 production 검색 경로는 아니지만, 데이터 점검과 향후 작업용으로 보류.
 
 ## 보류한 항목
 

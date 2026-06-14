@@ -62,6 +62,13 @@ production 기능을 지원하므로 유지 대상입니다.
 - 과거 DB rebuild, dump/restore 운영 흐름.
 - PostgreSQL 기반 전체 보유 책 검색을 전제로 한 운영 문서 또는 스크립트.
 
+2026-06 레거시 정리에서 위 후보 중 `run_search.bat`, `run_data_admin.bat`,
+`run_curation_admin.bat`, `run_tg_bot.example.bat`, `scripts/build_sqlite.py`,
+`scripts/build_library_split.py`, `scripts/migrate_sqlite_to_postgres.py`,
+`scripts/migrate_split_to_postgres.py`, `scripts/rebuild_search_db_local.py`는
+현재 Vercel + Supabase 운영과 무관한 과거 흐름으로 확인되어 제거되었습니다.
+`web/data_quality_admin.py`의 로컬 전체 rebuild operation도 함께 제거되었습니다.
+
 삭제 작업은 Phase 0 범위가 아닙니다. 실제 삭제는 영향 범위 조사, 소유 파일 지정, 검증 계획을 별도 작업으로 잡은 뒤 진행합니다.
 
 ## 유지/보류/제거 후보

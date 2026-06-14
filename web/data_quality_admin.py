@@ -37,13 +37,6 @@ OPERATIONS = {
         "description": "선택한 도서관을 부분 반영한 뒤 Stage1, Stage2, Stage3 후보 생성까지 자동으로 이어서 실행합니다.",
         "requires_csv_only": True,
     },
-    "load_csv_full_rebuild": {
-        "label": "로컬 DB 재구축 (전체)",
-        "command": ["scripts/rebuild_search_db_local.py", "--yes-rebuild"],
-        "destructive": True,
-        "description": "로컬 DB에서만 books/holdings를 drop 후 전체 CSV를 재적재합니다.",
-        "force_drop": True,
-    },
     "stage1_dryrun": {
         "label": "Stage1 점검 (dry-run)",
         "command": ["scripts/stage1_apply_exact_dedupe.py"],
