@@ -13,13 +13,6 @@ from blog_comments import create_blog_comment, get_blog_comments
 from blog_posts import get_blog_categories, get_blog_post, get_blog_posts
 from config import LIBRARIES, PLATFORM_LABELS, LIBRARY_SHORT
 from seo_books import get_seo_book_by_slug, get_seo_books
-from utils.normalize import (
-    normalize_title,
-    normalize_author,
-    normalize_search_text,
-    normalize_provider,
-)
-from utils.providers import provider_from_platforms
 from live_search_routes import live_search_bp
 from report_routes import report_bp
 from live_search.service import live_search as run_live_search
@@ -124,9 +117,6 @@ def add_html_no_cache_headers(response):
     return response
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DB = os.path.join(ROOT_DIR, "data", "library_split.db")
-LEGACY_DB = os.path.join(ROOT_DIR, "data", "library.db")
-DB_PATH = os.environ.get("LIBRARY_DB_PATH", DEFAULT_DB if os.path.exists(DEFAULT_DB) else LEGACY_DB)
 SHARED_SHELVES_FILE = os.environ.get("SHARED_SHELVES_FILE", os.path.join(ROOT_DIR, "data", "shared_shelves.json"))
 SHARED_SHELVES_STORAGE = os.environ.get("SHARED_SHELVES_STORAGE", "auto").strip().lower()
 MAX_SHARED_SHELF_BOOKS = 200
@@ -138,6 +128,7 @@ SITEMAP_TTL_SEC = int(os.environ.get("SITEMAP_TTL", "21600"))
 SITEMAP_CACHE = {"ts": 0, "count": 0, "pages": 0}
 SITEMAP_PAGE_CACHE = {}
 HOLDINGS_COLUMNS = None
+LEGACY_DB_AVAILABLE = None
 SHARED_SHELVES_TABLE_READY = False
 SUBSCRIPTION_TAG_PATTERN = re.compile(r"\s*\[구독형전자책\]\s*")
 
@@ -160,11 +151,43 @@ def _get_holdings_columns(conn):
 
 
 def get_db_conn():
-    return get_db(DB_PATH)
+    return get_db()
+
+
+def _legacy_postgres_tables_available():
+    conn = get_db_conn()
+    try:
+        cur = conn.execute(
+            """
+            SELECT table_name
+              FROM information_schema.tables
+             WHERE table_schema = 'public'
+               AND table_name IN ('books', 'holdings');
+            """
+        )
+        tables = set()
+        for row in cur.fetchall():
+            table_name = row.get("table_name") if isinstance(row, dict) else row[0]
+            if table_name:
+                tables.add(table_name)
+        return {"books", "holdings"}.issubset(tables)
+    finally:
+        conn.close()
 
 
 def legacy_db_available():
-    return using_postgres() or os.path.exists(DB_PATH)
+    global LEGACY_DB_AVAILABLE
+    if LEGACY_DB_AVAILABLE is not None:
+        return LEGACY_DB_AVAILABLE
+    if not using_postgres():
+        LEGACY_DB_AVAILABLE = False
+        return False
+    try:
+        LEGACY_DB_AVAILABLE = _legacy_postgres_tables_available()
+    except Exception as e:
+        print(f"[db warning] legacy books/holdings unavailable: {e}")
+        LEGACY_DB_AVAILABLE = False
+    return LEGACY_DB_AVAILABLE
 
 
 def clean_display_title(value):
