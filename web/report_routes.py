@@ -324,6 +324,7 @@ def _render_reports_page(
         show_topbar=False,
         topbar_desc="",
         active_tab="reports",
+        robots_meta="noindex,nofollow",
     ), status_code
 
 

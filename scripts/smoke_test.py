@@ -689,6 +689,8 @@ def main():
                 os.environ[name] = value
 
     empty_search = assert_response(client, "/api/search")
+    if empty_search.headers.get("X-Robots-Tag") != "noindex, nofollow":
+        raise AssertionError("API responses must send X-Robots-Tag noindex,nofollow")
     payload = empty_search.get_json()
     if payload != {"total": 0, "items": []}:
         raise AssertionError(f"unexpected empty search payload: {payload}")
@@ -697,6 +699,29 @@ def main():
     sitemap_body = sitemap.get_data(as_text=True)
     if "/sitemap-static.xml" not in sitemap_body:
         raise AssertionError("sitemap index did not include static sitemap")
+
+    seo_landing_paths = (
+        "/ebook-search",
+        "/digital-library-search",
+        "/seoul-ebook-library-search",
+    )
+    for path in seo_landing_paths:
+        page = assert_response(client, path)
+        body = page.get_data(as_text=True)
+        if f'href="http://localhost{path}"' not in body and f'href="https://www.soulib.kr{path}"' not in body:
+            raise AssertionError(f"{path} did not render canonical link")
+        if '<meta name="description"' not in body:
+            raise AssertionError(f"{path} did not render meta description")
+        if 'class="landing-search seo-landing-search"' not in body or 'action="/search"' not in body or 'name="q"' not in body:
+            raise AssertionError(f"{path} did not render search form")
+
+    static_sitemap = assert_response(client, "/sitemap-static.xml")
+    static_sitemap_body = static_sitemap.get_data(as_text=True)
+    for path in seo_landing_paths:
+        if path not in static_sitemap_body:
+            raise AssertionError(f"static sitemap did not include {path}")
+    if "/reports" in static_sitemap_body:
+        raise AssertionError("static sitemap should not include /reports")
 
     legacy_book = assert_response(client, "/book/1", expected_status=301)
     if not legacy_book.headers.get("Location", "").endswith("/search"):
@@ -1354,6 +1379,8 @@ def main():
     missing_recent = client.get("/api/reports/recent")
     if missing_recent.status_code != 503:
         raise AssertionError(f"missing report store API returned {missing_recent.status_code}, expected 503")
+    if missing_recent.headers.get("X-Robots-Tag") != "noindex, nofollow":
+        raise AssertionError("reports API must send X-Robots-Tag noindex,nofollow")
     missing_recent_payload = missing_recent.get_json()
     missing_recent_html = missing_recent_payload.get("html") or ""
     if "최근 접수 목록을 잠시 불러오지 못했습니다" not in missing_recent_html:

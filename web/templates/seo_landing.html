@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page.title }}{% endblock %}
+{% block body_class %}page-seo-landing{% endblock %}
+
+{% block content %}
+<div class="seo-landing-shell">
+    <section class="seo-landing-hero" aria-labelledby="seo-landing-title">
+        <p class="seo-landing-kicker">서울 전자도서관 중심</p>
+        <h1 id="seo-landing-title">{{ page.h1 }}</h1>
+        <p class="seo-landing-lead">{{ page.lead }}</p>
+
+        <form class="landing-search seo-landing-search" action="/search" method="get">
+            <label class="sr-only" for="seo-landing-query">검색어</label>
+            <span class="landing-search-brand" aria-hidden="true">
+                <img src="{{ url_for('static', filename='img/icon.png') }}" alt="">
+            </span>
+            <input id="seo-landing-query" name="q" type="search" autocomplete="off" enterkeyhint="search" placeholder="{{ page.placeholder }}" value="{{ page.default_query }}">
+            <button type="submit" aria-label="검색">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="M21 21l-4.3-4.3"></path>
+                </svg>
+            </button>
+        </form>
+
+        <div class="seo-landing-examples" aria-label="예시 검색">
+            {% for label, href in page.examples %}
+            <a href="{{ href }}">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="seo-landing-section" aria-labelledby="seo-support-title">
+        <h2 id="seo-support-title">지원 범위</h2>
+        <div class="seo-landing-list">
+            {% for item in page.support %}
+            <p>{{ item }}</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="seo-landing-section" aria-labelledby="seo-flow-title">
+        <h2 id="seo-flow-title">이용 흐름</h2>
+        <ol class="seo-landing-flow">
+            {% for title, text in flow %}
+            <li>
+                <span>{{ loop.index }}</span>
+                <strong>{{ title }}</strong>
+                <p>{{ text }}</p>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+
+    <section class="seo-landing-section" aria-labelledby="seo-faq-title">
+        <h2 id="seo-faq-title">자주 묻는 질문</h2>
+        <div class="seo-landing-faq">
+            {% for question, answer in page.faq %}
+            <details>
+                <summary>{{ question }}</summary>
+                <p>{{ answer }}</p>
+            </details>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="seo-landing-section seo-landing-related" aria-labelledby="seo-related-title">
+        <h2 id="seo-related-title">관련 안내</h2>
+        <div class="seo-landing-related-links">
+            {% for title, href in related_links %}
+            <a href="{{ href }}">{{ title }}</a>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

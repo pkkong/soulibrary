@@ -110,6 +110,8 @@ def handle_api_cors_preflight():
 @app.after_request
 def add_html_no_cache_headers(response):
     response = _apply_api_cors_headers(response)
+    if _is_api_request():
+        response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
     if response.content_type and response.content_type.startswith("text/html"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
@@ -505,6 +507,116 @@ def _home_structured_data(canonical_url):
     }
 
 
+SEO_LANDING_PAGES = {
+    "ebook-search": {
+        "path": "/ebook-search",
+        "title": "전자책 검색 | 서울 전자도서관 보유 현황 통합검색",
+        "description": "서울 전자도서관의 전자책 보유 도서관과 공급사 경로를 먼저 확인하세요. Soulib에서 검색한 뒤 연결된 기관 화면에서 대출 상태를 확인할 수 있습니다.",
+        "h1": "전자책 검색",
+        "lead": "서울 전자도서관에 있는 책을 먼저 찾고, 보유 도서관과 공급사를 이어서 확인합니다.",
+        "placeholder": "읽고 싶은 책 제목 검색",
+        "default_query": "",
+        "examples": (
+            ("불편한 편의점", "/search?q=%EB%B6%88%ED%8E%B8%ED%95%9C%20%ED%8E%B8%EC%9D%98%EC%A0%90&field=title"),
+            ("아몬드", "/search?q=%EC%95%84%EB%AA%AC%EB%93%9C&field=title"),
+        ),
+        "support": (
+            "서울 지역 공공 전자도서관 보유 현황을 중심으로 확인합니다.",
+            "교보, YES24, 북큐브 등 공급사별 경로를 구분해 보여줍니다.",
+            "도서관 응답이 가능한 경우 대출 가능, 예약, 상태 정보 없음 같은 신호를 함께 표시합니다.",
+        ),
+        "faq": (
+            ("전자책 전체를 검색하나요?", "아닙니다. Soulib은 서울 전자도서관에서 확인 가능한 전자책 보유 현황을 중심으로 검색합니다."),
+            ("검색 결과에서 바로 읽을 수 있나요?", "책을 고른 뒤 연결된 도서관 또는 공급사 화면에서 로그인하고 대출 상태를 확인해야 합니다."),
+            ("같은 책이 여러 개 나오면 어떻게 보나요?", "제목, 저자, 출판사를 함께 보고 내가 이용할 수 있는 도서관 결과를 먼저 확인하세요."),
+            ("상태 정보 없음은 무슨 뜻인가요?", "도서관이나 공급사 응답이 느리거나 상태를 공개하지 않는 경우입니다. 링크를 열어 직접 확인할 수 있습니다."),
+        ),
+    },
+    "digital-library-search": {
+        "path": "/digital-library-search",
+        "title": "전자도서관 검색 | 서울 전자도서관 공급사 경로 확인",
+        "description": "교보 전자도서관, YES24 전자도서관, 북큐브 전자도서관 등 서울 전자도서관 공급사 경로를 책 제목으로 먼저 좁혀보세요.",
+        "h1": "전자도서관 검색",
+        "lead": "도서관마다 다른 전자책 공급사를 한 번에 훑고, 내가 이용할 수 있는 기관으로 이동합니다.",
+        "placeholder": "책 제목 또는 저자 검색",
+        "default_query": "",
+        "examples": (
+            ("역행자", "/search?q=%EC%97%AD%ED%96%89%EC%9E%90&field=title"),
+            ("김초엽", "/search?q=%EA%B9%80%EC%B4%88%EC%97%BD&field=author"),
+        ),
+        "support": (
+            "도서관별로 흩어진 전자책 보유처를 검색 결과에서 먼저 비교합니다.",
+            "공급사 앱이 달라지는 경우를 상세 화면에서 확인할 수 있습니다.",
+            "검색 결과가 적을 때는 제목 일부, 저자명, 출판사를 바꿔 다시 좁힐 수 있습니다.",
+        ),
+        "faq": (
+            ("교보, YES24, 북큐브를 모두 지원하나요?", "지원 도서관에서 공개되는 범위 안에서 공급사별 결과를 모아 보여줍니다."),
+            ("도서관 회원이 아니어도 검색할 수 있나요?", "검색은 가능하지만 대출은 각 도서관 회원 자격과 로그인 정책을 따릅니다."),
+            ("예약 중인 책도 보이나요?", "확인 가능한 경우 예약 또는 대출 가능 상태를 표시합니다. 최종 상태는 기관 화면에서 한 번 더 확인하세요."),
+            ("서울 밖 도서관도 포함되나요?", "현재 포지셔닝은 서울 전자도서관 중심입니다. 서울 외 기관은 기본 약속 범위로 두지 않습니다."),
+        ),
+    },
+    "seoul-ebook-library-search": {
+        "path": "/seoul-ebook-library-search",
+        "title": "서울 전자도서관 검색 | 서울시 전자책 보유 도서 확인",
+        "description": "서울도서관과 서울 지역 전자도서관에서 찾을 수 있는 전자책 보유 경로를 검색하고, 연결된 기관 화면에서 대출 가능 여부를 확인하세요.",
+        "h1": "서울 전자도서관 검색",
+        "lead": "서울에서 이용할 수 있는 전자책을 책 제목으로 찾고, 보유 도서관과 공급사를 차분히 비교합니다.",
+        "placeholder": "서울 전자도서관에서 찾을 책",
+        "default_query": "",
+        "examples": (
+            ("세이노의 가르침", "/search?q=%EC%84%B8%EC%9D%B4%EB%85%B8%EC%9D%98%20%EA%B0%80%EB%A5%B4%EC%B9%A8&field=title"),
+            ("정세랑", "/search?q=%EC%A0%95%EC%84%B8%EB%9E%91&field=author"),
+        ),
+        "support": (
+            "서울도서관, 자치구 도서관, 교육청 계열 전자도서관 이용 흐름을 염두에 둡니다.",
+            "책 상세 화면에서 도서관과 공급사 경로를 나누어 확인합니다.",
+            "서울온, 도서관 회원증, 공급사 앱 준비가 필요한 경우 관련 안내 글로 이어집니다.",
+        ),
+        "faq": (
+            ("서울도서관 공식 서비스인가요?", "아닙니다. Soulib은 서울 전자도서관 보유 경로를 찾기 쉽게 정리한 별도 검색 서비스입니다."),
+            ("서울온만 있으면 바로 대출되나요?", "도서관마다 회원 자격과 전자책 이용 정책이 다릅니다. 서울온은 회원증 확인의 출발점으로 보면 됩니다."),
+            ("어느 도서관을 먼저 보면 좋나요?", "이미 회원인 도서관, 거주지 자치구 도서관, 서울도서관 순서로 확인하면 시행착오가 줄어듭니다."),
+            ("앱은 어떤 것을 설치해야 하나요?", "선택한 책이 연결되는 공급사에 따라 교보, YES24, 북큐브, See 같은 앱이 달라질 수 있습니다."),
+        ),
+    },
+}
+
+SEO_LANDING_FLOW = (
+    ("책 검색", "제목이나 저자명으로 먼저 좁힙니다."),
+    ("보유 도서관 확인", "내가 이용할 수 있는 도서관을 고릅니다."),
+    ("기관 화면에서 대출", "연결된 화면에서 로그인과 상태를 확인합니다."),
+    ("공급사 앱에서 열기", "안내되는 앱에서 대출한 책을 엽니다."),
+)
+
+SEO_LANDING_RELATED_LINKS = (
+    ("서울 전자도서관에서 책 찾는 법", "/blog/seoul-ebook-library-search-guide"),
+    ("전자도서관 검색 결과가 안 나올 때 확인할 것", "/blog/ebook-library-no-results-check"),
+    ("전자도서관 검색과 전자책 통합검색을 빠르게 하는 방법", "/blog/ebook-search-guide"),
+    ("서울 전자도서관을 처음 이용할 때 준비할 것", "/blog/seoul-on-library-guide"),
+)
+
+
+def _seo_landing_structured_data(page, canonical_url):
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": page["title"],
+        "url": canonical_url,
+        "description": page["description"],
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "서울시 전자도서 통합검색",
+            "url": _public_url("/"),
+        },
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": _public_url("/search?q={search_term_string}"),
+            "query-input": "required name=search_term_string",
+        },
+    }
+
+
 def _sitemap_stats():
     now = time.time()
     cached = SITEMAP_CACHE
@@ -848,7 +960,7 @@ def search_page():
     meta_title = "검색 - 서울시 전자도서 통합검색"
     meta_description = (
         "책 제목이나 저자로 전자도서관 보유 현황을 실시간 검색하세요. "
-        "교보, YES24, 북큐브, 부커스 등 서울 전자도서관의 전자책과 이북 대출 가능 여부를 확인합니다."
+        "교보, YES24, 북큐브, 부커스 등 서울 전자도서관의 전자책과 확인 가능한 대출 상태를 함께 봅니다."
     )
     return render_template(
         "search.html",
@@ -864,6 +976,34 @@ def search_page():
         og_title=meta_title,
         og_description=meta_description,
         og_url=canonical_url,
+    )
+
+
+@app.route("/ebook-search")
+@app.route("/digital-library-search")
+@app.route("/seoul-ebook-library-search")
+def seo_landing_page():
+    slug = request.path.strip("/")
+    page = SEO_LANDING_PAGES.get(slug)
+    if not page:
+        abort(404)
+
+    canonical_url = _public_url(page["path"])
+    return render_template(
+        "seo_landing.html",
+        page=page,
+        flow=SEO_LANDING_FLOW,
+        related_links=SEO_LANDING_RELATED_LINKS,
+        show_topbar=False,
+        topbar_desc="",
+        active_tab="home",
+        canonical_url=canonical_url,
+        meta_title=page["title"],
+        meta_description=page["description"],
+        og_title=page["title"],
+        og_description=page["description"],
+        og_url=canonical_url,
+        structured_data=_seo_landing_structured_data(page, canonical_url),
     )
 
 
@@ -1204,7 +1344,12 @@ def sitemap_index():
 def sitemap_static():
     base = _sitemap_base_url()
     today = time.strftime("%Y-%m-%d")
-    urls = [f"{base}/", f"{base}/search", f"{base}/blog", f"{base}/reports"]
+    urls = [
+        f"{base}/",
+        f"{base}/search",
+        f"{base}/blog",
+        *(f"{base}{page['path']}" for page in SEO_LANDING_PAGES.values()),
+    ]
     urls.extend(f"{base}/blog/{post['slug']}" for post in get_blog_posts())
     urls.extend(f"{base}/books/{book['slug']}" for book in get_seo_books())
     parts = ['<?xml version="1.0" encoding="UTF-8"?>']
