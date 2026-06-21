@@ -37,6 +37,16 @@ VERCEL_PROJECT_ID
 
 `VERCEL_TOKEN`은 Vercel access token이며, 현재 운영 기준 이름은 `soulib-github-actions-deploy`입니다. 토큰 값은 GitHub Actions secrets에만 두고 문서, 로그, `.env`, `.secrets/`에 남기지 않습니다.
 
+브라우저 콘솔을 열지 않고 GitHub 쪽 설정 상태를 확인할 때는 `gh` CLI를 사용합니다. 아래 명령은 secret 값을 보여주지 않고 이름과 갱신 시각만 보여줍니다.
+
+```bash
+gh secret list --repo pkkong/soulibrary
+gh variable list --repo pkkong/soulibrary
+gh run list --repo pkkong/soulibrary --limit 5
+```
+
+secret 값을 교체할 때도 채팅이나 shell history에 값을 남기지 않습니다. `gh secret set <NAME> --repo pkkong/soulibrary`를 실행한 뒤 표준입력으로 넣거나 GitHub UI에서 직접 넣습니다.
+
 ## Vercel Runtime Env
 
 Vercel production에는 아래 값이 필요합니다.
@@ -166,6 +176,16 @@ Search Console secret 관리:
 - 주간 저위험 수정 후보: technical SEO 수정이나 문서화 가능한 개선안을 queue로 정리합니다. 자동화가 직접 PR을 만들지는 않고, 메인 리뷰 후 필요한 경우 별도 PR로 진행합니다.
 
 ## Secret Rotation
+
+Secret hygiene check:
+
+```bash
+.venv/bin/python scripts/check_secret_hygiene.py --inventory
+```
+
+이 명령은 로컬 `.env`, `.secrets`, Vercel/Supabase link metadata의 키 이름과 파일명만 보여주고 값은 출력하지 않습니다. CI에서는 `python scripts/check_secret_hygiene.py`가 tracked 파일에 private key, GitHub token, JWT, literal DB URL, 공공 API key 기본값이 들어갔는지 확인합니다.
+
+2026-06-21 점검에서 과거 `web/config.py`에 공공 API key 기본값이 tracked code와 Git history에 남아 있던 것을 제거했습니다. 현재 tracked 파일에는 같은 값이 남아 있지 않지만, 해당 키는 발급처에서 재발급 또는 폐기하고 새 값은 로컬 `.env`나 운영 secret에만 둡니다.
 
 Vercel deploy token을 교체할 때:
 

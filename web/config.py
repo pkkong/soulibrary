@@ -96,11 +96,8 @@ CRAWLER_DIR = os.path.join(ROOT_DIR, "crawler")
 STATUS_FILE = os.path.join(DATA_DIR, "crawler_status.json")
 
 # API keys
-ODCLOUD_API_KEY = os.environ.get(
-    "ODCLOUD_API_KEY",
-    "0R7RBsF2YmoEs3gIwDmbZyv/SYGXCeJwZWyhhlsvX3qcSuGu89uzFL9/sODpXk3tmHa2nt7DP7yZJ/4RJ14FEA==",
-).strip()
-SEOUL_API_KEY = os.environ.get("SEOUL_API_KEY", "745942496d6b6f6e383774624c4c56").strip()
+ODCLOUD_API_KEY = os.environ.get("ODCLOUD_API_KEY", "").strip()
+SEOUL_API_KEY = os.environ.get("SEOUL_API_KEY", "").strip()
 
 # Library definitions
 LIBRARIES = {
