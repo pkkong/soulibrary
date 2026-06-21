@@ -17,9 +17,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 IGNORED_PATHS = [
     ".env",
-    ".secrets",
+    ".secrets/",
     ".vercel",
-    "supabase/.temp",
+    "supabase/.temp/",
 ]
 SECRET_PATTERNS = [
     (
