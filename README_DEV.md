@@ -136,6 +136,44 @@ python scripts/search_console_report.py --authorize
 python scripts/search_console_report.py
 ```
 
+Search Console 인증값을 다룰 때는 token 원문이나 JSON 본문을 출력하지 않습니다. 실패 보고에는 secret 이름, 파일 경로, 권한 상태, 재인증 필요 여부만 남깁니다.
+
+## SEO 자동 개선
+
+SEO 자동화는 production 지표를 읽고 개선 후보를 만드는 보조 루프입니다.
+
+```text
+측정
+-> 진단
+-> 저위험 자동 수정 후보
+-> 콘텐츠/UX 개선안
+-> QA
+-> PR 또는 초안
+-> 배포 검증
+```
+
+기본 권한은 issue, Growth Queue, 자동 점검 결과와 사람 검토용 초안 작성까지입니다. 글 본문, 랜딩 문구, 이미지, 사용자-facing UI는 자동 발행하지 않습니다.
+
+역할은 아래처럼 분리합니다.
+
+- Growth Analyst: Search Console과 production 지표를 분석하고 우선순위를 정합니다.
+- Technical SEO Worker: robots, sitemap, metadata, canonical, structured data 같은 저위험 기술 SEO 후보를 PR로 만듭니다.
+- Content Writer: 콘텐츠나 랜딩 문구 초안을 작성하되 직접 발행하지 않습니다.
+- Editor/Fact Checker: 문체, 사실관계, Soulib 검색 연결, 이미지 적합성을 검수합니다.
+- QA/Release Worker: smoke test, live smoke, 배포 후 production 상태를 확인합니다.
+
+운영 주기는 매일 audit, 주간 Growth Queue issue, 주간 저위험 수정 후보 정리를 기본으로 합니다. 자동화는 후보를 정리할 뿐이며, 실제 코드/콘텐츠 PR은 QA와 메인 리뷰 전에는 만들거나 병합하지 않습니다.
+
+Search Console 검색어와 페이지 성과는 운영 데이터입니다. GitHub issue, PR 본문, Actions artifact에는 원시 query/page/CTR/position을 그대로 올리지 않고 요약된 공개용 문구만 남깁니다. 원본 JSON은 job 내부 또는 로컬 파일로만 확인합니다.
+
+GitHub Actions에서 SEO 자동화를 실제 지표 기반으로 돌리려면 아래 값이 필요합니다. 값 원문은 로그에 출력하지 않습니다.
+
+```text
+Repository variable: GSC_SITE_URL=https://www.soulib.kr/
+Repository variable: PRODUCTION_BASE_URL=https://www.soulib.kr
+Repository secret: GSC_SERVICE_ACCOUNT_JSON 또는 GSC_OAUTH_TOKEN_JSON
+```
+
 ## 배포
 
 `main`에 push 또는 merge되면 GitHub Actions가 먼저 smoke test를 실행합니다. smoke test가 통과하면 Vercel CLI가 production 배포를 실행하고, `https://www.soulib.kr` 기준 live smoke test를 다시 실행합니다.

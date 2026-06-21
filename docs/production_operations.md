@@ -120,6 +120,51 @@ live smoke는 아래를 확인합니다.
 - `/api/search`
 - 공유 서재 생성/조회
 
+## SEO 자동 개선 운영
+
+SEO 자동화는 자동 발행 장치가 아니라 측정과 개선 후보를 안정적으로 만드는 운영 루프입니다.
+
+기본 루프:
+
+```text
+Search Console/production 측정
+-> 진단
+-> 저위험 자동 수정 후보
+-> 콘텐츠/UX 개선안
+-> QA
+-> PR 또는 초안
+-> 배포 후 production 검증
+```
+
+권한 경계:
+
+- 기본 권한은 GitHub issue, queue, 자동 점검 결과와 사람 검토용 초안 생성까지입니다.
+- 글 본문, 랜딩 문구, 이미지, 사용자-facing UI는 자동 발행하지 않습니다.
+- 저위험 자동 수정 후보는 queue로 정리하고, 실제 PR은 QA/Release Worker 검증과 메인 리뷰가 가능한 경우에만 별도로 만듭니다.
+- technical metadata나 문서 정리처럼 영향이 작은 변경도 `python scripts/smoke_test.py`, `git diff --check`, production live smoke를 통과해야 합니다.
+
+역할 분리:
+
+- Growth Analyst: Search Console과 production 지표를 읽고 하락/기회/우선순위를 진단합니다.
+- Technical SEO Worker: robots, sitemap, metadata, canonical, structured data 같은 기술 SEO 후보를 PR로 만듭니다.
+- Content Writer: 신규 글이나 랜딩 문구 초안을 작성하되 직접 발행하지 않습니다.
+- Editor/Fact Checker: 콘텐츠 사실관계, Soulib 검색 연결, 표현 품질, 이미지 적합성을 검수하고 반려할 수 있습니다.
+- QA/Release Worker: smoke test, live smoke, Search Console 설정 영향, 배포 후 검증을 확인합니다.
+
+Search Console secret 관리:
+
+- credential과 token JSON은 `.secrets/`, GitHub Actions secrets, 운영 secret에만 보관합니다.
+- 서비스 계정 key, OAuth client JSON, OAuth token 내용은 로그, 문서, PR 본문, issue 댓글에 출력하지 않습니다.
+- 인증 문제를 보고할 때는 파일 경로, secret 이름, 권한 상태만 남기고 토큰 원문이나 JSON 본문은 남기지 않습니다.
+- GitHub Actions에서는 repository variable `GSC_SITE_URL`, `PRODUCTION_BASE_URL`과 repository secret `GSC_SERVICE_ACCOUNT_JSON` 또는 `GSC_OAUTH_TOKEN_JSON`을 사용합니다.
+- Search Console 검색어와 페이지 성과는 운영 데이터입니다. GitHub issue, PR 본문, Actions artifact에는 원시 query/page/CTR/position을 그대로 올리지 않고 요약된 공개용 문구만 남깁니다. 원본 JSON은 job 내부 또는 로컬 파일로만 확인합니다.
+
+운영 주기:
+
+- 매일 audit: Search Console 지표, 색인/크롤링 이상, 주요 landing page 상태, production smoke 신호를 확인합니다.
+- 주간 Growth Queue issue: 발견한 기회와 위험을 우선순위, 예상 영향, 필요한 역할로 묶어 정리합니다.
+- 주간 저위험 수정 후보: technical SEO 수정이나 문서화 가능한 개선안을 queue로 정리합니다. 자동화가 직접 PR을 만들지는 않고, 메인 리뷰 후 필요한 경우 별도 PR로 진행합니다.
+
 ## Secret Rotation
 
 Vercel deploy token을 교체할 때:

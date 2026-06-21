@@ -48,10 +48,20 @@
 - UI/UX 변경은 UX/UI Designer가 방향을 잡고 Frontend Worker가 구현한다. 심미 리스크가 있으면 모바일/데스크톱 스크린샷을 남긴다.
 - 원인 불명 버그는 Explorer가 먼저 재현과 영향 범위를 찾고, 구현 Worker는 별도로 둔다.
 - 배포 감시는 성공하면 자동화를 멈추고, 평시 Ops Watcher는 과도하게 자주 돌리지 않는다.
+- SEO 자동 개선은 `측정 -> 진단 -> 저위험 자동 수정 후보 -> 콘텐츠/UX 개선안 -> QA -> 배포 검증` 루프로 운영한다.
+- SEO 자동화의 기본 권한은 GitHub issue, Growth Queue, 자동 점검 결과와 사람 검토용 초안까지이며 글/랜딩 문구/이미지/UI 자동 발행은 금지한다.
+- SEO 작업은 Growth Analyst, Technical SEO Worker, Content Writer, Editor/Fact Checker, QA/Release Worker 역할을 분리한다.
+- Search Console credential과 token은 `.secrets/`, GitHub Actions secrets, 운영 secret에만 두고 로그/문서/issue/PR에 원문을 출력하지 않는다.
 - 메인 채팅방은 최종 판단과 커밋/배포를 맡되, 혼자 구현부터 검수까지 끝내지 않는다.
 - `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 같은 지시서/MD 운영 규칙 변경은 기본적으로 Instruction Steward Worker가 맡는다.
 - 반복 지적이 나오면 Instruction Update Loop로 지적 내용을 관련 문서 규칙에 반영하고, 최종 보고에 `사용자 지적 -> 반영 문서/규칙` 매핑을 남긴다.
 - 블로그, 디자인, 버그, 운영 자동화에서 새 문제가 나오면 해당 가이드 문서 갱신 필요성도 함께 검토한다.
+
+## SEO/Growth 운영 큐
+
+- 매일 audit: Search Console 성과, 색인/크롤링 이상, 주요 landing page 상태, production smoke 신호를 확인한다.
+- 주간 Growth Queue issue: 기회와 위험을 우선순위, 예상 영향, 담당 역할, QA 필요 여부로 정리한다.
+- 주간 저위험 수정 후보: technical SEO 수정이나 문서성 개선안을 queue로 정리하되 자동 PR/merge는 하지 않는다.
 
 ## 커밋 금지
 

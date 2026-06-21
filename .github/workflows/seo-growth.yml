@@ -1,0 +1,203 @@
+name: SEO Growth
+
+on:
+  schedule:
+    # 07:20 KST daily. Weekly KST Monday and Thursday schedules run the same audit
+    # and then add the queue/candidate step.
+    - cron: "20 22 * * 1,2,4,5,6"
+    - cron: "20 22 * * 0"
+    - cron: "20 22 * * 3"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "audit"
+        type: choice
+        options:
+          - audit
+          - queue-issue
+          - draft-pr
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-growth-${{ github.event_name }}-${{ github.event.schedule || inputs.mode || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    outputs:
+      run_mode: ${{ steps.mode.outputs.run_mode }}
+      run_date: ${{ steps.mode.outputs.run_date }}
+      dry_run: ${{ steps.audit_meta.outputs.dry_run }}
+    env:
+      GSC_SITE_URL: ${{ vars.GSC_SITE_URL }}
+      GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
+      GSC_OAUTH_TOKEN_JSON: ${{ secrets.GSC_OAUTH_TOKEN_JSON }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL || 'https://www.soulib.kr' }}
+    steps:
+      - name: Resolve run mode
+        id: mode
+        run: |
+          set -euo pipefail
+          run_date="$(TZ=Asia/Seoul date +%F)"
+          run_mode="${{ inputs.mode || 'audit' }}"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            case "${{ github.event.schedule }}" in
+              "20 22 * * 0") run_mode="queue-issue" ;;
+              "20 22 * * 3") run_mode="draft-pr" ;;
+              *) run_mode="audit" ;;
+            esac
+          fi
+          echo "run_mode=$run_mode" >> "$GITHUB_OUTPUT"
+          echo "run_date=$run_date" >> "$GITHUB_OUTPUT"
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-data.txt
+
+      - name: Restore SEO growth state
+        uses: actions/cache/restore@v4
+        with:
+          path: .seo-growth-state
+          key: seo-growth-state-${{ steps.mode.outputs.run_date }}
+          restore-keys: |
+            seo-growth-state-
+
+      - name: Run SEO growth audit
+        run: |
+          set -euo pipefail
+          mkdir -p .seo-growth-state
+          inspection_limit=0
+          if [ "${{ steps.mode.outputs.run_mode }}" = "queue-issue" ]; then
+            inspection_limit=20
+          fi
+
+          audit_args=(
+            --base-url "$PRODUCTION_BASE_URL"
+            --url-inspection-limit "$inspection_limit"
+            --state-file .seo-growth-state/state.json
+            --write-state
+          )
+          if [ -n "${GSC_SITE_URL:-}" ]; then
+            audit_args+=(--site-url "$GSC_SITE_URL")
+          fi
+          if [ -z "${GSC_SERVICE_ACCOUNT_JSON:-}" ] && [ -z "${GSC_OAUTH_TOKEN_JSON:-}" ]; then
+            audit_args+=(--dry-run)
+          fi
+          if [ -z "${GSC_SITE_URL:-}" ]; then
+            audit_args+=(--dry-run)
+          fi
+
+          python scripts/seo_growth_audit.py "${audit_args[@]}" > seo-growth-audit.json
+          python -m json.tool seo-growth-audit.json > /dev/null
+
+      - name: Save SEO growth state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .seo-growth-state
+          key: seo-growth-state-${{ steps.mode.outputs.run_date }}-${{ github.run_id }}
+
+      - name: Read audit metadata
+        id: audit_meta
+        run: |
+          dry_run="$(python -c 'import json; print(str(json.load(open("seo-growth-audit.json")).get("dry_run", False)).lower())')"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+      - name: Plan SEO opportunities
+        run: |
+          python scripts/seo_opportunity_planner.py \
+            seo-growth-audit.json \
+            --json-output seo-growth-plan-private.json \
+            --public-json-output seo-growth-plan-public.json \
+            --github-issue-md seo-growth-issue.md \
+            --public-summary \
+            > /dev/null
+
+      - name: Upload SEO growth artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-growth-${{ steps.mode.outputs.run_date }}-${{ steps.mode.outputs.run_mode }}
+          path: |
+            seo-growth-plan-public.json
+            seo-growth-issue.md
+          retention-days: 30
+
+  weekly-queue-issue:
+    needs: audit
+    if: needs.audit.outputs.run_mode == 'queue-issue' && needs.audit.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download SEO growth artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: seo-growth-${{ needs.audit.outputs.run_date }}-${{ needs.audit.outputs.run_mode }}
+
+      - name: Create or update weekly SEO queue issue
+        run: |
+          set -euo pipefail
+          existing_issue="$(gh issue list \
+            --state open \
+            --search "[SEO] Growth Queue in:title" \
+            --json number \
+            --jq '.[0].number // ""')"
+          if [ -n "$existing_issue" ]; then
+            gh issue edit "$existing_issue" \
+              --title "[SEO] Growth Queue" \
+              --body-file seo-growth-issue.md
+            echo "Updated SEO queue issue: #$existing_issue"
+          else
+            gh issue create \
+              --title "[SEO] Growth Queue" \
+              --body-file seo-growth-issue.md
+          fi
+
+  weekly-draft-candidate:
+    needs: audit
+    if: needs.audit.outputs.run_mode == 'draft-pr' && needs.audit.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download SEO growth artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: seo-growth-${{ needs.audit.outputs.run_date }}-${{ needs.audit.outputs.run_mode }}
+
+      - name: Print draft candidate summary
+        run: |
+          set -euo pipefail
+          opportunity_count="$(python -c 'import json; print(sum(1 for item in json.load(open("seo-growth-plan-public.json")).get("opportunities", []) if item.get("automation_level") == "auto_patch_candidate"))')"
+          if [ "$opportunity_count" = "0" ]; then
+            echo "No low-risk technical SEO candidates crossed thresholds."
+            exit 0
+          fi
+
+          echo "Low-risk technical SEO candidates exist. Open the SEO growth artifact and create a reviewed PR manually if the suggested patch is still valid."
