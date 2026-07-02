@@ -136,6 +136,12 @@ python scripts/search_console_report.py --authorize
 python scripts/search_console_report.py
 ```
 
+GitHub Actions용 OAuth token을 갱신할 때도 값은 출력하지 않고 파일에서 바로 secret으로 넣습니다.
+
+```bash
+gh secret set GSC_OAUTH_TOKEN_JSON --repo pkkong/soulibrary < .secrets/search-console-oauth-token.json
+```
+
 Search Console 인증값을 다룰 때는 token 원문이나 JSON 본문을 출력하지 않습니다. 실패 보고에는 secret 이름, 파일 경로, 권한 상태, 재인증 필요 여부만 남깁니다.
 
 로컬 secret 상태와 tracked 파일 노출 여부는 아래 명령으로 확인합니다. 출력에는 값이 아니라 키 이름, 파일명, 패턴명만 나옵니다.
@@ -179,6 +185,8 @@ Repository variable: GSC_SITE_URL=https://www.soulib.kr/
 Repository variable: PRODUCTION_BASE_URL=https://www.soulib.kr
 Repository secret: GSC_SERVICE_ACCOUNT_JSON 또는 GSC_OAUTH_TOKEN_JSON
 ```
+
+OAuth token이 만료되거나 refresh에 실패하면 `SEO Growth`는 실패로 쌓이지 않고 dry-run으로 내려갑니다. 이 상태에서는 Search Console 원시 지표 기반 issue/초안 job은 건너뛰며, 실제 지표 자동화를 복구하려면 위 명령으로 `GSC_OAUTH_TOKEN_JSON`을 갱신하거나 장기 운영용 `GSC_SERVICE_ACCOUNT_JSON`으로 전환합니다.
 
 ## 배포
 

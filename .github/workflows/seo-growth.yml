@@ -102,7 +102,20 @@ jobs:
             audit_args+=(--dry-run)
           fi
 
-          python scripts/seo_growth_audit.py "${audit_args[@]}" > seo-growth-audit.json
+          set +e
+          python scripts/seo_growth_audit.py "${audit_args[@]}" > seo-growth-audit.json 2> seo-growth-audit.err
+          audit_status=$?
+          set -e
+          if [ "$audit_status" -ne 0 ]; then
+            if grep -Eq "OAuth token refresh failed|OAuth token file does not exist|OAuth token JSON is not valid|OAuth token file is not valid|Missing Search Console credentials|Search Console credential file does not exist|Missing OAuth client file|OAuth client file does not exist" seo-growth-audit.err; then
+              echo "::warning title=Search Console auth unavailable::Search Console credentials could not be used. Falling back to dry-run; refresh GSC_OAUTH_TOKEN_JSON or set GSC_SERVICE_ACCOUNT_JSON for real metrics."
+              python scripts/seo_growth_audit.py "${audit_args[@]}" --dry-run > seo-growth-audit.json
+            else
+              cat seo-growth-audit.err >&2
+              exit "$audit_status"
+            fi
+          fi
+          rm -f seo-growth-audit.err
           python -m json.tool seo-growth-audit.json > /dev/null
 
       - name: Save SEO growth state
