@@ -144,6 +144,8 @@ gh secret set GSC_OAUTH_TOKEN_JSON --repo pkkong/soulibrary < .secrets/search-co
 
 Search Console 인증값을 다룰 때는 token 원문이나 JSON 본문을 출력하지 않습니다. 실패 보고에는 secret 이름, 파일 경로, 권한 상태, 재인증 필요 여부만 남깁니다.
 
+Search Console 스크립트의 인증 실패 처리 기준은 `--auth-failure-mode dry-run|fail`입니다. 기본값은 `dry-run`이며, token 만료나 권한 실패가 나도 빈 지표 JSON을 출력하고 exit 0으로 끝내서 GitHub Actions에 빨간 실패를 쌓지 않습니다. 실제 지표 복구 검증이나 CI에서 반드시 실패시켜야 하는 점검에는 `--auth-failure-mode fail`을 명시합니다.
+
 로컬 secret 상태와 tracked 파일 노출 여부는 아래 명령으로 확인합니다. 출력에는 값이 아니라 키 이름, 파일명, 패턴명만 나옵니다.
 
 ```bash
@@ -186,7 +188,7 @@ Repository variable: PRODUCTION_BASE_URL=https://www.soulib.kr
 Repository secret: GSC_SERVICE_ACCOUNT_JSON 또는 GSC_OAUTH_TOKEN_JSON
 ```
 
-OAuth token이 만료되거나 refresh에 실패하면 `SEO Growth`는 실패로 쌓이지 않고 dry-run으로 내려갑니다. 이 상태에서는 Search Console 원시 지표 기반 issue/초안 job은 건너뛰며, 실제 지표 자동화를 복구하려면 위 명령으로 `GSC_OAUTH_TOKEN_JSON`을 갱신하거나 장기 운영용 `GSC_SERVICE_ACCOUNT_JSON`으로 전환합니다.
+OAuth token이 만료되거나 refresh에 실패하면 `SEO Growth`는 스크립트의 기본 `dry-run` fallback에 맡깁니다. 이 상태에서는 Search Console 원시 지표 기반 issue/초안 job은 건너뛰며, 실제 지표 자동화를 안정적으로 복구하려면 만료될 수 있는 `GSC_OAUTH_TOKEN_JSON`보다 `GSC_SERVICE_ACCOUNT_JSON` 전환을 우선합니다.
 
 ## 배포
 

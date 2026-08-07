@@ -10,9 +10,21 @@ SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
 DEFAULT_OAUTH_TOKEN_FILE = ".secrets/search-console-oauth-token.json"
 
 
+class SearchConsoleAuthUnavailable(RuntimeError):
+    pass
+
+
 def fail(message, exit_code=2):
     print(f"ERROR: {message}", file=sys.stderr)
     raise SystemExit(exit_code)
+
+
+def auth_unavailable(message):
+    raise SearchConsoleAuthUnavailable(message)
+
+
+def warn(message):
+    print(f"WARNING: {message}", file=sys.stderr)
 
 
 def load_google_modules():
@@ -41,17 +53,23 @@ def load_service_account_credentials(service_account, credentials_file, credenti
         try:
             info = json.loads(credentials_json)
         except json.JSONDecodeError as exc:
-            fail(f"GSC_SERVICE_ACCOUNT_JSON is not valid JSON: {exc}")
-        return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+            auth_unavailable(f"GSC_SERVICE_ACCOUNT_JSON is not valid JSON: {exc}")
+        try:
+            return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+        except Exception as exc:
+            auth_unavailable(f"GSC_SERVICE_ACCOUNT_JSON could not be loaded: {exc}")
 
     if not credentials_file:
-        fail(f"Missing Search Console credentials. {credential_help()}")
+        auth_unavailable(f"Missing Search Console credentials. {credential_help()}")
 
     path = Path(credentials_file).expanduser()
     if not path.exists():
-        fail(f"Search Console credential file does not exist: {path}")
+        auth_unavailable(f"Search Console credential file does not exist: {path}")
 
-    return service_account.Credentials.from_service_account_file(str(path), scopes=SCOPES)
+    try:
+        return service_account.Credentials.from_service_account_file(str(path), scopes=SCOPES)
+    except Exception as exc:
+        auth_unavailable(f"Search Console credential file could not be loaded: {exc}")
 
 
 def load_oauth_credentials(client_file, token_file, authorize):
@@ -67,7 +85,7 @@ def load_oauth_credentials(client_file, token_file, authorize):
         try:
             credentials = Credentials.from_authorized_user_file(str(token_path), SCOPES)
         except ValueError:
-            fail(
+            auth_unavailable(
                 "OAuth token file is not valid for Search Console access. "
                 "Run with --authorize to create a fresh token."
             )
@@ -79,30 +97,30 @@ def load_oauth_credentials(client_file, token_file, authorize):
         try:
             credentials.refresh(Request())
         except Exception:
-            fail("OAuth token refresh failed. Run with --authorize to create a fresh token.")
+            auth_unavailable("OAuth token refresh failed. Run with --authorize to create a fresh token.")
         write_oauth_token(token_path, credentials)
         return credentials
 
     if not authorize:
         if token_path.exists():
-            fail(
+            auth_unavailable(
                 "OAuth token is missing, expired, or cannot be refreshed. "
                 "Run with --authorize to create a fresh token."
             )
-        fail(
+        auth_unavailable(
             f"OAuth token file does not exist: {token_path}. "
             "Run with --authorize after setting GSC_OAUTH_CLIENT_FILE."
         )
 
     if not client_file:
-        fail(
+        auth_unavailable(
             "Missing OAuth client file. Set GSC_OAUTH_CLIENT_FILE or pass "
             "--oauth-client-file before running --authorize."
         )
 
     client_path = Path(client_file).expanduser()
     if not client_path.exists():
-        fail(f"OAuth client file does not exist: {client_path}")
+        auth_unavailable(f"OAuth client file does not exist: {client_path}")
 
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -159,18 +177,18 @@ def load_credentials(service_account, args):
         )
 
     if args.credentials_file:
-        fail(
+        auth_unavailable(
             f"Search Console credential file does not exist: "
             f"{Path(args.credentials_file).expanduser()}. {credential_help()}"
         )
 
-    fail(f"Missing Search Console credentials. {credential_help()}")
+    auth_unavailable(f"Missing Search Console credentials. {credential_help()}")
 
 
 def validate_credential_source(args):
     if args.authorize:
         if not args.oauth_client_file:
-            fail(
+            auth_unavailable(
                 "Missing OAuth client file. Set GSC_OAUTH_CLIENT_FILE or pass "
                 "--oauth-client-file before running --authorize."
             )
@@ -185,19 +203,19 @@ def validate_credential_source(args):
     if args.oauth_client_file or args.oauth_token_file:
         token_path = Path(args.oauth_token_file or DEFAULT_OAUTH_TOKEN_FILE).expanduser()
         if not token_path.exists():
-            fail(
+            auth_unavailable(
                 f"OAuth token file does not exist: {token_path}. "
                 "Run with --authorize after setting GSC_OAUTH_CLIENT_FILE."
             )
         return
 
     if args.credentials_file:
-        fail(
+        auth_unavailable(
             f"Search Console credential file does not exist: "
             f"{Path(args.credentials_file).expanduser()}. {credential_help()}"
         )
 
-    fail(f"Missing Search Console credentials. {credential_help()}")
+    auth_unavailable(f"Missing Search Console credentials. {credential_help()}")
 
 
 def query_search_analytics(
@@ -274,6 +292,34 @@ def summarize_period(service, site_url, end_date, days, row_limit):
     }
 
 
+def empty_period(end_date, days):
+    start_date = end_date - timedelta(days=days - 1)
+    return {
+        "days": days,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "summary": normalize_row({}),
+        "top_queries": [],
+        "top_pages": [],
+    }
+
+
+def auth_fallback_report(args, end_date):
+    return {
+        "site_url": args.site_url,
+        "generated_date": date.today().isoformat(),
+        "dry_run": True,
+        "search_console_unavailable": True,
+        "risk_notes": [
+            "Search Console credentials were unavailable; returned an empty dry-run report."
+        ],
+        "periods": [
+            empty_period(end_date, 7),
+            empty_period(end_date, 28),
+        ],
+    }
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Print Google Search Console Search Analytics summaries."
@@ -308,6 +354,12 @@ def parse_args():
         default=None,
         help="Inclusive end date in YYYY-MM-DD. Defaults to yesterday.",
     )
+    parser.add_argument(
+        "--auth-failure-mode",
+        choices=("dry-run", "fail"),
+        default=os.getenv("GSC_AUTH_FAILURE_MODE", "dry-run"),
+        help="Use dry-run to return empty JSON with exit 0 when Search Console auth is unavailable.",
+    )
     return parser.parse_args()
 
 
@@ -327,7 +379,6 @@ def main():
         fail("Missing Search Console property. Set GSC_SITE_URL or pass --site-url.")
     if args.row_limit < 1:
         fail("--row-limit must be at least 1.")
-    validate_credential_source(args)
 
     if args.end_date:
         try:
@@ -338,7 +389,16 @@ def main():
         end_date = date.today() - timedelta(days=1)
 
     service_account, build, http_error = load_google_modules()
-    credentials = load_credentials(service_account, args)
+    try:
+        validate_credential_source(args)
+        credentials = load_credentials(service_account, args)
+    except SearchConsoleAuthUnavailable as exc:
+        if args.authorize or args.auth_failure_mode == "fail":
+            fail(str(exc))
+        warn("Search Console credentials unavailable. Returning dry-run report.")
+        print(json.dumps(auth_fallback_report(args, end_date), ensure_ascii=False, indent=2))
+        return
+
     if args.authorize and not args.site_url:
         print("OAuth authorization completed.", file=sys.stderr)
         return
@@ -355,9 +415,15 @@ def main():
             ],
         }
     except http_error as exc:
+        if args.auth_failure_mode == "dry-run":
+            warn("Search Console API request failed. Returning dry-run report.")
+            report = auth_fallback_report(args, end_date)
+            report["risk_notes"].append(f"Search Console API error class: {exc.__class__.__name__}.")
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return
         fail(
             "Search Console API request failed. Check that the credential has access "
-            f"to {args.site_url}. Details: {exc}",
+            f"to {args.site_url}.",
             exit_code=1,
         )
 

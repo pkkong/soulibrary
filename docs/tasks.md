@@ -52,6 +52,7 @@
 - SEO 자동화의 기본 권한은 GitHub issue, Growth Queue, 자동 점검 결과와 사람 검토용 초안까지이며 글/랜딩 문구/이미지/UI 자동 발행은 금지한다.
 - SEO 작업은 Growth Analyst, Technical SEO Worker, Content Writer, Editor/Fact Checker, QA/Release Worker 역할을 분리한다.
 - Search Console credential과 token은 `.secrets/`, GitHub Actions secrets, 운영 secret에만 두고 로그/문서/issue/PR에 원문을 출력하지 않는다.
+- Search Console API 인증 만료/권한 실패는 기본 `--auth-failure-mode dry-run`으로 처리해 SEO Growth workflow가 빨간 실패로 쌓이지 않게 한다. 실제 지표 자동화 복구는 `GSC_SERVICE_ACCOUNT_JSON`을 우선하고, 강제로 실패를 드러내야 하는 점검에만 `--auth-failure-mode fail`을 쓴다.
 - 메인 채팅방은 최종 판단과 커밋/배포를 맡되, 혼자 구현부터 검수까지 끝내지 않는다.
 - `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 같은 지시서/MD 운영 규칙 변경은 기본적으로 Instruction Steward Worker가 맡는다.
 - 반복 지적이 나오면 Instruction Update Loop로 지적 내용을 관련 문서 규칙에 반영하고, 최종 보고에 `사용자 지적 -> 반영 문서/규칙` 매핑을 남긴다.

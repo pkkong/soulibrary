@@ -47,6 +47,10 @@ DEFAULT_TECHNICAL_PATHS = (
 )
 
 
+class SearchConsoleAuthUnavailable(RuntimeError):
+    pass
+
+
 class HeadParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -93,6 +97,14 @@ def fail(message, exit_code=2):
     raise SystemExit(exit_code)
 
 
+def auth_unavailable(message):
+    raise SearchConsoleAuthUnavailable(message)
+
+
+def warn(message):
+    print(f"WARNING: {message}", file=sys.stderr)
+
+
 def parse_env_int(name, default):
     value = os.getenv(name)
     if not value:
@@ -131,16 +143,22 @@ def load_service_account_credentials(service_account, credentials_file, credenti
         try:
             info = json.loads(credentials_json)
         except json.JSONDecodeError as exc:
-            fail(f"GSC_SERVICE_ACCOUNT_JSON is not valid JSON: {exc}")
-        return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+            auth_unavailable(f"GSC_SERVICE_ACCOUNT_JSON is not valid JSON: {exc}")
+        try:
+            return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+        except Exception as exc:
+            auth_unavailable(f"GSC_SERVICE_ACCOUNT_JSON could not be loaded: {exc}")
 
     if not credentials_file:
-        fail(f"Missing Search Console credentials. {credential_help()}")
+        auth_unavailable(f"Missing Search Console credentials. {credential_help()}")
 
     path = Path(credentials_file).expanduser()
     if not path.exists():
-        fail(f"Search Console credential file does not exist: {path}")
-    return service_account.Credentials.from_service_account_file(str(path), scopes=SCOPES)
+        auth_unavailable(f"Search Console credential file does not exist: {path}")
+    try:
+        return service_account.Credentials.from_service_account_file(str(path), scopes=SCOPES)
+    except Exception as exc:
+        auth_unavailable(f"Search Console credential file could not be loaded: {exc}")
 
 
 def write_oauth_token(token_path, credentials):
@@ -165,16 +183,16 @@ def load_oauth_credentials(client_file, token_file, token_json, authorize):
         try:
             token_info = json.loads(token_json)
         except json.JSONDecodeError as exc:
-            fail(f"GSC_OAUTH_TOKEN_JSON is not valid JSON: {exc}")
+            auth_unavailable(f"GSC_OAUTH_TOKEN_JSON is not valid JSON: {exc}")
         try:
             credentials = Credentials.from_authorized_user_info(token_info, SCOPES)
         except ValueError:
-            fail("OAuth token JSON is not valid for Search Console access.")
+            auth_unavailable("OAuth token JSON is not valid for Search Console access.")
     elif token_path.exists():
         try:
             credentials = Credentials.from_authorized_user_file(str(token_path), SCOPES)
         except ValueError:
-            fail("OAuth token file is not valid for Search Console access.")
+            auth_unavailable("OAuth token file is not valid for Search Console access.")
 
     if credentials and credentials.valid and not authorize:
         return credentials
@@ -183,19 +201,19 @@ def load_oauth_credentials(client_file, token_file, token_json, authorize):
         try:
             credentials.refresh(Request())
         except Exception:
-            fail("OAuth token refresh failed. Run with --authorize to create a fresh token.")
+            auth_unavailable("OAuth token refresh failed. Run with --authorize to create a fresh token.")
         if not token_json:
             write_oauth_token(token_path, credentials)
         return credentials
 
     if not authorize:
-        fail(f"OAuth token file does not exist or cannot be refreshed: {token_path}")
+        auth_unavailable(f"OAuth token file does not exist or cannot be refreshed: {token_path}")
 
     if not client_file:
-        fail("Missing OAuth client file. Set GSC_OAUTH_CLIENT_FILE or pass --oauth-client-file.")
+        auth_unavailable("Missing OAuth client file. Set GSC_OAUTH_CLIENT_FILE or pass --oauth-client-file.")
     client_path = Path(client_file).expanduser()
     if not client_path.exists():
-        fail(f"OAuth client file does not exist: {client_path}")
+        auth_unavailable(f"OAuth client file does not exist: {client_path}")
 
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -229,8 +247,8 @@ def load_credentials(service_account, args):
             args.authorize,
         )
     if args.credentials_file:
-        fail(f"Search Console credential file does not exist: {args.credentials_file}")
-    fail(f"Missing Search Console credentials. {credential_help()}")
+        auth_unavailable(f"Search Console credential file does not exist: {args.credentials_file}")
+    auth_unavailable(f"Missing Search Console credentials. {credential_help()}")
 
 
 def normalize_url(base_url, value):
@@ -728,7 +746,7 @@ def run_technical_checks(base_url, paths, timeout):
     return {"pages": checks, "supporting_files": aux_checks}
 
 
-def dry_run_report(args, end_date):
+def dry_run_report(args, end_date, risk_notes=None):
     periods = [empty_period(end_date, days) for days in (7, 28, 90)]
     target_pages = unique_ordered(
         [normalize_url(args.base_url, value) for value in DEFAULT_TARGET_PATHS + tuple(args.target_page)]
@@ -772,7 +790,7 @@ def dry_run_report(args, end_date):
             "skipped_reason": "dry_run",
         },
         "technical_checks": {"skipped_reason": "dry_run"},
-        "risk_notes": ["Dry run skipped Google API and production HTTP requests."],
+        "risk_notes": risk_notes or ["Dry run skipped Google API and production HTTP requests."],
     }
 
 
@@ -838,6 +856,12 @@ def parse_args():
     parser.add_argument("--state-file", default=os.getenv("SEO_GROWTH_STATE_FILE"))
     parser.add_argument("--write-state", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--auth-failure-mode",
+        choices=("dry-run", "fail"),
+        default=os.getenv("SEO_AUTH_FAILURE_MODE", "dry-run"),
+        help="Use dry-run to exit 0 when Search Console auth or access is unavailable.",
+    )
     return parser.parse_args()
 
 
@@ -865,34 +889,84 @@ def main():
         fail("Missing Search Console property. Set GSC_SITE_URL or pass --site-url.")
 
     service_account, build, http_error = load_google_modules()
-    credentials = load_credentials(service_account, args)
+    try:
+        credentials = load_credentials(service_account, args)
+    except SearchConsoleAuthUnavailable as exc:
+        if args.authorize or args.auth_failure_mode == "fail":
+            fail(str(exc))
+        warn("Search Console credentials unavailable. Falling back to dry-run.")
+        print(
+            json.dumps(
+                dry_run_report(
+                    args,
+                    end_date,
+                    risk_notes=[
+                        "Search Console credentials were unavailable; audit fell back to dry-run."
+                    ],
+                ),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return
+
     if args.authorize:
         print("OAuth authorization completed.", file=sys.stderr)
         return
 
     service = build("searchconsole", "v1", credentials=credentials, cache_discovery=False)
-    periods = [summarize_period(service, args.site_url, end_date, days, args.row_limit) for days in (7, 28, 90)]
-    period_28 = next(period for period in periods if period["days"] == 28)
+    try:
+        periods = [
+            summarize_period(service, args.site_url, end_date, days, args.row_limit)
+            for days in (7, 28, 90)
+        ]
+        period_28 = next(period for period in periods if period["days"] == 28)
 
-    inferred_pages = [row["page"] for row in period_28["top_pages"][:5]]
-    inferred_keywords = [row["query"] for row in period_28["top_queries"][:5]]
-    target_pages = unique_ordered(
-        [normalize_url(args.base_url, value) for value in DEFAULT_TARGET_PATHS + tuple(args.target_page)]
-        + inferred_pages
-    )
-    target_keywords = unique_ordered(list(DEFAULT_TARGET_KEYWORDS) + args.target_keyword + inferred_keywords)
-    normalized_inspection_urls = unique_ordered(
-        [normalize_url(args.base_url, value) for value in args.inspection_url + target_pages]
-    )
+        inferred_pages = [row["page"] for row in period_28["top_pages"][:5]]
+        inferred_keywords = [row["query"] for row in period_28["top_queries"][:5]]
+        target_pages = unique_ordered(
+            [normalize_url(args.base_url, value) for value in DEFAULT_TARGET_PATHS + tuple(args.target_page)]
+            + inferred_pages
+        )
+        target_keywords = unique_ordered(list(DEFAULT_TARGET_KEYWORDS) + args.target_keyword + inferred_keywords)
+        normalized_inspection_urls = unique_ordered(
+            [normalize_url(args.base_url, value) for value in args.inspection_url + target_pages]
+        )
 
-    inspected = inspect_urls(
-        service,
-        args.site_url,
-        normalized_inspection_urls,
-        args.url_inspection_limit,
-        http_error,
-    ) if args.url_inspection_limit else []
-    inspected = apply_indexing_state(inspected, args.state_file, args.write_state, date.today())
+        inspected = (
+            inspect_urls(
+                service,
+                args.site_url,
+                normalized_inspection_urls,
+                args.url_inspection_limit,
+                http_error,
+            )
+            if args.url_inspection_limit
+            else []
+        )
+        inspected = apply_indexing_state(inspected, args.state_file, args.write_state, date.today())
+        target_report = build_target_report(
+            service, args.site_url, end_date, (7, 28, 90), target_pages, target_keywords
+        )
+    except http_error as exc:
+        if args.auth_failure_mode == "fail":
+            fail("Search Console API request failed. Check credential access.", exit_code=1)
+        warn("Search Console API request failed. Falling back to dry-run.")
+        print(
+            json.dumps(
+                dry_run_report(
+                    args,
+                    end_date,
+                    risk_notes=[
+                        "Search Console API request failed; audit fell back to dry-run.",
+                        f"Search Console API error class: {exc.__class__.__name__}.",
+                    ],
+                ),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return
 
     report = {
         "schema_version": "seo_growth_audit.v1",
@@ -903,9 +977,7 @@ def main():
         "end_date": end_date.isoformat(),
         "search_console": {
             "periods": periods,
-            "targets": build_target_report(
-                service, args.site_url, end_date, (7, 28, 90), target_pages, target_keywords
-            ),
+            "targets": target_report,
         },
         "url_inspection": {
             "limit": min(max(args.url_inspection_limit, 0), 20),

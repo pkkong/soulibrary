@@ -168,7 +168,9 @@ Search Console secret 관리:
 - 인증 문제를 보고할 때는 파일 경로, secret 이름, 권한 상태만 남기고 토큰 원문이나 JSON 본문은 남기지 않습니다.
 - GitHub Actions에서는 repository variable `GSC_SITE_URL`, `PRODUCTION_BASE_URL`과 repository secret `GSC_SERVICE_ACCOUNT_JSON` 또는 `GSC_OAUTH_TOKEN_JSON`을 사용합니다.
 - Search Console 검색어와 페이지 성과는 운영 데이터입니다. GitHub issue, PR 본문, Actions artifact에는 원시 query/page/CTR/position을 그대로 올리지 않고 요약된 공개용 문구만 남깁니다. 원본 JSON은 job 내부 또는 로컬 파일로만 확인합니다.
-- `GSC_OAUTH_TOKEN_JSON` refresh가 실패하면 `SEO Growth`는 경고를 남기고 dry-run으로 내려갑니다. 이 경우 Search Console 지표 기반 issue/초안 job은 건너뛰며, 실제 지표 자동화를 복구하려면 token을 재인증해서 GitHub secret을 갱신하거나 서비스 계정으로 전환합니다.
+- Search Console 스크립트는 `--auth-failure-mode dry-run|fail`을 사용합니다. 기본값은 `dry-run`이며, 인증 만료나 권한 실패 시 빈 지표 JSON을 출력하고 exit 0으로 끝내서 `SEO Growth`가 빨간 실패로 쌓이지 않게 합니다.
+- 실제 지표 자동화를 복구하려면 `GSC_SERVICE_ACCOUNT_JSON`을 우선 권장합니다. `GSC_OAUTH_TOKEN_JSON`은 refresh가 다시 실패할 수 있으므로 서비스 계정 전환이 어려울 때의 보조 경로로 봅니다.
+- 엄격한 복구 검증이나 인증 상태 감시에서 실패를 바로 드러내야 할 때만 `--auth-failure-mode fail`을 명시합니다.
 
 OAuth token을 갱신할 때:
 
