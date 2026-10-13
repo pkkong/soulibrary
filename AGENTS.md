@@ -395,6 +395,25 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 - 자동화는 새 글/새 코드 발행보다 “감지, 요약, 게이트 통과 여부 확인”을 우선한다.
 - 운영 자동화에서 새 문제가 나오면 QA/Release Worker와 별도로 Instruction Steward Worker가 해당 가이드 문서 갱신 필요성을 검토한다.
 
+### 서비스 검토와 관측성
+
+- 코딩, 속도, 디자인, 서비스 검토는 운영 route와 실제 사용자 흐름을 먼저 확인하고, 발견 사항을 근거·영향·우선순위·소유 파일·검증 방법으로 보고한다.
+- 사용량은 분석 태그 설치, 대시보드 접근, 실제 수집, 개선 이벤트 측정을 구분한다. GA4 조회 기간과 활성 사용자 정의를 명시하고, 내부 방문·QA·bot 혼입 여부와 미검증 설정을 함께 남긴다.
+- 현재 사용자 승인 범위에 따라 검색어, 방문자, 서비스 이용 데이터를 측정한다. 연락처, 공유 서재 slug, 원문 전체 URL 등 서비스 분석에 불필요한 데이터는 제외한다.
+- 실제 traffic 숫자, 개별 검색어, GA account/property 식별자, 페이지별 성과는 공개 GitHub 문서·issue·PR·artifact에 남기지 않는다. 원본과 자세한 감사 결과는 ignored 로컬 artifact 또는 승인된 분석 저장소에서 다룬다.
+- GSC 인증 실패의 `dry-run`/exit 0은 측정 성공이 아니다. 실행 성공과 실제 수집 여부를 별도로 표시하고, 빈 fallback을 사용자 0명 또는 개선 기회 없음으로 해석하지 않는다.
+- 실시간 검색 변경은 DB 없는 운영, cache hit/miss, 외부 실패·timeout·부분 응답, 0건과 조회 실패 구분을 검증한다. 응답 시간은 조건·표본 수를 기록하고 단일 표본을 p95나 일반적인 속도로 제시하지 않는다.
+- 검색 화면은 초기·완료 0건·부분 결과·전체 실패·재시도 상태와 모바일/데스크톱, 키보드·sheet 포커스를 확인한다. 신고 성공 이벤트는 실제 저장 성공만 측정하고 공개 신고에 연락처를 저장하지 않는다.
+- 구체적인 측정 계약과 검수 절차는 [docs/service_observability.md](docs/service_observability.md)를 따른다.
+
+### 레거시 삭제
+
+- 삭제 전에 repo 참조 검색, 실제 Flask route map, import/template/static load 경로를 확인한다. 단순 파일명이나 나이만으로 삭제하지 않는다.
+- 삭제 목록, 유지/보류 항목, production 영향과 회귀 검증을 먼저 정하고 Worker에게 파일 소유권을 지정한다.
+- 일부 미사용 함수가 있어도 production helper가 함께 들어 있는 파일은 보존한다. crawler/data/admin과 numeric book 호환 경로는 별도 필요성 판단 없이 제거하지 않는다.
+- 삭제 후 참조 잔존, 유지 route 응답, sitemap XML, DB 없는 검색, `git diff --check`와 관련 smoke를 확인한다. 제거한 route와 원래 미등록이던 route를 구분해 보고한다.
+- 현재 삭제/보존 근거는 [docs/public_repository_inventory.md](docs/public_repository_inventory.md)에 기록한다.
+
 ### Instruction Update Loop
 
 사용자가 운영 방식, 역할 분리, 품질 게이트, 반복 지적 반영 누락을 지적하면 아래 순서를 따른다.
@@ -429,6 +448,8 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 - 자동화가 발행/커밋 권한을 갖는 경우 QA 게이트가 별도로 있었는가
 - 지시서 변경은 Instruction Steward Worker에게 위임됐는가
 - 반복 지적은 Instruction Update Loop를 거쳐 문서 규칙으로 반영됐는가
+- 사용량 보고가 실제 수집 근거와 기간을 갖추고, GSC fallback과 내부 트래픽의 영향을 구분했는가
+- 공개 보고에 운영 원시 지표나 식별자를 넣지 않았고, 삭제 작업은 route/참조 근거와 회귀 검증을 갖췄는가
 
 최종 보고는 최소한 아래 항목을 포함한다.
 

@@ -115,8 +115,23 @@ jobs:
       - name: Read audit metadata
         id: audit_meta
         run: |
-          dry_run="$(python -c 'import json; print(str(json.load(open("seo-growth-audit.json")).get("dry_run", False)).lower())')"
-          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          python - <<'PY'
+          import json
+          import os
+
+          report = json.load(open("seo-growth-audit.json"))
+          degraded = bool(report.get("dry_run") or report.get("dry_run_source"))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"dry_run={str(degraded).lower()}\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("### Search Console measurement\n\n")
+              if degraded:
+                  summary.write("**Measurement degraded / data unavailable.** The audit used a dry-run fallback; workflow success does not confirm data collection. Empty opportunities do not mean no traffic or no improvements. Weekly queue and draft steps are skipped. Restore credentials/property access and validate with `--auth-failure-mode fail`.\n")
+              else:
+                  summary.write("Search Console API data was collected. This measures Google search performance; visitor usage requires separate analytics verification.\n")
+          if degraded:
+              print("::warning title=Measurement degraded::Search Console data unavailable: dry-run fallback. Workflow success is not measurement success; weekly actions are skipped.")
+          PY
 
       - name: Plan SEO opportunities
         run: |

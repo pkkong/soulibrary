@@ -36,11 +36,26 @@ Soulib은 현재 공개 저장소로 운영해도 되는 구조를 목표로 정
 - `web/templates/admin.html`: 현재 route map에 없는 과거 `/admin` 화면이며 내부 admin API도 없어 과거 제거됨.
 - `web/templates/guide.html`: 현재 route map과 `render_template` 참조가 없는 과거 `/guide` 화면이므로 과거 제거됨.
 
+### 서비스 감사에서 확인한 레거시 정리
+
+- `web/curations.py`, `web/curation_routes.py`: production entrypoint에 blueprint가 등록되지 않고 다른 runtime import가 없는 큐레이션 경로.
+- `web/templates/curations.html`, `web/templates/curation_detail.html`, `web/templates/curation_admin.html`: 위 미등록 경로에서만 사용하던 템플릿.
+- `web/static/js/curations.js`: 위 레거시 템플릿에서만 로드하던 스크립트.
+- `web/static/js/home.js`: 현재 템플릿의 load 참조와 `__HOME_CURATIONS__` setter가 없는 이전 홈 구현.
+- `web/static/sitemap.xml`: 현재 `/sitemap.xml`과 `/sitemap-static.xml`은 `app_search.py`에서 동적으로 생성하므로 미사용 정적 중복물.
+- `web/templates/data_quality_admin.html`의 `/admin/curations` 링크: 등록된 route가 없는 링크 1개 제거.
+- `web/status_api_routes.py`의 미사용 `_bookcube_page_size`, `_bookcube_page_url`, `_bookcube_search_list_url`, `_gangnam_page_url` 및 `http_fallback` import 제거.
+- `web/utils/http.py`의 미사용 `http_fallback` 정의만 제거. HTTP/TLS helper 파일 자체는 현재 production 의존성이므로 보존.
+- `web/config.py`의 즉시 덮이는 초기 `LIBRARY_SHORT` literal 제거. 최종 표시값은 유지.
+
+근거는 전체 참조 검색, Flask route map, 남은 코드의 AST 비교이며 유지 페이지 응답과 동적 sitemap XML을 검증한다. 앞으로의 삭제도 [service_observability.md](service_observability.md)의 삭제 게이트를 따른다.
+
 ## 유지한 항목
 
 - `web/app_search.py`: 현재 production Flask 앱.
 - `web/live_search/`: DB 없는 실시간 검색 경로.
 - `web/report_routes.py`, `web/blog_comments.py`: GitHub Issues 연동.
+- `web/utils/http.py`: 현재 검색 connector와 상태 API가 쓰는 HTTP/TLS helper.
 - `supabase/migrations/`: 공유 서재 영속 저장 schema.
 - `apps-in-toss/`: Toss miniapp client.
 - `crawler/`, 남은 data/admin scripts: 현재 production 검색 경로는 아니지만, 데이터 점검과 향후 작업용으로 보류.
@@ -51,7 +66,6 @@ Soulib은 현재 공개 저장소로 운영해도 되는 구조를 목표로 정
 
 - CSV/PostgreSQL 적재 스크립트.
 - 데이터 품질 관리자 코드.
-- 큐레이션 관리자 코드.
 - 전수 크롤링 spider.
 - Search Console 분석 스크립트.
 
@@ -60,6 +74,7 @@ Soulib은 현재 공개 저장소로 운영해도 되는 구조를 목표로 정
 ## 공개 저장소 운영 규칙
 
 - `.env`, `.secrets/`, DB 파일, CSV 산출물, 로그, local cache는 커밋하지 않습니다.
+- 실제 traffic 숫자, 개별 검색어, 페이지별 성과, GA account/property 식별자와 자세한 서비스 감사 보고서는 공개 저장소에 커밋하지 않습니다. `artifacts/` 같은 ignored 로컬 파일 또는 승인된 분석 저장소로 분리합니다.
 - Vercel env `GITHUB_ISSUE_REPO`는 `pkkong/soulibrary`를 기준으로 둡니다.
 - Cloudtype은 rollback 경로가 아니라 과거 운영 기록입니다.
 - 과거 credential 노출이 의심되면 공개 여부와 별개로 토큰을 회전합니다.

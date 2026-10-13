@@ -1,8 +1,10 @@
 import os
+import copy
 import hashlib
 import json
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError, as_completed
 from urllib.parse import urlencode
 
 from config import LIBRARIES, LIBRARY_SHORT
@@ -23,9 +25,12 @@ LIVE_SEARCH_TOTAL_TIMEOUT = float(os.environ.get("LIVE_SEARCH_TOTAL_TIMEOUT", "5
 LIVE_SEARCH_MAX_WORKERS = int(os.environ.get("LIVE_SEARCH_MAX_WORKERS", "40"))
 LIVE_SEARCH_PER_LIBRARY_LIMIT = int(os.environ.get("LIVE_SEARCH_PER_LIBRARY_LIMIT", "10"))
 LIVE_DETAIL_CACHE_SIZE = int(os.environ.get("LIVE_DETAIL_CACHE_SIZE", "1024"))
+LIVE_SEARCH_PARTIAL_TTL_SEC = max(1, min(float(os.environ.get("LIVE_SEARCH_PARTIAL_TTL_SEC", "15")), LIVE_SEARCH_TTL_SEC))
 
 _CACHE = TTLMemoryCache(ttl_seconds=LIVE_SEARCH_TTL_SEC, max_items=LIVE_SEARCH_CACHE_SIZE)
 _DETAIL_CACHE = TTLMemoryCache(ttl_seconds=LIVE_SEARCH_TTL_SEC, max_items=LIVE_DETAIL_CACHE_SIZE)
+_INFLIGHT = {}
+_INFLIGHT_LOCK = threading.Lock()
 
 CONNECTOR_FACTORIES = {
     "Kyobo_New": KyoboNewConnector,
@@ -242,6 +247,8 @@ def _filters_from_items(items: list[dict]) -> dict:
 
 
 def _slice_response(payload: dict, refine: str, limit: int, offset: int, cache_hit: bool) -> dict:
+    # Requests sharing an in-flight search must never mutate each other's items.
+    payload = copy.deepcopy(payload)
     base_items = payload.get("items") or []
     items = [item for item in base_items if _item_matches_refine(item, refine)]
     _attach_live_detail_urls(items)
@@ -264,6 +271,16 @@ def _connector_for_library(code: str, cfg: dict):
     return factory()
 
 
+def _library_may_match_providers(code: str, cfg: dict, provider_labels: list[str]) -> bool:
+    if not provider_labels:
+        return True
+    # Public and mixed-library connectors can include multiple providers. Only
+    # prune the ordinary connectors whose result platform is fixed by config.
+    if code in SPECIAL_CONNECTOR_FACTORIES or cfg.get("platform") in {"Mixed", "Unknown"}:
+        return True
+    return _provider_allows_result(provider_labels, {"platform": cfg.get("platform"), "library_code": code})
+
+
 def _search_libraries(query: str, field: str, library_codes: list[str], provider_labels: list[str]) -> tuple[list, list[dict]]:
     if not library_codes:
         return [], []
@@ -273,17 +290,35 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
     tasks = []
     for code in library_codes:
         cfg = dict(LIBRARIES[code])
+        if not _library_may_match_providers(code, cfg, provider_labels):
+            continue
         cfg["short_name"] = LIBRARY_SHORT.get(code, cfg.get("library_name") or code)
         connector = _connector_for_library(code, cfg)
         if not connector:
             continue
         tasks.append((code, cfg, connector))
 
+    if not tasks:
+        return [], [{"platform": "all", "platforms": [], "elapsed_ms": 0, "errors": [], "error_count": 0,
+                     "searched_libraries": 0, "successful_libraries": 0}]
+
     max_workers = max(1, min(LIVE_SEARCH_MAX_WORKERS, len(tasks)))
     started = time.time()
 
     executor = ThreadPoolExecutor(max_workers=max_workers)
     futures = {}
+    handled = set()
+
+    def collect(future):
+        code, platform = futures[future]
+        handled.add(future)
+        try:
+            for result in future.result():
+                if _provider_allows_result(provider_labels, result) and _result_matches_query(query, field, result):
+                    results.append(result)
+        except Exception as exc:
+            errors.append({"library_code": code, "platform": platform, "error": str(exc)})
+
     try:
         for code, cfg, connector in tasks:
             future = executor.submit(
@@ -298,26 +333,50 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
             futures[future] = (code, cfg.get("platform") or getattr(connector, "platform", ""))
 
         for future in as_completed(futures, timeout=LIVE_SEARCH_TOTAL_TIMEOUT):
-            code, platform = futures[future]
-            try:
-                for result in future.result():
-                    if _provider_allows_result(provider_labels, result) and _result_matches_query(query, field, result):
-                        results.append(result)
-            except Exception as exc:
-                errors.append({"library_code": code, "platform": platform, "error": str(exc)})
+            collect(future)
     except TimeoutError:
         for future, (code, platform) in futures.items():
-            if not future.done():
+            if future in handled:
+                continue
+            if future.done():
+                collect(future)
+            else:
                 future.cancel()
                 errors.append({"library_code": code, "platform": platform, "error": "search_timeout"})
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
 
     elapsed_ms = int((time.time() - started) * 1000)
-    if errors:
-        errors = errors[:10]
-    platforms = sorted({(LIBRARIES.get(code) or {}).get("platform") or "Unknown" for code in library_codes})
-    return results, [{"platform": "all", "platforms": platforms, "elapsed_ms": elapsed_ms, "errors": errors}]
+    platforms = sorted({cfg.get("platform") or "Unknown" for _code, cfg, _connector in tasks})
+    return results, [{"platform": "all", "platforms": platforms, "elapsed_ms": elapsed_ms, "errors": errors[:10],
+                     "error_count": len(errors), "failed_libraries": [error["library_code"] for error in errors],
+                     "searched_libraries": len(tasks), "successful_libraries": len(tasks) - len(errors)}]
+
+
+def _search_payload(query: str, field: str, providers: list[str], libraries: list[str]) -> dict:
+    library_codes = _selected_library_codes(libraries)
+    raw_results, diagnostics = _search_libraries(query, field, library_codes, providers)
+    merged_items = merge_live_results(raw_results)
+    partial = any(diagnostic.get("error_count") or diagnostic.get("errors") for diagnostic in diagnostics)
+    scope_limited = bool(providers or libraries)
+    for item in merged_items:
+        item["counts_partial"] = bool(partial or scope_limited or normalize_text(query) != normalize_text(item.get("title")))
+    return {
+        "total": len(merged_items),
+        "items": merged_items,
+        "filters": _filters_from_items(merged_items),
+        "meta": {
+            "mode": "live",
+            "cache_hit": False,
+            "partial": partial,
+            "scope_limited": scope_limited,
+            "connectors": sorted({platform for diagnostic in diagnostics for platform in diagnostic.get("platforms", [])}),
+            "searched_libraries": sum(diagnostic.get("searched_libraries", len(library_codes)) for diagnostic in diagnostics),
+            "successful_libraries": sum(diagnostic.get("successful_libraries", 0) for diagnostic in diagnostics),
+            "failed_libraries": [code for diagnostic in diagnostics for code in diagnostic.get("failed_libraries", [])],
+            "diagnostics": diagnostics,
+        },
+    }
 
 
 def live_search(
@@ -344,20 +403,32 @@ def live_search(
     if cached:
         return _slice_response(cached, refine, limit, offset, True)
 
-    library_codes = _selected_library_codes(libraries)
-    raw_results, diagnostics = _search_libraries(query, field, library_codes, providers)
-    merged_items = merge_live_results(raw_results)
-    payload = {
-        "total": len(merged_items),
-        "items": merged_items,
-        "filters": _filters_from_items(merged_items),
-        "meta": {
-            "mode": "live",
-            "cache_hit": False,
-            "connectors": sorted({(LIBRARIES.get(code) or {}).get("platform") or "Unknown" for code in library_codes}),
-            "searched_libraries": len(library_codes),
-            "diagnostics": diagnostics,
-        },
-    }
-    _CACHE.set(cache_key, payload)
+    with _INFLIGHT_LOCK:
+        # A preceding request may have populated the cache after the first read.
+        cached = _CACHE.get(cache_key)
+        if cached:
+            return _slice_response(cached, refine, limit, offset, True)
+        future = _INFLIGHT.get(cache_key)
+        leader = future is None
+        if leader:
+            future = Future()
+            _INFLIGHT[cache_key] = future
+
+    if not leader:
+        payload = future.result(timeout=max(1, LIVE_SEARCH_TOTAL_TIMEOUT) + 2)
+        return _slice_response(payload, refine, limit, offset, False)
+
+    try:
+        payload = _search_payload(query, field, providers, libraries)
+        if not payload["meta"]["partial"]:
+            _CACHE.set(cache_key, payload)
+        elif payload["items"]:
+            _CACHE.set(cache_key, payload, ttl_seconds=LIVE_SEARCH_PARTIAL_TTL_SEC)
+        future.set_result(payload)
+    except BaseException as exc:
+        future.set_exception(exc)
+        raise
+    finally:
+        with _INFLIGHT_LOCK:
+            _INFLIGHT.pop(cache_key, None)
     return _slice_response(payload, refine, limit, offset, False)

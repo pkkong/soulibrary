@@ -57,6 +57,8 @@
 - `AGENTS.md`, `README_DEV.md`, `docs/tasks.md` 같은 지시서/MD 운영 규칙 변경은 기본적으로 Instruction Steward Worker가 맡는다.
 - 반복 지적이 나오면 Instruction Update Loop로 지적 내용을 관련 문서 규칙에 반영하고, 최종 보고에 `사용자 지적 -> 반영 문서/규칙` 매핑을 남긴다.
 - 블로그, 디자인, 버그, 운영 자동화에서 새 문제가 나오면 해당 가이드 문서 갱신 필요성도 함께 검토한다.
+- 서비스 검토·관측성·검색 신뢰·레거시 삭제의 근거와 게이트는 [service_observability.md](service_observability.md)를 따른다. 현재 승인된 검색어·방문자·이용 데이터를 측정하되 실제 traffic/개별 query/account 식별자는 공개 문서에 넣지 않는다.
+- GSC workflow 성공과 실제 수집 여부를 별도로 표시한다. `dry-run` fallback은 측정 장애이며, 내부 트래픽 필터가 Testing 상태이면 실제 제외된 것으로 보고하지 않는다.
 
 ## SEO/Growth 운영 큐
 
@@ -80,5 +82,13 @@
 1. Codespaces/Codex Cloud에서 새 작업이 바로 가능한지 확인
 2. 모바일에서 브랜치/PR/배포 상태를 확인하는 운영 흐름 고정
 3. 검색 상세 오류 신고가 들어오면 GitHub Issue 기준으로 재현, 수정, 고객용 처리 로그 작성
-4. 레거시 DB/큐레이션 코드는 실제 운영 필요성이 생길 때만 별도 정리
+4. 남은 레거시 DB·data/admin 코드는 실제 필요성과 참조/route 근거를 확인한 뒤 별도 정리. 미등록 큐레이션 묶음의 삭제 기록은 [public_repository_inventory.md](public_repository_inventory.md) 참고
 5. Cloudtype은 해지 대상이므로 rollback 경로가 아니라 과거 운영 기록으로만 취급
+
+## 서비스 감사 후속 큐
+
+1. GSC 인증 복구와 실제 수집 확인, GA 내부 방문/QA 제외 검증, 검색→결과→상세→도서관 이동/서재 저장 흐름의 이벤트 QA
+2. 검색 cache/동시 요청/partial 신뢰 회귀와 live smoke의 실제 `/api/live_search` 호출 확인
+3. 상세 제목 후보 조회와 도봉 상태 fallback의 전체 시간 예산, 상태 cache 크기 제한, 공급사별 TLS 예외 범위 조사
+4. 신고 목록 pagination·해결 상태의 사실성 검토. 공개 연락처 저장 제거 후에도 과거 신고의 개인정보는 별도 점검
+5. 기능별 회귀가 확보된 뒤 `app_search.py`와 공통 CSS를 점진적으로 분리. 대규모 구조 변경과 디자인 변경을 한 번에 섞지 않는다

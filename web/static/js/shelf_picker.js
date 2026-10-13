@@ -53,7 +53,10 @@
             const input = event.target.closest("[data-shelf-picker-list]");
             if (!input || !activeBook || !activeKey) return;
             if (input.checked) {
-                shelf.add(activeBook, input.value);
+                const saved = shelf.add(activeBook, input.value);
+                if (saved && shelf.has(activeKey, input.value) && window.SoulibAnalytics) {
+                    window.SoulibAnalytics.track("shelf_save", {list_count: shelf.listsForBook(activeKey).length});
+                }
             } else {
                 shelf.removeFromList(activeKey, input.value);
             }
@@ -64,7 +67,10 @@
             const input = document.getElementById("shelf-picker-new-name");
             const list = shelf.createList(input.value);
             if (!list) return;
-            shelf.add(activeBook, list.id);
+            const saved = shelf.add(activeBook, list.id);
+            if (saved && shelf.has(activeKey, list.id) && window.SoulibAnalytics) {
+                window.SoulibAnalytics.track("shelf_save", {list_count: shelf.listsForBook(activeKey).length});
+            }
             input.value = "";
             render();
         });
@@ -79,6 +85,10 @@
         document.getElementById("shelf-picker-overlay").hidden = false;
         document.getElementById("shelf-picker-sheet").hidden = false;
         document.body.classList.add("shelf-picker-open");
+        if (window.SoulibDialog) window.SoulibDialog.open(document.getElementById("shelf-picker-sheet"), {
+            backdrop: document.getElementById("shelf-picker-overlay"),
+            onClose: close,
+        });
     }
 
     function close() {
@@ -87,6 +97,7 @@
         if (overlay) overlay.hidden = true;
         if (sheet) sheet.hidden = true;
         document.body.classList.remove("shelf-picker-open");
+        if (window.SoulibDialog) window.SoulibDialog.close(sheet);
     }
 
     function render() {
@@ -94,6 +105,8 @@
         const bookEl = document.getElementById("shelf-picker-book");
         const listsEl = document.getElementById("shelf-picker-lists");
         if (!bookEl || !listsEl) return;
+        const focused = document.activeElement;
+        const focusedListId = focused && listsEl.contains(focused) && focused.matches("[data-shelf-picker-list]") ? focused.value : null;
 
         const meta = [activeBook.author, activeBook.publisher].filter(Boolean).join(" · ");
         bookEl.innerHTML = `
@@ -115,6 +128,10 @@
                 </label>
             `;
         }).join("");
+        if (focusedListId) {
+            const restored = Array.from(listsEl.querySelectorAll("[data-shelf-picker-list]")).find(input => input.value === focusedListId);
+            if (restored) restored.focus({preventScroll: true});
+        }
     }
 
     function isSaved(book) {

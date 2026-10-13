@@ -1,10 +1,14 @@
 import json
 import os
 import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import quote
+from unittest.mock import patch
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -25,6 +29,8 @@ import report_routes  # noqa: E402
 import seo_books  # noqa: E402
 import status_api_routes  # noqa: E402
 import live_search_routes  # noqa: E402
+import live_search.service as live_service  # noqa: E402
+from live_search.cache import TTLMemoryCache  # noqa: E402
 from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
 from live_search.connectors.bookers import BookersConnector  # noqa: E402
 from live_search.models import LiveSearchResult  # noqa: E402
@@ -178,10 +184,123 @@ def assert_blog_images_load(client):
         raise AssertionError("Broken blog images:\n" + "\n".join(failures))
 
 
+def assert_live_search_failure_contract():
+    """Keep timeout/cache/singleflight regressions DB-free and off the network."""
+    def result(code="mapo", platform="Kyobo_New"):
+        return LiveSearchResult(title="회귀검증책", author="작가", publisher="출판사",
+                                library_code=code, library_name=code, library_short=code,
+                                platform=platform)
+
+    success = [{"errors": [], "error_count": 0, "searched_libraries": 1, "successful_libraries": 1}]
+    failure = [{"errors": [{"library_code": "mapo", "error": "search_timeout"}],
+                "error_count": 1, "failed_libraries": ["mapo"],
+                "searched_libraries": 1, "successful_libraries": 0}]
+    with patch.object(live_service, "_CACHE", TTLMemoryCache(600)), \
+            patch.object(live_service, "_DETAIL_CACHE", TTLMemoryCache(600)):
+        with patch.object(live_service, "_search_libraries", return_value=([], failure)) as upstream:
+            for _ in range(2):
+                payload = live_service.live_search("실패한검색", "title")
+                assert payload["meta"]["partial"] and not payload["meta"]["cache_hit"]
+            assert upstream.call_count == 2, "failed empty results must not poison the cache"
+
+        with patch.object(live_service, "_search_libraries", return_value=([result()], failure)):
+            payload = live_service.live_search("회귀검증책", "title")
+            cached = live_service.live_search("회귀검증책", "title")
+            assert payload["items"][0]["counts_partial"] and cached["meta"]["partial"]
+            assert cached["meta"]["cache_hit"]
+            expiry, _ = next(iter(live_service._CACHE._items.values()))
+            assert 0 < expiry - time.time() <= live_service.LIVE_SEARCH_PARTIAL_TTL_SEC
+
+        with patch.object(live_service, "_search_libraries", return_value=([result()], success)):
+            limited = live_service.live_search("회귀검증책", "title", libraries_raw="mapo")
+            assert limited["meta"]["scope_limited"] and not limited["meta"]["partial"]
+            assert live_search_routes._attach_summary_urls(limited, "회귀검증책")["items"][0]["counts_partial"]
+
+        barrier = threading.Barrier(6)
+        def fetch(*args):
+            time.sleep(0.08)
+            return [result()], success
+
+        def search(index):
+            barrier.wait(timeout=5)
+            return live_service.live_search("동시요청", "title", limit=1, offset=index % 2)
+
+        with patch.object(live_service, "_search_libraries", side_effect=fetch) as upstream:
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                responses = list(executor.map(search, range(6)))
+            assert upstream.call_count == 1, "concurrent identical searches must share one fanout"
+        assert all(len(value["items"]) == 1 for value in responses[::2])
+        assert all(not value["items"] for value in responses[1::2])
+        responses[0]["items"][0]["title"] = "mutated"
+        assert responses[2]["items"][0]["title"] == "회귀검증책"
+        assert not live_service._INFLIGHT
+
+        barrier = threading.Barrier(6)
+        def fail(*args):
+            time.sleep(0.08)
+            raise RuntimeError("smoke leader failure")
+
+        def failed_search(index):
+            barrier.wait(timeout=5)
+            try:
+                live_service.live_search("실패동시요청", "title")
+            except RuntimeError as error:
+                return str(error)
+
+        with patch.object(live_service, "_search_libraries", side_effect=fail) as upstream:
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                failures = list(executor.map(failed_search, range(6)))
+            assert upstream.call_count == 1 and failures == ["smoke leader failure"] * 6
+        assert not live_service._INFLIGHT, "failed leader must release waiting requests"
+        with patch.object(live_service, "_search_libraries", return_value=([], success)):
+            assert live_service.live_search("실패동시요청", "title")["total"] == 0
+
+    calls = []
+    class Connector:
+        def search_library(self, code, cfg, query, field, limit, timeout):
+            calls.append(code)
+            return []
+
+    with patch.object(live_service, "_connector_for_library", return_value=Connector()):
+        live_service._search_libraries("회귀검증책", "title", list(live_service.LIBRARIES), ["YES24"])
+    assert len(calls) < len(live_service.LIBRARIES), "fixed incompatible providers should be pruned"
+    assert set(live_service.SPECIAL_CONNECTOR_FACTORIES) <= set(calls)
+    assert all(code in calls for code, cfg in live_service.LIBRARIES.items()
+               if cfg.get("platform") in {"Mixed", "Unknown"})
+
+    release = threading.Event()
+    class SlowConnector:
+        def search_library(self, *args):
+            release.wait(1)
+            return []
+
+    try:
+        with patch.object(live_service, "LIVE_SEARCH_TOTAL_TIMEOUT", 0.01), \
+                patch.object(live_service, "_connector_for_library", return_value=SlowConnector()):
+            _, diagnostics = live_service._search_libraries("회귀검증책", "title", ["mapo", "yongsan"], [])
+            assert diagnostics[0]["error_count"] == 2 and diagnostics[0]["successful_libraries"] == 0
+    finally:
+        release.set()
+
+    book = {"title": "회귀검증책", "author": "작가", "counts": {"total": 1}, "libraries": [{"code": "mapo"}]}
+    with patch.object(live_search_routes, "live_search", return_value={"items": [book], "meta": {"partial": True}}), \
+            patch.object(live_search_routes, "get_cached_live_detail", return_value=None):
+        assert live_search_routes._find_complete_live_book(book)["_live_detail_complete"] is False
+        payload = app.test_client().get("/api/live_book_detail?title=회귀검증책&author=작가").get_json()
+        assert payload["counts_partial"] and payload["book"]["counts_partial"]
+
+    cache = TTLMemoryCache(600, max_items=2)
+    cache.set("a", 1)
+    cache.set("b", 2)
+    cache.set("a", 3)
+    assert cache.get("b") == 2 and cache.get("a") == 3
+
+
 def main():
     shared_shelves_tmp = Path(os.environ["SHARED_SHELVES_FILE"])
     shared_shelves_tmp.unlink(missing_ok=True)
     client = app.test_client()
+    assert_live_search_failure_contract()
 
     cover_choice = merge_live_results(
         [
@@ -229,7 +348,7 @@ def main():
         raise AssertionError("search page title should keep the service name")
     if "책 제목이나 저자를 검색하세요." not in search_body:
         raise AssertionError("search page should keep the concise empty state")
-    if "search.js?v=live20260527a" not in search_body:
+    if "search.js?v=live20261012a" not in search_body:
         raise AssertionError("search page should use the current search asset")
 
     blog = assert_response(client, "/blog")
@@ -1353,6 +1472,8 @@ def main():
         if url != "https://api.github.com/repos/pkkong/soulibrary/issues":
             raise AssertionError(f"unexpected issue url: {url}")
         body = (json or {}).get("body", "")
+        if "## 연락처" in body or "tester@example.com" in body:
+            raise AssertionError("report submission must not publish a contact field")
         if "저장 실패 테스트입니다." in body:
             return FakeIssueFailureResponse()
         if not json or (

@@ -85,6 +85,8 @@ Codespaces에서는 포트 `5001`이 자동 포워딩됩니다. 모바일이나 
 → Vercel production 배포와 live smoke test 통과
 ```
 
+서비스 검토, 검색 성능, 이용자 분석, 피드백과 레거시 삭제의 추가 게이트는 [docs/service_observability.md](docs/service_observability.md)를 따른다. 검색 변경은 실제 `/api/live_search` 응답과 부분 실패를 확인하고, 분석 설치 여부와 실제 데이터 수집을 구분한다. 검색어·방문자·이용 데이터 수집은 현재 사용자 승인 범위이며, 원시 운영 지표와 자세한 감사 보고서는 공개 커밋에서 제외한다.
+
 ## 환경변수
 
 필요한 값은 `.env.example`을 참고합니다. 기본 실시간 검색은 별도 DB 없이 실행됩니다.
@@ -145,6 +147,8 @@ gh secret set GSC_OAUTH_TOKEN_JSON --repo pkkong/soulibrary < .secrets/search-co
 Search Console 인증값을 다룰 때는 token 원문이나 JSON 본문을 출력하지 않습니다. 실패 보고에는 secret 이름, 파일 경로, 권한 상태, 재인증 필요 여부만 남깁니다.
 
 Search Console 스크립트의 인증 실패 처리 기준은 `--auth-failure-mode dry-run|fail`입니다. 기본값은 `dry-run`이며, token 만료나 권한 실패가 나도 빈 지표 JSON을 출력하고 exit 0으로 끝내서 GitHub Actions에 빨간 실패를 쌓지 않습니다. 실제 지표 복구 검증이나 CI에서 반드시 실패시켜야 하는 점검에는 `--auth-failure-mode fail`을 명시합니다.
+
+exit 0 또는 workflow 성공은 실제 측정 성공을 뜻하지 않습니다. `dry_run`과 경고/step summary를 확인하고, 데이터 미수집을 이용자 0명으로 해석하지 않습니다. OAuth refresh 실패 시 사용자 재인증 또는 서비스 계정 접근 권한이 필요하며, GA4에 연결된 GSC 대시보드 조회와 API 자동화 복구는 별도로 확인합니다.
 
 로컬 secret 상태와 tracked 파일 노출 여부는 아래 명령으로 확인합니다. 출력에는 값이 아니라 키 이름, 파일명, 패턴명만 나옵니다.
 

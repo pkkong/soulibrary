@@ -15,7 +15,10 @@ from seo_books import record_search_results
 live_search_bp = Blueprint("live_search", __name__)
 
 
-def _counts_need_hydration(query: str, item: dict) -> bool:
+def _counts_need_hydration(query: str, item: dict, meta: dict | None = None) -> bool:
+    meta = meta or {}
+    if item.get("counts_partial") or meta.get("partial") or meta.get("scope_limited"):
+        return True
     query_key = normalize_text(query)
     title_key = normalize_text(item.get("title"))
     return bool(query_key and title_key and query_key != title_key)
@@ -25,7 +28,7 @@ def _attach_summary_urls(payload: dict, query: str) -> dict:
     for item in payload.get("items") or []:
         if not isinstance(item, dict) or not item.get("title"):
             continue
-        needs_hydration = _counts_need_hydration(query, item)
+        needs_hydration = _counts_need_hydration(query, item, payload.get("meta"))
         item["counts_partial"] = needs_hydration
         if not needs_hydration:
             item.pop("summary_url", None)
@@ -296,7 +299,7 @@ def _pop_live_detail_complete(book: dict) -> bool:
 def _find_complete_live_book(target: dict, fallback: dict | None = None):
     if not target.get("title"):
         return _copy_live_book(fallback, _is_complete_fallback(fallback))
-    items = []
+    candidates = []
     for query in _title_search_candidates(target["title"]):
         payload = live_search(
             query=query,
@@ -306,9 +309,14 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
             limit=100,
             offset=0,
         )
-        items.extend(payload.get("items") or [])
+        meta = payload.get("meta") or {}
+        search_complete = not (meta.get("partial") or meta.get("scope_limited") or any(
+            diagnostic.get("error_count") or diagnostic.get("errors")
+            for diagnostic in meta.get("diagnostics") or []
+        ))
+        candidates.extend((item, search_complete and not item.get("counts_partial")) for item in payload.get("items") or [])
 
-    family_matches = [(item, True) for item in items if _same_book_family_with_author(target, item)]
+    family_matches = [(item, complete) for item, complete in candidates if _same_book_family_with_author(target, item)]
     if fallback and _same_book_family_with_author(target, fallback):
         family_matches.append((fallback, _is_complete_fallback(fallback)))
     if family_matches:
@@ -319,16 +327,16 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
         return _copy_live_book(best, complete)
 
     ranked = sorted(
-        [item for item in items if _safe_loose_detail_match(target, item)],
-        key=lambda item: _match_score(target, item),
+        [(item, complete) for item, complete in candidates if _safe_loose_detail_match(target, item)],
+        key=lambda entry: _match_score(target, entry[0]),
         reverse=True,
     )
-    best = ranked[0] if ranked else None
+    best, complete = ranked[0] if ranked else (None, False)
     if not best:
         return _copy_live_book(fallback, _is_complete_fallback(fallback))
     if fallback and _library_count(fallback) > _library_count(best) and _same_book_family_with_author(target, fallback):
         return _copy_live_book(fallback, _is_complete_fallback(fallback))
-    return _copy_live_book(best, True)
+    return _copy_live_book(best, complete)
 
 
 def _detail_hydrate_url(cache_key: str, target: dict, fallback: dict | None = None) -> str:
@@ -384,6 +392,7 @@ def api_live_book_summary():
                 "author": book.get("author") or "",
                 "publisher": book.get("publisher") or "",
                 "counts": book.get("counts") or {},
+                "counts_partial": not _pop_live_detail_complete(book),
                 "live_detail_url": book.get("live_detail_url") or "",
                 "live_detail_key": book.get("live_detail_key") or "",
             }
@@ -423,12 +432,14 @@ def api_live_book_detail():
                     "image_url": decorated.get("image_url") or "",
                     "image_candidates": decorated.get("image_candidates") or [],
                     "counts": decorated.get("counts") or {},
+                    "counts_partial": decorated.get("counts_partial", False),
                     "libraries": decorated.get("libraries") or [],
                     "live_detail_key": decorated.get("live_detail_key") or cache_key,
                     "live_detail_url": decorated.get("live_detail_url") or "",
                 },
                 "groups_html": render_template("partials/live_library_groups.html", book=decorated),
                 "counts": decorated.get("counts") or {},
+                "counts_partial": decorated.get("counts_partial", False),
                 "live_detail_key": decorated.get("live_detail_key") or cache_key,
             }
         )
