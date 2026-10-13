@@ -35,6 +35,7 @@
     {% endif %}
 
     <form class="report-form" method="post" action="/reports">
+        <p class="report-public-notice" id="report-public-notice">신고 내용과 문제가 있던 주소는 사이트와 GitHub에 공개됩니다. 이름·연락처 등 개인정보는 적지 마세요.</p>
         <label class="report-field">
             <span>분류</span>
             <span class="report-select-wrap">
@@ -48,17 +49,12 @@
 
         <label class="report-field">
             <span>내용</span>
-            <textarea name="message" rows="6" maxlength="1200" required placeholder="어떤 문제가 있었나요?">{{ form.message }}</textarea>
+            <textarea name="message" rows="6" maxlength="1200" required aria-describedby="report-public-notice" placeholder="어떤 문제가 있었나요?">{{ form.message }}</textarea>
         </label>
 
         <label class="report-field">
             <span>문제가 있던 주소</span>
-            <input name="page_url" type="url" value="{{ form.page_url }}" placeholder="https://www.soulib.kr/search?q=..." inputmode="url">
-        </label>
-
-        <label class="report-field">
-            <span>연락처</span>
-            <input name="contact" type="text" value="{{ form.contact }}" maxlength="120" placeholder="선택 입력">
+            <input name="page_url" type="url" value="{{ form.page_url }}" aria-describedby="report-public-notice" placeholder="https://www.soulib.kr/search?q=..." inputmode="url">
         </label>
 
         <label class="report-honeypot" aria-hidden="true">
@@ -84,6 +80,9 @@
 {% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+    {% if saved_report %}
+    if (window.SoulibAnalytics) window.SoulibAnalytics.track("report_success");
+    {% endif %}
     const form = document.querySelector(".report-form");
     const submit = document.querySelector(".report-submit");
     if (!form || !submit) {

@@ -107,6 +107,7 @@
         const overlay = document.getElementById(QUICK_SEARCH_ID);
         if (overlay) overlay.hidden = true;
         document.body.classList.remove("is-quick-search-open");
+        if (window.SoulibDialog) window.SoulibDialog.close(overlay);
     }
 
     function quickSearchUrl(value) {
@@ -121,7 +122,7 @@
         let overlay = document.getElementById(QUICK_SEARCH_ID);
         if (overlay) return overlay;
         document.body.insertAdjacentHTML("beforeend", `
-            <div class="quick-search-overlay" id="${QUICK_SEARCH_ID}" hidden>
+            <div class="quick-search-overlay" id="${QUICK_SEARCH_ID}" role="dialog" aria-modal="true" aria-label="검색" hidden>
                 <form class="quick-search-box" id="quick-search-form" role="search">
                     <span class="quick-search-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -167,6 +168,7 @@
         if (pageInput && pageInput.value && !input.value) input.value = pageInput.value;
         overlay.hidden = false;
         document.body.classList.add("is-quick-search-open");
+        if (window.SoulibDialog) window.SoulibDialog.open(overlay, {initialFocus: input, onClose: closeQuickSearch});
         focusInput(input);
         window.setTimeout(() => focusInput(input), 60);
     }

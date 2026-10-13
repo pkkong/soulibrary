@@ -10,7 +10,6 @@ from flask import Blueprint, jsonify, redirect, render_template, request, url_fo
 report_bp = Blueprint("reports", __name__)
 
 MAX_MESSAGE_LEN = 1200
-MAX_CONTACT_LEN = 120
 MAX_PAGE_URL_LEN = 500
 REPORT_MESSAGE_MIN_LEN = 5
 DEFAULT_GITHUB_REPO = "pkkong/soulibrary"
@@ -30,7 +29,6 @@ def _report_form_from_mapping(values) -> dict:
     return {
         "category": _clean(values.get("category") or "오류", 20),
         "message": _clean(values.get("message"), MAX_MESSAGE_LEN),
-        "contact": _clean(values.get("contact"), MAX_CONTACT_LEN),
         "page_url": _clean(values.get("page_url"), MAX_PAGE_URL_LEN),
     }
 
@@ -125,7 +123,6 @@ def _default_report_form(page_url: str = "") -> dict:
     return {
         "category": "오류",
         "message": "",
-        "contact": "",
         "page_url": page_url,
     }
 
@@ -349,9 +346,6 @@ def _create_github_issue(form: dict, user_agent: str) -> dict:
             "",
             "## 문제가 있던 주소",
             form["page_url"] or "(입력 없음)",
-            "",
-            "## 연락처",
-            form["contact"] or "(입력 없음)",
             "",
             "## User-Agent",
             f"`{user_agent or '(unknown)'}`",

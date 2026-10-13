@@ -20,7 +20,7 @@ from adapters.status_parsers import (
     parse_yes24_status,
 )
 from config import LIBRARIES
-from utils.http import DEFAULT_HEADERS, DOBONG_HEADERS, get_status_session, http_fallback
+from utils.http import DEFAULT_HEADERS, DOBONG_HEADERS, get_status_session
 
 status_api_bp = Blueprint("status_api", __name__)
 
@@ -105,48 +105,12 @@ def _bookcube_list_url(library_code: str) -> str:
     )
 
 
-def _bookcube_page_size(list_url: str) -> int:
-    parsed = urlparse(list_url)
-    qs = parse_qs(parsed.query)
-    value = (qs.get("itemCount") or [""])[0]
-    try:
-        size = int(value)
-        return max(1, size)
-    except Exception as e:
-        print(f"[status error] {e}")
-        print(traceback.format_exc())
-        return 20
-
-
-def _bookcube_page_url(list_url: str, page: int) -> str:
-    parsed = urlparse(list_url)
-    qs = parse_qs(parsed.query)
-    qs["page"] = [str(page)]
-    new_query = urlencode(qs, doseq=True)
-    return urlunparse(parsed._replace(query=new_query))
-
-
 def _bookcube_status_list_url(list_url: str) -> str:
     if not list_url:
         return list_url
     parsed = urlparse(list_url)
     qs = parse_qs(parsed.query)
     qs["itemCount"] = ["200"]
-    new_query = urlencode(qs, doseq=True)
-    return urlunparse(parsed._replace(query=new_query))
-
-
-def _bookcube_search_list_url(list_url: str, keyword: str, keyoption2: str = "1") -> str:
-    if not list_url or not keyword:
-        return list_url
-    parsed = urlparse(list_url)
-    qs = parse_qs(parsed.query)
-    qs["page"] = ["1"]
-    qs["itemCount"] = ["200"]
-    qs["searchType"] = ["search"]
-    qs["searchoption"] = ["1"]
-    qs["keyoption2"] = [keyoption2]
-    qs["keyword"] = [keyword]
     new_query = urlencode(qs, doseq=True)
     return urlunparse(parsed._replace(query=new_query))
 
@@ -160,14 +124,6 @@ def _gangnam_list_url(library_code: str) -> str:
     if not base_url:
         return ""
     return f"{base_url.rstrip('/')}/elibbook/book_category.asp?mode=&page_num=1&branch=99&supply_code=&strSort=p&ldav="
-
-
-def _gangnam_page_url(list_url: str, page: int) -> str:
-    parsed = urlparse(list_url)
-    qs = parse_qs(parsed.query)
-    qs["page_num"] = [str(page)]
-    new_query = urlencode(qs, doseq=True)
-    return urlunparse(parsed._replace(query=new_query))
 
 
 @status_api_bp.route("/api/kyobo_status")

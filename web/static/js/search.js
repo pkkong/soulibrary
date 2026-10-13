@@ -19,10 +19,6 @@ const PROVIDER_LABELS = {
     "기타 도서관": "기타",
 };
 
-const PROVIDER_LOGOS = {};
-const MSG_NO_RESULTS = "검색 결과가 없습니다.";
-const MSG_ERROR = "검색 중 오류가 발생했습니다.";
-const MSG_ERROR_PREFIX = "오류: ";
 const CARD_SUMMARY_HYDRATE_LIMIT = 5;
 const MIN_COVER_SOURCE_WIDTH = 170;
 
@@ -33,6 +29,11 @@ let totalCount = 0;
 let currentQueryText = "";
 let refineQueryText = "";
 let loadMoreInFlight = false;
+let searchController = null;
+let loadMoreController = null;
+let searchGeneration = 0;
+let currentMeta = {};
+let lastSuccessParams = "";
 let currentFilters = { providers: [], libraries: [] };
 let selectedProviders = new Set();
 let selectedLibraries = new Set();
@@ -41,10 +42,7 @@ let tempSelectedProviders = new Set();
 let tempSelectedLibraries = new Set();
 let tempSelectedField = "title_author";
 const summaryHydrateStarted = new Set();
-const filterBar = document.querySelector(".filter-bar");
-if (filterBar) filterBar.style.display = "none"; // legacy filter bar hidden
 const filterSummary = document.getElementById("filter-summary");
-const filterSummaryText = document.getElementById("filter-summary-text");
 const searchPageEl = document.querySelector(".search-page");
 const searchEmptyState = document.getElementById("search-empty-state");
 const shelf = window.SoulibShelf;
@@ -56,15 +54,35 @@ function _isValidSearchField(value) {
     return value === "title_author" || value === "title" || value === "author" || value === "publisher";
 }
 
-function showResultsMessage(text, kind) {
-    const resultsDiv = document.getElementById("results");
-    if (!resultsDiv) return;
-    setSearchEmpty(false);
-    resultsDiv.innerHTML = "";
-    const el = document.createElement("div");
-    el.className = `card result-message ${kind}`;
-    el.innerText = text || "";
-    resultsDiv.appendChild(el);
+function showSearchFeedback(text, options = {}) {
+    const feedback = document.getElementById("search-feedback");
+    if (!feedback) return;
+    document.getElementById("search-feedback-text").textContent = text || "";
+    document.getElementById("search-retry").hidden = !options.retry;
+    document.getElementById("search-reset-filters").hidden = !options.reset;
+    document.getElementById("search-feedback-guide").hidden = !options.guide;
+    feedback.hidden = !text;
+}
+
+function hasSearchFilters() {
+    return selectedField !== "title_author" || selectedProviders.size > 0 || selectedLibraries.size > 0 || !!refineQueryText;
+}
+
+function showSearchOutcome() {
+    if (currentMeta.partial && currentMeta.successful_libraries === 0 && Number(currentMeta.searched_libraries) > 0) {
+        document.getElementById("status").textContent = "검색을 완료하지 못했습니다.";
+        showSearchFeedback("도서관 정보를 확인하지 못했습니다. 잠시 뒤 다시 시도해주세요.", {retry: true, reset: hasSearchFilters()});
+    } else if (currentMeta.partial) {
+        showSearchFeedback("일부 도서관을 확인하지 못했습니다. 다시 시도하면 결과가 더 나올 수 있습니다.", {retry: true, reset: hasSearchFilters(), guide: !currentResults.length});
+    } else if (!currentResults.length) {
+        showSearchFeedback("검색 결과가 없습니다. 제목 일부나 저자로 다시 검색해보세요.", {reset: hasSearchFilters(), guide: true});
+    } else {
+        showSearchFeedback("");
+    }
+}
+
+function trackSearch(name, params) {
+    if (window.SoulibAnalytics) window.SoulibAnalytics.track(name, params);
 }
 
 function providerLabel(raw) {
@@ -248,34 +266,19 @@ function buildFilters(results, filters) {
     };
 }
 
-function renderFilterList(containerId, items, type) {
-    const box = document.getElementById(containerId);
-    if (!box) return;
-    box.innerHTML = items.map(val => `
-        <label>
-            <input type="checkbox" value="${val}" data-type="${type}" />
-            <span>${val}</span>
-        </label>
-    `).join("");
-    box.querySelectorAll("input").forEach(input => {
-        input.addEventListener("change", (e) => {
-            const value = e.target.value;
-            if (type === "provider") {
-                if (e.target.checked) selectedProviders.add(value);
-                else selectedProviders.delete(value);
-            } else {
-                if (e.target.checked) selectedLibraries.add(value);
-                else selectedLibraries.delete(value);
-            }
-        });
-    });
-}
 
 function resetFilters() {
+    selectedField = "title_author";
     selectedProviders.clear();
     selectedLibraries.clear();
-    document.querySelectorAll("#platform-filters input, #library-filters input").forEach(i => i.checked = false);
-    applyFilters();
+    refineQueryText = "";
+    if (refineToggle) refineToggle.checked = false;
+    if (searchTopInput) {
+        searchTopInput.value = currentQueryText;
+        searchTopInput.placeholder = "검색어를 입력하세요";
+    }
+    updateFilterSummary();
+    if (currentQueryText) fetchSearch(currentQueryText, "");
 }
 
 function applyFilters(reset = true) {
@@ -291,75 +294,93 @@ function applyFilters(reset = true) {
     const prefix = currentQueryText ? `'${currentQueryText}'` : "";
     const refineLabel = refineQueryText ? ` + '${refineQueryText}'` : "";
     const label = prefix ? `${prefix}${refineLabel} ` : "";
-    document.getElementById('status').innerText = `${label}검색 결과 ${countText}권`;
+    const scope = currentMeta.partial ? "확인된 검색 결과" : "검색 결과";
+    document.getElementById('status').innerText = `${label}${scope} ${countText}권`;
     updateFilterSummary();
 
     const loadMoreBtn = document.getElementById('load-more');
     if (filteredResults.length === 0) {
         if (loadMoreBtn) loadMoreBtn.style.display = "none";
-        showResultsMessage(MSG_NO_RESULTS, "empty");
+        showSearchOutcome();
         return;
     }
 
     renderMore();
 }
 
-function fetchSearch(query, refine) {
+async function fetchSearch(query, refine) {
+    if (searchController) searchController.abort();
+    if (loadMoreController) loadMoreController.abort();
+    loadMoreInFlight = false;
+    setLoadMoreLoading(false);
+    const generation = ++searchGeneration;
+    const controller = new AbortController();
+    searchController = controller;
+    const started = performance.now();
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
     const loader = document.getElementById('loading-spinner');
     const loadMoreBtn = document.getElementById('load-more');
-    setSearchEmpty(false);
-    if (searchPageEl) searchPageEl.classList.remove("has-results");
-    statusDiv.innerText = "";
-    resultsDiv.innerHTML = "";
-    loader.style.display = "block";
-    loadMoreBtn.style.display = "none";
-    renderIndex = 0;
-    currentResults = [];
-    filteredResults = [];
-    totalCount = 0;
-    renderedBooksByShelfKey.clear();
-    summaryHydrateStarted.clear();
-    const params = new URLSearchParams();
-    params.set("query", query);
-    params.set("field", selectedField);
-    params.set("limit", PAGE_SIZE.toString());
-    params.set("offset", "0");
+    const params = new URLSearchParams({query, field: selectedField, limit: String(PAGE_SIZE), offset: "0"});
+    const searchMetrics = {search_term: [query, refine].filter(Boolean).join(" ").slice(0, 200), field: selectedField,
+        provider_count: selectedProviders.size, library_count: selectedLibraries.size};
     if (refine) params.set("refine", refine);
-    if (selectedProviders.size > 0) {
-        params.set("providers", [...selectedProviders].join(","));
+    if (selectedProviders.size) params.set("providers", [...selectedProviders].join(","));
+    if (selectedLibraries.size) params.set("libraries", [...selectedLibraries].join(","));
+    const keepResults = params.toString() === lastSuccessParams && currentResults.length > 0;
+    setSearchEmpty(false);
+    showSearchFeedback("");
+    if (!keepResults) {
+        if (searchPageEl) searchPageEl.classList.remove("has-results");
+        resultsDiv.replaceChildren();
+        renderIndex = 0;
+        currentResults = [];
+        filteredResults = [];
+        totalCount = 0;
+        renderedBooksByShelfKey.clear();
+        summaryHydrateStarted.clear();
     }
-    if (selectedLibraries.size > 0) {
-        params.set("libraries", [...selectedLibraries].join(","));
-    }
+    statusDiv.textContent = "도서관에서 검색 중입니다…";
+    resultsDiv.setAttribute("aria-busy", "true");
+    loader.style.display = keepResults ? "none" : "block";
+    loadMoreBtn.style.display = "none";
     syncSearchPageUrl(query, refine);
-    fetch(`${SEARCH_API_ENDPOINT}?${params.toString()}`)
-        .then(res => res.json())
-        .then(data => {
+    trackSearch("search_start", searchMetrics);
+    const slowTimer = setTimeout(() => {
+        if (generation === searchGeneration) statusDiv.textContent = "일부 도서관 응답이 늦어지고 있습니다…";
+    }, 8000);
+    try {
+        const response = await fetch(`${SEARCH_API_ENDPOINT}?${params}`, {signal: controller.signal});
+        if (!response.ok) throw new Error("http");
+        const data = await response.json();
+        if (generation !== searchGeneration) return;
+        if (data.error) throw new Error("api");
+        currentResults = Array.isArray(data.items) ? data.items : [];
+        const totalValue = Number(data.total);
+        totalCount = Number.isFinite(totalValue) ? totalValue : currentResults.length;
+        currentMeta = data.meta || {};
+        lastSuccessParams = params.toString();
+        buildFilters(currentResults, data.filters || null);
+        applyFilters();
+        showSearchOutcome();
+        loadMoreBtn.onclick = loadMoreFromServer;
+        const failedLibraries = currentMeta.failed_libraries;
+        trackSearch("search_result", {...searchMetrics, result_count: totalCount, duration_ms: performance.now() - started,
+            partial: !!currentMeta.partial, failed_library_count: Array.isArray(failedLibraries) ? failedLibraries.length : Number(failedLibraries || 0)});
+    } catch (error) {
+        if (error.name === "AbortError" || generation !== searchGeneration) return;
+        statusDiv.textContent = "검색을 완료하지 못했습니다.";
+        showSearchFeedback("도서관에 연결하지 못했습니다. 잠시 뒤 다시 시도해주세요.", {retry: true, reset: hasSearchFilters()});
+        const errorType = error.name === "TypeError" ? "network" : error.name === "SyntaxError" ? "invalid_response" : error.message;
+        trackSearch("search_error", {...searchMetrics, duration_ms: performance.now() - started, error_type: errorType});
+    } finally {
+        clearTimeout(slowTimer);
+        if (generation === searchGeneration) {
             loader.style.display = "none";
-            if (data.error) {
-                showResultsMessage(MSG_ERROR_PREFIX + data.error, "error");
-                return;
-            }
-            const items = Array.isArray(data.items) ? data.items : [];
-            const totalValue = Number(data.total);
-            totalCount = Number.isFinite(totalValue) ? totalValue : 0;
-            if (items.length === 0) {
-                statusDiv.innerText = `'${query}' 검색 결과 0권`;
-                return;
-            }
-            currentResults = items;
-            buildFilters(items, data.filters || null);
-            applyFilters();
-            if (loadMoreBtn) loadMoreBtn.onclick = loadMoreFromServer;
-            if (filterBar) filterBar.style.display = "flex";
-        })
-        .catch(err => {
-            loader.style.display = "none";
-            showResultsMessage(MSG_ERROR, "error");
-            console.error(err);
-            });
+            resultsDiv.removeAttribute("aria-busy");
+            searchController = null;
+        }
+    }
 }
 
 function syncSearchPageUrl(query, refine) {
@@ -386,17 +407,6 @@ function search() {
     fetchSearch(query, "");
 }
 
-function uniqueLibraries(book) {
-    const seen = new Set();
-    const libs = [];
-    extractLibraries(book).forEach(l => {
-        const key = l.code || l.short || l.name;
-        if (seen.has(key)) return;
-        seen.add(key);
-        libs.push(l);
-    });
-    return libs;
-}
 
 function renderMore() {
     const resultsDiv = document.getElementById('results');
@@ -485,56 +495,47 @@ function setLoadMoreLoading(isLoading) {
     }
 }
 
-function loadMoreFromServer() {
-    if (!currentQueryText) return;
-    if (loadMoreInFlight) return;
+async function loadMoreFromServer() {
+    if (!currentQueryText || loadMoreInFlight || searchController) return;
     loadMoreInFlight = true;
     setLoadMoreLoading(true);
-    const params = new URLSearchParams();
-    params.set("query", currentQueryText);
-    params.set("field", selectedField);
-    params.set("limit", PAGE_SIZE.toString());
-    params.set("offset", String(currentResults.length));
+    const generation = searchGeneration;
+    const controller = new AbortController();
+    loadMoreController = controller;
+    const params = new URLSearchParams({query: currentQueryText, field: selectedField, limit: String(PAGE_SIZE), offset: String(currentResults.length)});
     if (refineQueryText) params.set("refine", refineQueryText);
-    if (selectedProviders.size > 0) {
-        params.set("providers", [...selectedProviders].join(","));
-    }
-    if (selectedLibraries.size > 0) {
-        params.set("libraries", [...selectedLibraries].join(","));
-    }
-    fetch(`${SEARCH_API_ENDPOINT}?${params.toString()}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                showResultsMessage(MSG_ERROR_PREFIX + data.error, "error");
-                setLoadMoreLoading(false);
-                loadMoreInFlight = false;
-                return;
-            }
-            const items = Array.isArray(data.items) ? data.items : [];
-            if (items.length === 0) {
-                const loadMoreBtn = document.getElementById('load-more');
-                if (loadMoreBtn) loadMoreBtn.style.display = "none";
-                setLoadMoreLoading(false);
-                loadMoreInFlight = false;
-                return;
-            }
-            const totalValue = Number(data.total);
-            if (Number.isFinite(totalValue)) {
-                totalCount = totalValue;
-            }
-            currentResults = currentResults.concat(items);
-            buildFilters(currentResults, data.filters || null);
-            applyFilters(false);
+    if (selectedProviders.size) params.set("providers", [...selectedProviders].join(","));
+    if (selectedLibraries.size) params.set("libraries", [...selectedLibraries].join(","));
+    try {
+        const response = await fetch(`${SEARCH_API_ENDPOINT}?${params}`, {signal: controller.signal});
+        if (!response.ok) throw new Error("search_failed");
+        const data = await response.json();
+        if (generation !== searchGeneration) return;
+        if (data.error) throw new Error("search_failed");
+        const items = Array.isArray(data.items) ? data.items : [];
+        currentMeta = data.meta || {};
+        showSearchFeedback("");
+        if (!items.length) {
+            document.getElementById('load-more').style.display = "none";
+            showSearchOutcome();
+            return;
+        }
+        const totalValue = Number(data.total);
+        if (Number.isFinite(totalValue)) totalCount = totalValue;
+        currentResults = currentResults.concat(items);
+        buildFilters(currentResults, data.filters || null);
+        applyFilters(false);
+        showSearchOutcome();
+    } catch (error) {
+        if (error.name === "AbortError" || generation !== searchGeneration) return;
+        showSearchFeedback("나머지 검색 결과를 불러오지 못했습니다. 더 보기를 다시 눌러주세요.");
+    } finally {
+        if (generation === searchGeneration) {
             setLoadMoreLoading(false);
             loadMoreInFlight = false;
-        })
-        .catch(err => {
-            showResultsMessage(MSG_ERROR, "error");
-            console.error(err);
-            setLoadMoreLoading(false);
-            loadMoreInFlight = false;
-        });
+            loadMoreController = null;
+        }
+    }
 }
 
 document.addEventListener("click", (event) => {
@@ -578,6 +579,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const q = (params.get("q") || "").trim();
     if (!q) return;
 
+    selectedProviders = new Set((params.get("providers") || "").split(",").filter(Boolean));
+    selectedLibraries = new Set((params.get("libraries") || "").split(",").filter(Boolean));
     const field = (params.get("field") || "").trim();
     if (_isValidSearchField(field)) selectedField = field;
     refineQueryText = (params.get("refine") || "").trim();
@@ -640,8 +643,6 @@ if (refineToggle) {
     syncRefineUI();
 }
 
-function toggleFilters() {
-}
 
 // filter sheet
 let currentSheet = null; // field, provider, library
@@ -677,6 +678,8 @@ function openFilterSheet(type) {
     sheet.classList.add("show");
     sheet.setAttribute("aria-hidden", "false");
     sheet.removeAttribute("inert");
+    if (filterSummary) filterSummary.setAttribute("aria-expanded", "true");
+    if (window.SoulibDialog) window.SoulibDialog.open(sheet, {trigger: filterSummary, backdrop: overlay, onClose: closeSheet});
 }
 
 function closeSheet() {
@@ -687,6 +690,8 @@ function closeSheet() {
     sheet.setAttribute("aria-hidden", "true");
     sheet.setAttribute("inert", "");
     currentSheet = null;
+    if (filterSummary) filterSummary.setAttribute("aria-expanded", "false");
+    if (window.SoulibDialog) window.SoulibDialog.close(sheet);
 }
 
 function applySheet() {
@@ -727,7 +732,7 @@ function renderSheetOptions(type) {
         items.forEach(val => {
             const checked = tempSelectedProviders.has(val) ? "checked" : "";
             optsEl.insertAdjacentHTML("beforeend", `
-                <label><input type="checkbox" data-type="provider" value="${val}" ${checked} /> ${val}</label>
+                <label><input type="checkbox" data-type="provider" value="${escapeAttr(val)}" ${checked} /> ${escapeHtml(val)}</label>
             `);
         });
     } else if (type === "library") {
@@ -737,7 +742,7 @@ function renderSheetOptions(type) {
         items.forEach(val => {
             const checked = tempSelectedLibraries.has(val) ? "checked" : "";
             optsEl.insertAdjacentHTML("beforeend", `
-                <label><input type="checkbox" data-type="library" value="${val}" ${checked} /> ${val}</label>
+                <label><input type="checkbox" data-type="library" value="${escapeAttr(val)}" ${checked} /> ${escapeHtml(val)}</label>
             `);
         });
     }
@@ -758,7 +763,6 @@ function renderSheetOptions(type) {
     });
 }
 
-const queryInput = document.getElementById('query');
 const searchTopForm = document.getElementById('search-top-form');
 if (searchTopForm) {
     searchTopForm.addEventListener('submit', (e) => {
@@ -778,11 +782,13 @@ document.querySelectorAll(".sheet-tab").forEach(btn => {
 });
 
 function updateFilterSummary() {
-    if (!filterSummary || !filterSummaryText) return;
-    const titleEl = filterSummary.querySelector(".filter-title");
-    if (titleEl) titleEl.remove();
-    filterSummaryText.innerText = "필터";
-    filterSummary.style.display = "flex";
-}
-
-
+    if (!filterSummary) return;
+    const active = hasSearchFilters();
+    filterSummary.classList.toggle("has-filters", active);
+    filterSummary.setAttribute("aria-label", active ? "필터 (선택됨)" : "필터");
+}
+
+document.getElementById("search-retry").addEventListener("click", () => {
+    if (currentQueryText) fetchSearch(currentQueryText, refineQueryText);
+});
+document.getElementById("search-reset-filters").addEventListener("click", resetFilters);

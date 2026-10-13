@@ -12,45 +12,7 @@ PLATFORM_LABELS = {
     "Unknown": "기타",
 }
 
-# Short nicknames for compact library display
-LIBRARY_SHORT = {
-    "yongsan": "용산",
-    "mapo": "마포",
-    "gangbuk": "강북",
-    "gangbuk_subs": "강북",
-    "gwangjin": "광진(소장)",
-    "gwangjin_subs": "광진(구독)",
-    "seongdong": "성동",
-    "gangdong_owned": "강동(소장)",
-    "gangdong_subs": "강동(구독)",
-    "dobong": "도봉",
-    "seodaemun_subs": "서대문(구독)",
-    "seodaemun_owned": "서대문(소장)",
-    "junggu": "중구",
-    "jungnang": "중랑",
-    "gwanak": "관악",
-    "nowon": "노원",
-    "guro": "구로",
-    "seoul": "서울시",
-    "sen_owned": "서울교육청(소장)",
-    "sen_subs": "서울교육청(구독)",
-    "seongbuk": "성북",
-    "gangnam": "강남",
-    "yeongdeungpo": "영등포",
-    "dongdaemun": "동대문",
-    "dongjak": "동작",
-    "gangseo": "강서",
-    "seocho": "서초",
-    "eunpyeong": "은평",
-    "jongno": "종로",
-    "songpa_subs": "송파",
-    "songpa_owned": "송파",
-    "geumcheon": "금천",
-    "yangcheon_subs": "양천",
-    "yangcheon_owned": "양천",
-}
-
-# Override short names without subscription/owned qualifiers
+# Short nicknames for compact library display without subscription/owned qualifiers
 LIBRARY_SHORT = {
     "yongsan": "용산",
     "mapo": "마포",

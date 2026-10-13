@@ -22,14 +22,15 @@ class TTLMemoryCache:
                 return None
             return copy.deepcopy(value)
 
-    def set(self, key, value):
+    def set(self, key, value, ttl_seconds=None):
         now = time.time()
+        ttl_seconds = self.ttl_seconds if ttl_seconds is None else max(1, float(ttl_seconds))
         with self._lock:
-            if len(self._items) >= self.max_items:
+            if key not in self._items and len(self._items) >= self.max_items:
                 expired = [k for k, (expires_at, _) in self._items.items() if expires_at <= now]
                 for k in expired:
                     self._items.pop(k, None)
                 while len(self._items) >= self.max_items:
                     oldest_key = min(self._items, key=lambda k: self._items[k][0])
                     self._items.pop(oldest_key, None)
-            self._items[key] = (now + self.ttl_seconds, copy.deepcopy(value))
+            self._items[key] = (now + ttl_seconds, copy.deepcopy(value))

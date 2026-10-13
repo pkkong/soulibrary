@@ -43,12 +43,6 @@ def get_status_session():
     return _STATUS_SESSION
 
 
-def http_fallback(url: str) -> str:
-    if url.startswith("https://"):
-        return "http://" + url[len("https://"):]
-    return url
-
-
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

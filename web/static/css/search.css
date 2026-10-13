@@ -2097,6 +2097,38 @@ body.has-topbar .search-top {
 .result-message.error { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
 .result-message.empty { background: #f8fafc; border-color: #e5e7eb; color: #374151; }
 
+.search-feedback {
+    margin: 10px 14px 18px;
+    color: var(--text-sub);
+    font-size: 14px;
+    line-height: 1.55;
+}
+.search-feedback p { margin: 0; }
+.search-feedback-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
+.search-feedback-actions button,
+.search-feedback-actions a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-main);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.filter-summary.has-filters { background: #e5e5ea; }
+.report-public-notice { margin: 0; color: var(--text-sub); font-size: 14px; line-height: 1.55; }
+.detail-status-note { margin: 0 0 14px; color: var(--text-sub); font-size: 13px; line-height: 1.55; }
+.filter-sheet :focus-visible,
+.shelf-picker-sheet :focus-visible,
+.quick-search-overlay :focus-visible,
+.js-book-card:focus-visible,
+.search-feedback-actions :focus-visible { outline: 2px solid var(--text-main); outline-offset: 3px; }
+.shelf-picker-list:has(input:focus-visible) { outline: 2px solid var(--text-main); outline-offset: 3px; }
+
 .detail-hero {
     position: relative;
     height: 360px;

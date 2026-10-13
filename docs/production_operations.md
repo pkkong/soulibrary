@@ -127,8 +127,22 @@ live smoke는 아래를 확인합니다.
 - `/robots.txt`
 - `/static/css/search.css`
 - `/static/js/search.js`
-- `/api/search`
+- `/api/live_search`: 실제 도서관 검색 여부, 응답 schema, 전체 실패/부분 응답
 - 공유 서재 생성/조회
+
+production을 읽기만 점검할 때는 `python scripts/live_smoke.py https://www.soulib.kr --skip-shared --check-supporting`을 사용한다. 공유 서재 생성은 건너뛰고 신고 페이지와 sitemap XML을 추가 확인한다. 일부 외부 도서관 실패는 degraded warning으로 표시하며, 모든 도서관 실패 후 빈 결과는 실패로 판정한다. 읽기 점검 통과와 새 코드 배포 검증을 구분한다.
+
+검색 변경은 cache hit/miss를 구분하고 운영 검색이 DB 없이 동작하는지 확인한다. 자세한 검수 계약은 [service_observability.md](service_observability.md)를 참고한다.
+
+## 서비스 사용량과 피드백
+
+- GA4 태그 설치, 데이터 수집, 대시보드 접근, 실제 이용 이벤트를 각각 확인한다. 실제 traffic/검색어/페이지 성과 원본은 공개 문서에 기록하지 않는다.
+- 현재 검색어·방문자·이용 데이터 수집은 사용자 승인 범위다. 연락처·공유 서재 slug·원문 전체 URL은 제외하며, analytics 오류가 검색/서재/신고 기능을 중단시키지 않게 검증한다.
+- GA 내부 트래픽 필터는 상태까지 확인한다. Testing은 실제 제외가 아니다. enhanced measurement와 query redaction 설정을 코드 이벤트 정제와 별도로 검수한다.
+- enhanced measurement는 OFF, 정제된 수동 page view와 custom 이벤트를 기준으로 한다. `library_outbound`와 `shelf_save`는 주요 이벤트, `search_term`은 event-scoped 맞춤 측정기준으로 관리하며 배포 후 실제 수집을 확인한다.
+- 공유 서재 방문은 `/shelf/shared`의 공통 경로로 측정하고 slug를 제외한다. 공개 블로그·SEO landing 경로는 유지한다. 검수 중 수집 제외는 `SoulibAnalytics.setOptOut(true)`를 사용하며 상세 API와 저장 키는 [service_observability.md](service_observability.md)를 따른다.
+- 공개 GitHub 신고는 공개 사실을 폼에 알리고 연락처 필드를 받거나 저장하지 않는다. 성공 이벤트는 실제 접수 성공을 기준으로 한다.
+- GSC API 인증과 GA에 연결된 GSC 대시보드 조회는 별도 경로다. OAuth refresh 실패는 사용자 재인증 또는 서비스 계정 권한 복구가 필요하다.
 
 ## SEO 자동 개선 운영
 
@@ -169,6 +183,7 @@ Search Console secret 관리:
 - GitHub Actions에서는 repository variable `GSC_SITE_URL`, `PRODUCTION_BASE_URL`과 repository secret `GSC_SERVICE_ACCOUNT_JSON` 또는 `GSC_OAUTH_TOKEN_JSON`을 사용합니다.
 - Search Console 검색어와 페이지 성과는 운영 데이터입니다. GitHub issue, PR 본문, Actions artifact에는 원시 query/page/CTR/position을 그대로 올리지 않고 요약된 공개용 문구만 남깁니다. 원본 JSON은 job 내부 또는 로컬 파일로만 확인합니다.
 - Search Console 스크립트는 `--auth-failure-mode dry-run|fail`을 사용합니다. 기본값은 `dry-run`이며, 인증 만료나 권한 실패 시 빈 지표 JSON을 출력하고 exit 0으로 끝내서 `SEO Growth`가 빨간 실패로 쌓이지 않게 합니다.
+- `dry-run` fallback은 측정 장애로 표시하고 warning/step summary를 확인합니다. workflow 성공과 실지표 수집 성공을 구분하며, 빈 fallback을 이용자 0명 또는 개선 후보 없음으로 해석하지 않습니다.
 - 실제 지표 자동화를 복구하려면 `GSC_SERVICE_ACCOUNT_JSON`을 우선 권장합니다. `GSC_OAUTH_TOKEN_JSON`은 refresh가 다시 실패할 수 있으므로 서비스 계정 전환이 어려울 때의 보조 경로로 봅니다.
 - 엄격한 복구 검증이나 인증 상태 감시에서 실패를 바로 드러내야 할 때만 `--auth-failure-mode fail`을 명시합니다.
 

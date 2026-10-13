@@ -26,7 +26,7 @@
         {% endif %}
 
         <div class="detail-topbar">
-            <button class="detail-icon-btn" type="button" onclick="history.length > 1 ? history.back() : (location.href='/search')">✕</button>
+            <button class="detail-icon-btn" type="button" aria-label="검색 결과로 돌아가기" onclick="history.length > 1 ? history.back() : (location.href='/search')">✕</button>
             <button class="detail-icon-btn detail-shelf-btn" type="button" data-detail-shelf aria-label="내 서재에 담기"></button>
         </div>
 
@@ -66,7 +66,7 @@
     <div class="detail-sheet">
         <section class="detail-panel detail-info">
             <div class="detail-inner">
-                <h2 class="detail-title">{{ book.title }}</h2>
+                <h1 class="detail-title">{{ book.title }}</h1>
                 <div class="detail-meta">
                     {% if book.author %}
                     <a class="detail-meta-row detail-meta-link" href="/search?q={{ book.author|urlencode }}&field=author">
@@ -89,7 +89,7 @@
                 <div class="detail-section-head">
                     <div class="detail-section-title">소장 도서관</div>
                 </div>
-                <div class="sr-only" data-detail-status-note aria-live="polite"></div>
+                <p class="detail-status-note" data-detail-status-note role="status" aria-live="polite"{% if not book.counts_partial %} hidden{% endif %}>{% if book.counts_partial %}일부 도서관 정보만 표시됩니다.{% endif %}</p>
 
                 {% include "partials/live_library_groups.html" %}
             </div>
@@ -101,7 +101,7 @@
 {% block scripts %}
 {% if book %}
 <script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260526a') }}"></script>
-<script src="{{ url_for('static', filename='js/shelf_picker.js', v='20260519i') }}"></script>
+<script src="{{ url_for('static', filename='js/shelf_picker.js', v='20261012a') }}"></script>
 <script>
     (function () {
         const BOOK_TITLE = {{ book.title|tojson }};
@@ -214,6 +214,7 @@
             const holder = card.querySelector("[data-status-text]");
             if (card.dataset.serviceType === "Subscription") {
                 holder.textContent = TEXT.subscription;
+                holder.removeAttribute("aria-label");
                 holder.classList.remove("is-loading", "is-muted", "is-error");
                 applyKind(card, "available", 0);
                 return;
@@ -240,6 +241,8 @@
                 holder.classList.remove("is-loading", "is-error");
                 holder.classList.add("is-muted");
                 applyKind(card, "unknown", 0);
+            } finally {
+                holder.removeAttribute("aria-label");
             }
         }
 
@@ -332,10 +335,17 @@
                 current.outerHTML = data.groups_html;
                 applyHydratedBook(data.book || {}, true);
                 window.dispatchEvent(new CustomEvent("soulib:live-book-hydrated", {detail: data.book || {}}));
-                if (note) note.textContent = "";
+                if (note) {
+                    const partial = !!(data.counts_partial || (data.book && data.book.counts_partial));
+                    note.hidden = !partial;
+                    note.textContent = partial ? "일부 도서관을 확인하지 못했습니다. 보유 정보가 더 있을 수 있습니다." : "";
+                }
                 return true;
             } catch (err) {
-                if (note) note.textContent = "";
+                if (note) {
+                    note.hidden = false;
+                    note.textContent = "도서관 정보를 모두 확인하지 못했습니다. 표시된 정보는 일부일 수 있습니다.";
+                }
                 const placeholder = document.querySelector("[data-library-placeholder]");
                 if (placeholder) {
                     placeholder.classList.add("is-error");

@@ -7,6 +7,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from xml.etree import ElementTree
 
 
 DEFAULT_TIMEOUT = 35
@@ -46,7 +47,25 @@ def assert_status(base, path, expected=200):
     return parsed, body
 
 
-def smoke(base, check_shared=True):
+def validate_live_search(payload):
+    if not isinstance(payload, dict):
+        raise AssertionError("/api/live_search did not return JSON")
+    meta = payload.get("meta") or {}
+    if meta.get("mode") != "live" or not isinstance(meta.get("searched_libraries"), int) or meta["searched_libraries"] <= 0:
+        raise AssertionError("/api/live_search did not perform a live library search")
+    if not isinstance(payload.get("items"), list) or type(payload.get("total")) is not int or payload["total"] < 0:
+        raise AssertionError("/api/live_search returned invalid items/total")
+    diagnostics = meta.get("diagnostics") or []
+    failures = sum(d.get("error_count", len(d.get("errors") or [])) for d in diagnostics)
+    failures = max(failures, len(meta.get("failed_libraries") or []))
+    successful = meta.get("successful_libraries", meta["searched_libraries"] - failures)
+    if not payload["items"] and (successful <= 0 or failures >= meta["searched_libraries"]):
+        raise AssertionError("/api/live_search returned no results after every library failed")
+    if meta.get("partial") or failures:
+        print("warning: live search degraded; some upstream libraries failed", file=sys.stderr)
+
+
+def smoke(base, check_shared=True, check_supporting=False):
     checks = [
         "/",
         "/search",
@@ -59,10 +78,16 @@ def smoke(base, check_shared=True):
         assert_status(base, path)
         print(f"ok {path}")
 
-    search_payload, _ = assert_status(base, "/api/search?q=python")
-    if not isinstance(search_payload, dict):
-        raise AssertionError("/api/search did not return JSON")
-    print("ok /api/search")
+    search_payload, _ = assert_status(base, "/api/live_search?query=python")
+    validate_live_search(search_payload)
+    print("ok /api/live_search")
+
+    if check_supporting:
+        assert_status(base, "/reports")
+        _, sitemap = assert_status(base, "/sitemap.xml")
+        if ElementTree.fromstring(sitemap).tag.rsplit("}", 1)[-1] not in {"sitemapindex", "urlset"}:
+            raise AssertionError("/sitemap.xml did not return sitemap XML")
+        print("ok reports/sitemap read checks")
 
     if check_shared:
         payload = {
@@ -89,9 +114,10 @@ def main():
     parser = argparse.ArgumentParser(description="Run a live Soulib smoke test against a base URL.")
     parser.add_argument("base_url", help="Deployment base URL, for example https://www.soulib.kr")
     parser.add_argument("--skip-shared", action="store_true", help="Skip shared shelf create/read checks.")
+    parser.add_argument("--check-supporting", action="store_true", help="Read reports and validate sitemap XML.")
     args = parser.parse_args()
 
-    smoke(args.base_url, check_shared=not args.skip_shared)
+    smoke(args.base_url, check_shared=not args.skip_shared, check_supporting=args.check_supporting)
     print("live_smoke: ok")
 
 
