@@ -7,6 +7,8 @@
 - 현재 사용자 승인 범위에 따라 검색어, 방문자, 서비스 이용 데이터를 수집한다.
 - 연락처, 공유 서재 slug, 원문 전체 URL 등 분석에 불필요한 값은 보내지 않는다. 페이지 분류와 정제된 경로를 사용하고 referrer와 동적 페이지 제목도 검수한다.
 - production canonical domain에서 수집하고 로컬·preview·admin·ops 방문과 검수 트래픽의 혼입을 확인한다. 분석 전송 실패가 제품 기능을 막으면 안 된다.
+- 구현은 `web/static/js/analytics.js`의 `SoulibAnalytics`를 사용한다. 정제된 수동 `page_view`와 허용된 이용 이벤트를 보내고 GA 기본 세션·참여 지표를 유지한다. 웹 stream의 enhanced measurement는 OFF로 유지하여 자동 search/outbound/form 이벤트의 중복·원문 전송을 방지한다.
+- 공유 서재 방문은 `page_type=shared_shelf`, page URL과 내부 referrer의 경로 `/shelf/shared`로 집계한다. 실제 slug는 보내지 않는다. 공개 블로그와 SEO landing 경로는 보존하고 query string·fragment는 제거한다.
 - 수집 승인과 공개는 별개다. 실제 traffic 숫자, 개별 query, 페이지별 성과, account/property 식별자, 자세한 감사 보고서는 ignored 로컬 artifact 또는 승인된 분석 저장소에서만 다룬다.
 
 ## 사용량을 확인하는 절차
@@ -22,22 +24,29 @@
 
 ## 이용 이벤트 계약
 
-아래는 구현·QA가 맞춰야 하는 의미다. 실제 매개변수 이름과 전송 여부는 analytics 구현을 확인하고 문서를 갱신한다. 검색어는 승인된 검색 이벤트에서 수집한다.
+아래는 `SoulibAnalytics.track(name, params)`의 구현 계약이다. 검색어는 승인된 검색 이벤트의 `search_term`으로 수집하며 앞뒤 공백 제거 후 최대 200자로 제한한다. 전송 여부는 production 조건과 opt-out을 함께 확인한다.
 
 | 이벤트 | 측정 시점 | 확인할 데이터 |
 |---|---|---|
-| `search_start` | 실제 검색 요청 시작 | 검색어, 검색 필드, 도서관/공급사 선택 수 |
-| `search_result` | 검색 응답 처리 완료 | 검색어, 결과 수, 소요 시간, partial, 실패 도서관 수 |
-| `search_error` | 검색 요청 실패 | 검색어, 소요 시간, 분류된 오류 |
-| `detail_open` | 실제 상세 진입 | 페이지 분류 |
-| `library_outbound` | 도서관 이용 링크 선택 | 허용된 공급사 분류 |
-| `shelf_save` | 실제 서재 저장 성공 | 대상 서재 수 등 이용량 |
-| `report_success` | 실제 신고 저장 성공 | 접수 성공 여부 |
+| `search_start` | 실제 검색 요청 시작 | `search_term`, `field`, `provider_count`, `library_count` |
+| `search_result` | 검색 응답 처리 완료 | 위 필드와 `result_count`, `duration_ms`, `partial`, `failed_library_count` |
+| `search_error` | 검색 요청 실패 | 검색 필드와 `duration_ms`, 허용된 `error_type` |
+| `detail_open` | 실제 상세 진입 | 정제된 페이지 필드 |
+| `library_outbound` | 도서관 이용 링크 선택 | `provider`: 교보/YES24/기타 |
+| `shelf_save` | 실제 서재 저장 성공 | `list_count` |
+| `report_success` | 실제 신고 저장 성공 | `success=true` |
 
 - 새 검색/재시도/상세 이동의 이벤트 중복을 확인한다. API 호출 수와 실제 사용자 행동 수를 구분한다.
 - `report_success`는 실제 생성된 신고를 기준으로 한다. `?saved=1`, honeypot 또는 실패 응답은 성공 이벤트로 세지 않는다.
 - 검색어 외 신고 본문·연락처·공유 URL은 이벤트 매개변수에 추가하지 않는다. 임의의 DOM text/전체 URL을 자동 전송하지 않는다.
 - GA 주요 이벤트 등록과 내부 필터 활성화는 외부 설정이다. 코드 구현 완료를 외부 설정 완료로 보고하지 않는다.
+- GA 주요 이벤트는 `library_outbound`, `shelf_save`를 사용한다. `search_term`은 event-scoped 맞춤 측정기준이다. 추가 `partial` 측정기준과 `result_count`/`duration_ms` 측정항목은 관리자 등록 완료 여부와 배포 후 실제 수집을 별도로 검증한다.
+
+### 검수용 opt-out
+
+브라우저 콘솔에서 `SoulibAnalytics.setOptOut(true)`를 실행하면 현재 브라우저의 수집을 중단한다. localStorage 키는 `soulib.analytics.optOut`, 값은 `1`이다. 저장소 접근이 차단된 경우에도 현재 페이지에서는 메모리 opt-out을 적용한다. 다시 수집하려면 `SoulibAnalytics.setOptOut(false)`를 실행한다. `SoulibAnalytics.isEnabled()`로 현재 조건을 확인한다.
+
+검수 때 opt-out 상태와 production 조건을 기록하고, `node scripts/frontend_regression_test.cjs`로 검색어 허용·URL/referrer 정제·공유 서재 slug 제외·opt-out의 이벤트 미전송을 확인한다. fake gtag 검증 통과와 production GA의 실수집 확인을 구분한다.
 
 ## Search Console 측정 상태
 
