@@ -20,12 +20,16 @@ from adapters.status_parsers import (
     parse_yes24_status,
 )
 from config import LIBRARIES
+from live_search.cache import TTLMemoryCache
 from utils.http import DEFAULT_HEADERS, DOBONG_HEADERS, get_status_session
 
 status_api_bp = Blueprint("status_api", __name__)
 
 STATUS_TTL_SEC = int(os.environ.get("KYOBO_STATUS_TTL", "120"))
-STATUS_CACHE = {}
+STATUS_CACHE_SIZE = max(1, int(os.environ.get("STATUS_CACHE_SIZE", "1024")))
+STATUS_CACHE = TTLMemoryCache(ttl_seconds=STATUS_TTL_SEC, max_items=STATUS_CACHE_SIZE)
+DOBONG_STATUS_TOTAL_TIMEOUT = max(0.1, float(os.environ.get("DOBONG_STATUS_TOTAL_TIMEOUT", "12")))
+DOBONG_STATUS_ATTEMPT_TIMEOUT = max(0.1, float(os.environ.get("DOBONG_STATUS_ATTEMPT_TIMEOUT", "4.5")))
 
 
 def _kyobo_base_url(library_code: str) -> str:
@@ -138,8 +142,8 @@ def api_kyobo_status():
 
     cache_key = f"kyobo:{library_code}:{brcd}:{ctts_dvsn_code}:{ctgr_id}:{sntn_auth_code}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     params = {"cttsDvsnCode": ctts_dvsn_code, "brcd": brcd, "ctgrId": ctgr_id}
     if sntn_auth_code:
@@ -156,7 +160,7 @@ def api_kyobo_status():
         if not status:
             raise RuntimeError("status_missing")
         payload = {"library_code": library_code, "brcd": brcd, "status": status}
-        STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+        STATUS_CACHE.set(cache_key, payload)
         return jsonify(payload)
     except Exception as e:
         print(f"[status error] {e}")
@@ -173,8 +177,8 @@ def api_yes24_status():
 
     cache_key = f"yes24:{library_code}:{goods_id}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     list_url = _yes24_list_url(library_code)
     if not list_url:
@@ -205,7 +209,7 @@ def api_yes24_status():
         return jsonify({"library_code": library_code, "goods_id": goods_id, "status": None}), 502
 
     payload = {"library_code": library_code, "goods_id": goods_id, "status": status}
-    STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+    STATUS_CACHE.set(cache_key, payload)
     return jsonify(payload)
 
 
@@ -219,8 +223,8 @@ def api_bookcube_status():
 
     cache_key = f"bookcube:{library_code}:{content_id}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     base_url = bookcube_base_url(library_code)
     if not base_url:
@@ -264,7 +268,7 @@ def api_bookcube_status():
     payload = {"library_code": library_code, "content_id": content_id, "status": status}
     if debug:
         payload.update({"attempted": attempted, "source": source})
-    STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+    STATUS_CACHE.set(cache_key, payload)
     return jsonify(payload)
 
 
@@ -279,8 +283,8 @@ def api_gangnam_status():
 
     cache_key = f"gangnam:{library_code}:{content_id}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     attempted = []
     status = None
@@ -331,7 +335,7 @@ def api_gangnam_status():
             payload.update({"library_code": library_code, "content_id": content_id, "attempted": attempted})
         return jsonify(payload), 502
     payload = {"library_code": library_code, "content_id": content_id, "status": status}
-    STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+    STATUS_CACHE.set(cache_key, payload)
     return jsonify(payload)
 
 
@@ -343,8 +347,8 @@ def api_seoul_status():
 
     cache_key = f"seoul:{content_id}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     try:
         session = get_status_session()
@@ -356,7 +360,7 @@ def api_seoul_status():
         if not status:
             raise RuntimeError("status_missing")
         payload = {"content_id": content_id, "status": status}
-        STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+        STATUS_CACHE.set(cache_key, payload)
         return jsonify(payload)
     except Exception as e:
         print(f"[status error] {e}")
@@ -378,8 +382,8 @@ def api_sen_status():
 
     cache_key = f"sen:{library_code}:{content_id}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     try:
         session = get_status_session()
@@ -403,7 +407,7 @@ def api_sen_status():
         if not status:
             raise RuntimeError("status_missing")
         payload = {"library_code": library_code, "content_id": content_id, "status": status}
-        STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+        STATUS_CACHE.set(cache_key, payload)
         return jsonify(payload)
     except Exception as e:
         print(f"[status error] {e}")
@@ -421,8 +425,8 @@ def api_eunpyeong_status():
 
     cache_key = f"eunpyeong:{content_type}:{content_id}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     attempted = []
     try:
@@ -448,7 +452,7 @@ def api_eunpyeong_status():
         if not status:
             raise RuntimeError("status_missing")
         payload = {"content_id": content_id, "status": status}
-        STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+        STATUS_CACHE.set(cache_key, payload)
         return jsonify(payload)
     except Exception as e:
         print(f"[status error] {e}")
@@ -471,13 +475,16 @@ def api_dobong_status():
     product_candidates = [requested_product_cd] if requested_product_cd else ["001", "002"]
     cache_key = f"dobong:{brcd}:{','.join(product_candidates)}:{category_id}"
     cached = STATUS_CACHE.get(cache_key)
-    if cached and (time.time() - cached["time"]) < STATUS_TTL_SEC:
-        return jsonify(cached["payload"])
+    if cached is not None:
+        return jsonify(cached)
 
     attempted = []
     session = get_status_session()
     url = "https://elib.dobong.kr/Kyobo_T3_Mobile/Phone/Main/Ebook_Detail.asp"
+    deadline = time.monotonic() + DOBONG_STATUS_TOTAL_TIMEOUT
     for product_cd in product_candidates:
+        if time.monotonic() >= deadline:
+            break
         params = {
             "type": "EBOOK",
             "barcode": brcd,
@@ -499,15 +506,22 @@ def api_dobong_status():
             pc_paths.reverse()
         candidates = [(url, params), *[(pc_url, pc_params) for pc_url in pc_paths]]
         for candidate_url, candidate_params in candidates:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
             attempted.append(f"{candidate_url}?{urlencode(candidate_params)}")
             try:
-                res = session.get(candidate_url, params=candidate_params, timeout=15, headers=DOBONG_HEADERS, verify=False)
+                # Requests limits socket inactivity, not total wall time. The
+                # remaining budget prevents starting another slow fallback.
+                res = session.get(candidate_url, params=candidate_params,
+                                  timeout=min(DOBONG_STATUS_ATTEMPT_TIMEOUT, remaining),
+                                  headers=DOBONG_HEADERS, verify=False)
                 res.raise_for_status()
                 status = parse_dobong_status(res.text)
                 if not status:
                     continue
                 payload = {"brcd": brcd, "product_cd": product_cd, "status": status}
-                STATUS_CACHE[cache_key] = {"time": time.time(), "payload": payload}
+                STATUS_CACHE.set(cache_key, payload)
                 return jsonify(payload)
             except Exception as e:
                 print(f"[status error] {e}")

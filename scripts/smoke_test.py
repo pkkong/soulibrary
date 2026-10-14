@@ -1,5 +1,7 @@
+import copy
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -7,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from urllib.parse import quote
 from unittest.mock import patch
 
@@ -27,9 +30,11 @@ from app_search import app  # noqa: E402
 import blog_comments  # noqa: E402
 import report_routes  # noqa: E402
 import seo_books  # noqa: E402
+import seo_opportunity_planner as seo_planner  # noqa: E402
 import status_api_routes  # noqa: E402
 import live_search_routes  # noqa: E402
 import live_search.service as live_service  # noqa: E402
+import live_search.cache as live_cache  # noqa: E402
 from live_search.cache import TTLMemoryCache  # noqa: E402
 from live_search.connectors.legacy import DobongKyoboConnector  # noqa: E402
 from live_search.connectors.bookers import BookersConnector  # noqa: E402
@@ -217,7 +222,7 @@ def assert_live_search_failure_contract():
             assert live_search_routes._attach_summary_urls(limited, "회귀검증책")["items"][0]["counts_partial"]
 
         barrier = threading.Barrier(6)
-        def fetch(*args):
+        def fetch(*args, **kwargs):
             time.sleep(0.08)
             return [result()], success
 
@@ -236,7 +241,7 @@ def assert_live_search_failure_contract():
         assert not live_service._INFLIGHT
 
         barrier = threading.Barrier(6)
-        def fail(*args):
+        def fail(*args, **kwargs):
             time.sleep(0.08)
             raise RuntimeError("smoke leader failure")
 
@@ -296,11 +301,364 @@ def assert_live_search_failure_contract():
     assert cache.get("b") == 2 and cache.get("a") == 3
 
 
+def assert_search_deadline_contract():
+    """A short detail budget must neither cancel nor consume ordinary flights."""
+    def result():
+        return LiveSearchResult(title="시간예산검증책", author="작가", library_code="mapo",
+                                library_name="마포", library_short="마포", platform="Kyobo_New")
+
+    success = [{"errors": [], "error_count": 0, "searched_libraries": 1, "successful_libraries": 1}]
+    failure = [{"errors": [{"error": "search_timeout"}], "error_count": 1,
+                "searched_libraries": 1, "successful_libraries": 0}]
+    with patch.object(live_service, "_CACHE", TTLMemoryCache(600)), \
+            patch.object(live_service, "_DETAIL_CACHE", TTLMemoryCache(600)):
+        with patch.object(live_service, "_search_libraries", return_value=([result()], success)) as upstream:
+            complete = live_service.live_search("시간예산검증책", "title", deadline=time.monotonic() + 1)
+            assert not complete["meta"]["partial"]
+            assert live_service.live_search("시간예산검증책", "title")["meta"]["cache_hit"]
+            assert upstream.call_count == 1, "complete budgeted results may populate the normal cache"
+        live_service._CACHE.clear()
+        with patch.object(live_service, "_search_libraries") as upstream:
+            try:
+                live_service.live_search("만료된예산", "title", deadline=time.monotonic() - 1)
+            except live_service.LiveSearchDeadlineExceeded:
+                pass
+            else:
+                raise AssertionError("expired budget must stop before starting a fanout")
+            assert upstream.call_count == 0 and not live_service._INFLIGHT
+        with patch.object(live_service, "_search_libraries", return_value=([result()], failure)) as upstream:
+            partial = live_service.live_search("시간예산검증책", "title", deadline=time.monotonic() + 1)
+            assert partial["meta"]["partial"] and partial["items"][0]["counts_partial"]
+            assert live_service._CACHE.get(live_service._cache_key("시간예산검증책", "title", [], [])) is None
+            assert not live_service.live_search("시간예산검증책", "title")["meta"]["cache_hit"]
+            assert upstream.call_count == 2, "budget partial must not contaminate later normal searches"
+        live_service._CACHE.clear()
+
+        entered, release = threading.Event(), threading.Event()
+        def normal_fanout(*args, **kwargs):
+            entered.set()
+            assert release.wait(2), "test did not release the ordinary search"
+            return [result()], success
+
+        with patch.object(live_service, "_search_libraries", side_effect=normal_fanout) as upstream:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                leader = executor.submit(live_service.live_search, "일반진행", "title")
+                try:
+                    assert entered.wait(2)
+                    key = live_service._cache_key("일반진행", "title", [], [])
+                    ordinary_future = live_service._INFLIGHT[key]
+                    try:
+                        live_service.live_search("일반진행", "title", deadline=time.monotonic() + 0.02)
+                    except live_service.LiveSearchDeadlineExceeded:
+                        pass
+                    else:
+                        raise AssertionError("short follower must stop at its own deadline")
+                    assert not leader.done() and not ordinary_future.cancelled()
+                    assert live_service._INFLIGHT.get(key) is ordinary_future
+                    assert upstream.call_count == 1
+                finally:
+                    release.set()
+                assert not leader.result(timeout=2)["meta"]["partial"]
+        assert not live_service._INFLIGHT
+        live_service._CACHE.clear()
+
+        entered, release = threading.Event(), threading.Event()
+        def independent_fanout(*args, deadline=None, **kwargs):
+            if deadline is not None:
+                entered.set()
+                assert release.wait(2)
+                return [result()], failure
+            return [result()], success
+
+        with patch.object(live_service, "_search_libraries", side_effect=independent_fanout) as upstream:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                budgeted = executor.submit(live_service.live_search, "독립진행", "title", deadline=time.monotonic() + 1)
+                try:
+                    assert entered.wait(2)
+                    ordinary = executor.submit(live_service.live_search, "독립진행", "title")
+                    assert not ordinary.result(timeout=1)["meta"]["partial"]
+                    assert not budgeted.done() and upstream.call_count == 2
+                finally:
+                    release.set()
+                assert budgeted.result(timeout=2)["meta"]["partial"]
+        assert not live_service._INFLIGHT
+        assert not live_service.live_search("독립진행", "title")["meta"]["partial"]
+
+    fast_done, release, slow_done = threading.Event(), threading.Event(), threading.Event()
+    class Connector:
+        def search_library(self, code, cfg, query, field, limit, timeout):
+            if code == "mapo":
+                fast_done.set()
+                return [result()]
+            try:
+                release.wait(2)
+                return []
+            finally:
+                slow_done.set()
+
+    try:
+        with patch.object(live_service, "_CACHE", TTLMemoryCache(600)), \
+                patch.object(live_service, "_DETAIL_CACHE", TTLMemoryCache(600)), \
+                patch.object(live_service, "_connector_for_library", return_value=Connector()):
+            payload = live_service.live_search("시간예산검증책", "title", libraries_raw="mapo,yongsan", deadline=time.monotonic() + 0.1)
+            assert fast_done.is_set() and payload["total"] == 1 and payload["meta"]["partial"]
+            assert payload["meta"]["successful_libraries"] == 1
+            assert live_service._CACHE.get(live_service._cache_key("시간예산검증책", "title", [], ["mapo", "yongsan"])) is None
+    finally:
+        release.set()
+        assert slow_done.wait(2)
+
+
+def assert_detail_deadline_contract():
+    target = {"title": "시간예산검증책 : 부제", "author": "올바른 작가", "publisher": "출판사"}
+    book = {**target, "counts": {"total": 1}, "libraries": [{"code": "mapo"}]}
+    family = {**book, "title": "시간예산검증책", "counts": {"total": 4}, "counts_partial": True}
+    empty = {**book, "counts": {"total": 0}, "libraries": []}
+    wrong = {**book, "author": "다른 작가", "counts": {"total": 99}}
+    clock, calls = [100.0], []
+    queries = [target["title"], "시간예산검증책", "시간예산검증책 추가"]
+
+    def fake_search(*, query, deadline, **kwargs):
+        calls.append((query, deadline, deadline - clock[0]))
+        clock[0] += 3
+        return {"items": [book, wrong], "meta": {}}
+
+    with patch.object(live_search_routes, "LIVE_DETAIL_TOTAL_TIMEOUT", 5), \
+            patch.object(live_search_routes.time, "monotonic", side_effect=lambda: clock[0]), \
+            patch.object(live_search_routes, "_title_search_candidates", return_value=queries), \
+            patch.object(live_search_routes, "live_search", side_effect=fake_search):
+        selected = live_search_routes._find_complete_live_book(target)
+    assert [call[0] for call in calls] == queries[:2], "expired detail budget must stop the next title candidate"
+    assert [call[1] for call in calls] == [105.0, 105.0]
+    assert [call[2] for call in calls] == [5.0, 2.0]
+    assert selected["author"] == target["author"] and not selected["_live_detail_complete"]
+    with patch.object(live_search_routes, "live_search", side_effect=live_service.LiveSearchDeadlineExceeded("test deadline")):
+        unknown_author = live_search_routes._find_complete_live_book({**target, "author": ""}, book)
+    assert unknown_author["author"] == book["author"] and not unknown_author["_live_detail_complete"]
+
+    client = app.test_client()
+    for endpoint in ("live_book_detail", "live_book_summary"):
+        route = f"/api/{endpoint}?title={quote(target['title'])}&author={quote(target['author'])}"
+        for fallback, expected_status in [(book, 200), (family, 200), (empty, 502), (wrong, 502), (None, 502)]:
+            clock[0] = 100
+            with patch.object(live_search_routes, "LIVE_DETAIL_TOTAL_TIMEOUT", 1), \
+                    patch.object(live_search_routes.time, "monotonic", side_effect=lambda: clock[0]), \
+                    patch.object(live_search_routes, "get_cached_live_detail", return_value=copy.deepcopy(fallback)), \
+                    patch.object(live_search_routes, "live_search", side_effect=live_service.LiveSearchDeadlineExceeded("test deadline")), \
+                    patch("builtins.print"):
+                response = client.get(route)
+            assert response.status_code == expected_status, f"{endpoint}: invalid fallback accepted: {response.status_code}"
+            if expected_status == 200:
+                payload = response.get_json()
+                assert payload["counts_partial"]
+                assert payload.get("book", payload)["author"] == target["author"]
+                assert payload.get("book", payload)["counts"]["total"] == fallback["counts"]["total"]
+        with patch.object(live_search_routes, "get_cached_live_detail", return_value=None), \
+                patch.object(live_search_routes, "live_search", return_value={"items": [], "meta": {}}):
+            assert client.get(route).status_code == 404, "complete empty detail is distinct from timed-out lookup"
+        for meta in ({"partial": True}, {"diagnostics": [{"error_count": 1}]}):
+            with patch.object(live_search_routes, "get_cached_live_detail", return_value=None), \
+                    patch.object(live_search_routes, "live_search", return_value={"items": [], "meta": meta}), \
+                    patch("builtins.print"):
+                assert client.get(route).status_code == 502, "failed empty lookup must not become a completed 404"
+
+
+def assert_status_budget_cache_contract():
+    assert isinstance(status_api_routes.STATUS_CACHE, TTLMemoryCache)
+    assert status_api_routes.STATUS_CACHE.max_items == status_api_routes.STATUS_CACHE_SIZE
+    clock = {"mono": 100.0, "wall": 100.0}
+    cache = TTLMemoryCache(2, max_items=2)
+    calls = []
+    class Response:
+        text = "mock status"
+        def raise_for_status(self):
+            pass
+
+    class Session:
+        duration = 0.0
+        def get(self, url, params=None, timeout=None, **kwargs):
+            calls.append({"url": url, "params": dict(params or {}), "timeout": timeout})
+            clock["mono"] += min(self.duration, timeout)
+            return Response()
+
+    session = Session()
+    client = app.test_client()
+    route = "/api/dobong_status?brcd=smoke-budget&category_id=test-category&debug=1"
+    key = "dobong:smoke-budget:001,002:test-category"
+    with patch.object(status_api_routes, "STATUS_CACHE", cache), \
+            patch.object(status_api_routes, "DOBONG_STATUS_TOTAL_TIMEOUT", 12), \
+            patch.object(status_api_routes, "DOBONG_STATUS_ATTEMPT_TIMEOUT", 4.5), \
+            patch.object(status_api_routes.time, "monotonic", side_effect=lambda: clock["mono"]), \
+            patch.object(live_cache.time, "time", side_effect=lambda: clock["wall"]), \
+            patch.object(status_api_routes, "get_status_session", return_value=session):
+        session.duration = 4.5
+        with patch.object(status_api_routes, "parse_dobong_status", return_value=None):
+            response = client.get(route)
+            assert response.status_code == 502 and response.get_json()["status"] is None
+            assert [call["timeout"] for call in calls] == [4.5, 4.5, 3.0]
+            assert len(response.get_json()["attempted"]) == 3
+            assert cache.get(key) is None, "failed status must not be cached"
+            clock["mono"] = 100
+            assert client.get(route).status_code == 502
+            assert len(calls) == 6, "a failed status must be retried rather than reused"
+
+        calls.clear()
+        clock["mono"] = 100
+        session.duration = 0.1
+        status = {"owned": 2, "loaned": 1, "available": 1, "reserved": 0}
+        with patch.object(status_api_routes, "parse_dobong_status", side_effect=[None] * 5 + [status]) as parser:
+            response = client.get(route)
+            assert response.status_code == 200 and response.get_json()["product_cd"] == "002"
+            paths = [call["url"].rsplit("/", 1)[-1] for call in calls]
+            assert paths == ["Ebook_Detail.asp", "ebook_View.asp", "audio_View.asp", "Ebook_Detail.asp", "audio_View.asp", "ebook_View.asp"]
+            assert [call["params"]["product_cd"] for call in calls] == ["001"] * 3 + ["002"] * 3
+            assert all(call["params"].get("category_id") == "test-category" for call in calls if "View.asp" in call["url"])
+            parser.side_effect = None
+            parser.return_value = status
+            assert client.get(route).get_json() == response.get_json() and len(calls) == 6
+            cached = cache.get(key)
+            assert cached["status"]["owned"] == 2 and "payload" not in cached
+            cached["status"]["owned"] = 99
+            assert cache.get(key)["status"]["owned"] == 2
+            clock["wall"] += 3
+            assert client.get(route).status_code == 200 and len(calls) == 7
+            cache.clear()
+            assert cache.get(key) is None
+            assert client.get(route).status_code == 200 and len(calls) == 8
+
+        cache.clear()
+        value = {"status": {"owned": 2}}
+        cache.set("a", value)
+        value["status"]["owned"] = 99
+        cache.set("b", {"status": {"owned": 3}})
+        assert cache.get("a")["status"]["owned"] == 2
+        cache.set("c", {"status": {"owned": 4}})
+        assert len(cache._items) == 2 and cache.get("a") is None
+        clock["wall"] += 3
+        assert cache.get("b") is None and cache.get("c") is None
+        assert not cache._items
+
+
+def assert_seo_public_projection_contract():
+    """Synthetic Search Console input must remain private in every public output."""
+    kinds = ("indexing", "index_monitor", "technical", "ctr", "ranking", "query_theme",
+             "target_page", "target_keyword", "query_mapping", "search_ux")
+    query = 'QA_PRIVATE_QUERY_7F3A 검증비공개검색어 "quoted" 전자도서관'
+    private_page = f"https://example.invalid/QA_PRIVATE_PAGE_7F3A?q={quote(query)}"
+    extra = "QA_EXTRA_SECRET_7F3A"
+    metrics = {"impressions": 9876543, "clicks": 7654321, "ctr": 0.00123456789,
+               "position": 8.7654321, "delta_impressions": 3456789}
+    evidence = {**metrics, "query": query, "page": private_page, "sample_queries": [query],
+                "private_extra": extra, "traffic_bucket": extra, "coverage_state": extra,
+                "verdict": extra, "error": extra, "status_code": 503,
+                "broken_images": [private_page], "broken_internal_links": [private_page]}
+    opportunities = []
+    for kind in kinds:
+        item = seo_planner.make_opportunity(kind, f'{query} {private_page}', extra, copy.deepcopy(evidence), extra)
+        item.update({"private_extra": extra, "unknown_nested": {"account_id": extra}, "automation_level": extra})
+        item["required_roles"].append(extra)
+        item["required_checks"].append(extra)
+        item["guardrails"].append(extra)
+        opportunities.append(item)
+    plan = {"schema_version": "seo_opportunity_plan.v1", "generated_date": "2026-10-14",
+            "source_audit_generated_at": extra, "site_url": f"sc-domain:{extra}", "base_url": private_page,
+            "period_days": 28, "dry_run_source": True, "guardrails": [extra], "opportunities": opportunities,
+            "unknown_header": extra, "visitor_count": 9876543, "raw_property_id": extra}
+    original = copy.deepcopy(plan)
+    public = seo_planner.sanitize_plan(plan)
+    public_markdown = seo_planner.render_markdown(plan, public=True)
+    header_keys = {"schema_version", "generated_date", "source_audit_generated_at", "site_url", "base_url",
+                   "period_days", "dry_run_source", "guardrails", "opportunities"}
+    item_keys = {"id", "type", "priority", "title", "rationale", "suggested_action", "automation_level",
+                 "required_roles", "required_checks", "guardrails", "evidence_summary"}
+    assert set(public) == header_keys
+    assert public["schema_version"] == "seo_opportunity_plan.v1" and public["dry_run_source"] is True
+    assert public["period_days"] == 28 and public["generated_date"] == "2026-10-14"
+    assert public["site_url"] == public["base_url"] == "https://www.soulib.kr"
+    assert len(public["opportunities"]) == len(kinds)
+    for index, item in enumerate(public["opportunities"], 1):
+        assert set(item) == item_keys
+        assert item["type"] == kinds[index - 1] and item["id"] == f"{item['type']}-{index}"
+        assert item["required_roles"] == list(seo_planner.ROLE_MAP[item["type"]])
+        assert item["required_checks"] == list(seo_planner.CHECK_MAP[item["type"]])
+        assert item["automation_level"] == seo_planner.AUTOMATION_LEVEL[item["type"]]
+        assert item["title"] in public_markdown and all(role in public_markdown for role in item["required_roles"])
+        assert all(check in public_markdown for check in item["required_checks"])
+    assert plan == original, "public projection must not mutate private evidence"
+    private_json = json.dumps(plan, ensure_ascii=False)
+    private_markdown = seo_planner.render_markdown(plan, public=False)
+    assert json.loads(private_json)["opportunities"][0]["evidence"]["query"] == query
+    assert query in private_markdown and private_page in private_markdown
+    assert str(metrics["impressions"]) in private_json and str(metrics["impressions"]) in private_markdown
+
+    def assert_redacted(public_json, markdown):
+        encoded = json.dumps(public_json, ensure_ascii=False)
+        forbidden = ["qa_private_query_7f3a", "검증비공개검색어", "qa_private_page_7f3a",
+                     extra.lower(), quote("검증비공개검색어").lower(), quote(query).lower(),
+                     "9876543", "7654321", "8.7654321", "3456789",
+                     "노출: 500회 이상", "클릭 있음", "클릭 없음", "순위: 1페이지권", "순위: 개선 여지 있음"]
+        for value in forbidden:
+            assert value not in encoded.lower() and value not in markdown.lower(), "private SEO data leaked"
+        for item in public_json["opportunities"]:
+            assert "evidence" not in item and "private_extra" not in item and "unknown_nested" not in item
+            assert "impressions" not in item and "clicks" not in item and "position" not in item
+    assert_redacted(public, public_markdown)
+    malformed = copy.deepcopy(plan)
+    malformed.update({"schema_version": extra, "generated_date": extra, "period_days": extra})
+    malformed["opportunities"][0].update({"type": extra, "priority": extra})
+    closed = seo_planner.sanitize_plan(malformed)
+    assert closed["opportunities"][0]["type"] == "review" and closed["opportunities"][0]["priority"] == "P3"
+    assert_redacted(closed, seo_planner.render_markdown(malformed, public=True))
+
+    # Real argparse/build/write wiring with a synthetic audit and local temp files.
+    row = {**metrics, "query": query, "page": private_page, "private_extra": extra}
+    search_row = {**row, "page": f"https://example.invalid/search?q={quote(query)}"}
+    audit = {"generated_at": "2026-10-14T00:00:00Z", "site_url": f"sc-domain:{extra}",
+             "base_url": private_page, "dry_run": True,
+             "url_inspection": {"inspected": [{"url": private_page, "verdict": "FAIL", "unindexed_days": 15},
+                                               {"url": private_page, "error": extra}]},
+             "technical_checks": {"pages": [{"url": private_page, "ok": False, "status_code": 503}]},
+             "search_console": {"periods": [{"days": 28, "top_queries": [row], "top_pages": [row],
+                                               "top_page_queries": [search_row]}],
+                                "targets": {"pages": [{"page": private_page, "periods": {"28": metrics}}],
+                                            "keywords": [{"query": query, "periods": {"28": metrics}}]}}}
+    with TemporaryDirectory(prefix="soulib-seo-smoke-") as directory:
+        directory = Path(directory)
+        audit_path, private_path, public_path, issue_path = [directory / name for name in ("audit.json", "private.json", "public.json", "issue.md")]
+        audit_path.write_text(json.dumps(audit, ensure_ascii=False), encoding="utf-8")
+        result = subprocess.run([sys.executable, str(ROOT_DIR / "scripts/seo_opportunity_planner.py"), str(audit_path),
+                                 "--max-opportunities", "50", "--json-output", str(private_path),
+                                 "--public-json-output", str(public_path), "--github-issue-md", str(issue_path),
+                                 "--public-summary", "--markdown"], capture_output=True, text=True, check=True)
+        public_cli = json.loads(public_path.read_text(encoding="utf-8"))
+        private_cli = json.loads(private_path.read_text(encoding="utf-8"))
+        issue = issue_path.read_text(encoding="utf-8")
+        assert {item["type"] for item in public_cli["opportunities"]} == set(kinds)
+        assert public_cli["dry_run_source"] is True and public_cli["schema_version"] == "seo_opportunity_plan.v1"
+        assert result.stdout == issue == seo_planner.render_markdown(private_cli, public=True)
+        assert_redacted(public_cli, issue)
+        private_text = json.dumps(private_cli, ensure_ascii=False)
+        assert any(item["evidence"].get("query") == query for item in private_cli["opportunities"])
+        assert private_page in private_text and "9876543" in private_text and extra in private_text
+        assert "9876543" in seo_planner.render_markdown(private_cli, public=False)
+        common = [sys.executable, str(ROOT_DIR / "scripts/seo_opportunity_planner.py"), str(audit_path), "--max-opportunities", "50"]
+        public_stdout = subprocess.run(common + ["--public-summary"], capture_output=True, text=True, check=True)
+        stdout_plan = json.loads(public_stdout.stdout)
+        assert stdout_plan == public_cli, "public-summary stdout JSON must use the same safe projection"
+        assert_redacted(stdout_plan, issue)
+        private_stdout = subprocess.run(common, capture_output=True, text=True, check=True)
+        assert json.loads(private_stdout.stdout) == private_cli, "default stdout must preserve the private plan"
+
+
 def main():
     shared_shelves_tmp = Path(os.environ["SHARED_SHELVES_FILE"])
     shared_shelves_tmp.unlink(missing_ok=True)
     client = app.test_client()
     assert_live_search_failure_contract()
+    assert_search_deadline_contract()
+    assert_detail_deadline_contract()
+    assert_status_budget_cache_contract()
+    assert_seo_public_projection_contract()
 
     cover_choice = merge_live_results(
         [
@@ -1242,7 +1600,7 @@ def main():
     def fake_set_cached_detail(key, item):
         cache_writes[key] = dict(item)
 
-    def fake_live_search(query, field, providers_raw="", libraries_raw="", limit=20, offset=0, refine=""):
+    def fake_live_search(query, field, providers_raw="", libraries_raw="", limit=20, offset=0, refine="", *, deadline=None):
         if query == "프로젝트" and field == "title_author":
             return {"total": 1, "items": [partial_book], "filters": {"providers": [], "libraries": []}, "meta": {}}
         if query == "프로젝트 헤일메리" and field == "title":

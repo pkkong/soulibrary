@@ -10,6 +10,7 @@
 - 구현은 `web/static/js/analytics.js`의 `SoulibAnalytics`를 사용한다. 정제된 수동 `page_view`와 허용된 이용 이벤트를 보내고 GA 기본 세션·참여 지표를 유지한다. 웹 stream의 enhanced measurement는 OFF로 유지하여 자동 search/outbound/form 이벤트의 중복·원문 전송을 방지한다.
 - 공유 서재 방문은 `page_type=shared_shelf`, page URL과 내부 referrer의 경로 `/shelf/shared`로 집계한다. 실제 slug는 보내지 않는다. 공개 블로그와 SEO landing 경로는 보존하고 query string·fragment는 제거한다.
 - 수집 승인과 공개는 별개다. 실제 traffic 숫자, 개별 query, 페이지별 성과, account/property 식별자, 자세한 감사 보고서는 ignored 로컬 artifact 또는 승인된 분석 저장소에서만 다룬다.
+- 공개 JSON·Markdown·`--public-summary` 표준 출력은 같은 명시적 allowlist를 사용하고 private 원본은 보존한다. 검색어에서 파생한 id·title, unknown fields, encoded query와 traffic metric bucket의 간접 누출도 fixture 회귀로 검사한다.
 
 ## 사용량을 확인하는 절차
 
@@ -19,6 +20,7 @@
 4. 방문/세션/조회수와 검색 성공·도서관 이동·서재 저장을 함께 확인한다. 주요 이벤트 0은 측정 설정 미비인지 실제 이용 없음인지 확인한다.
 5. 내부 트래픽 필터의 Testing은 실제 제외가 아니다. enhanced measurement의 자동 search/outbound/form 이벤트와 query redaction은 manual 이벤트 검수와 별도로 확인한다.
 6. 확인일과 최근 정상 수집일, 접근 불가·미검증 항목을 남긴다. 코드 검증과 외부 GA 설정 변경 여부를 분리한다.
+7. 실제 이벤트 이름과 횟수 확인, 맞춤 정의 등록, 맞춤항목 값의 처리 완료를 구분한다. 신규 배포·등록 후 미완성 기간의 0관측을 전송 실패로 단정하지 않고, 조회 기간·보고 시간대·집계 시각을 기록한다. 원문과 수집 숫자는 ignored 보고서에만 남긴다.
 
 주간 검토에서는 총 유입, 검색을 수행한 방문자, 완전/부분/실패 검색, 상세 진입, 도서관 이동, 서재 저장, 재방문 추세를 본다. 작은 표본은 비율만 강조하지 않고 사건 수와 기간을 함께 기록한다.
 
@@ -65,6 +67,18 @@
 - 응답 시간은 endpoint, 조건, cache 상태, 측정 환경·표본 수를 기록한다. 단일 샘플을 SLA나 p95로 일반화하지 않는다.
 - `python scripts/smoke_test.py`, `git diff --check`, 실제 `/api/live_search` live smoke를 수행한다. mock 응답 검증과 외부 도서관 연결 검증 결과를 구분한다.
 - [UX_UI_Guide.md](UX_UI_Guide.md)에 따라 초기·완료 0건·부분 결과·전체 실패·재시도와 360px/430px/desktop 화면, dialog 이름·Tab 순환·Escape·포커스 복귀를 확인한다.
+
+### 상세·상태 조회의 시간 예산과 cache 계약
+
+- 내부 `live_search(..., deadline=...)`는 절대 monotonic 마감 시각을 받는다. `deadline=None`의 일반 검색은 기존 `LIVE_SEARCH_TOTAL_TIMEOUT`·query cache·single-flight를 유지한다. 짧은 예산 호출자의 대기 종료가 일반 검색 flight를 취소하거나 일반 요청에 짧은 예산을 물려주면 안 된다.
+- `/api/live_book_detail`과 `/api/live_book_summary`의 제목 후보들은 `LIVE_DETAIL_TOTAL_TIMEOUT`(기본 8초)의 deadline을 공유한다. 예산이 끝나면 다음 후보를 시작하지 않고, 제목/저자가 호환되며 보유처가 있는 기존 fallback은 `counts_partial=true`로 보존한다. 제목이 같아도 다른 저자의 fallback은 거절한다.
+- 조회 실패·예산 소진으로 usable 후보/fallback이 없으면 502, 정상적으로 끝난 조회에서 책이 없으면 404를 반환한다. 실패한 빈 조회를 정상 0건으로 표시하지 않는다.
+- deadline 자체로 제한된 partial 검색 결과는 일반 query cache에 쓰지 않는다. 일반 검색의 결과 있는 partial cache는 짧은 TTL을 유지한다. 완전한 결과의 cache 재사용과 일반 flight의 독립성을 회귀로 확인한다.
+- 상태 API 8개는 `STATUS_CACHE_SIZE`(기본 1024)와 기존 `KYOBO_STATUS_TTL`(기본 120초)을 사용하는 TTLMemoryCache를 공유한다. 만료·상한 eviction·deep copy·`clear()`와 성공 응답 재사용을 확인하고, 실패 상태는 cache하지 않는다.
+- 도봉 상태 fallback은 `DOBONG_STATUS_TOTAL_TIMEOUT`(기본 12초)의 monotonic 예산을 공유한다. 각 HTTP 시도의 timeout은 남은 예산과 `DOBONG_STATUS_ATTEMPT_TIMEOUT`(기본 4.5초) 중 작은 값이다. 기존 후보 순서·product/category 매개변수와 status schema를 유지한다.
+- Requests timeout은 socket에 데이터가 오지 않는 시간을 제한하므로 HTTP 다운로드 전체의 hard wall이 아니다. 이미 실행 중인 thread/HTTP 작업은 마감 뒤에도 남을 수 있다. 동작 보장과 남은 한계를 구분하고 실제 경과 시간을 별도로 측정한다. [Requests 공식 timeout 설명](https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts).
+
+관련 smoke 회귀는 일반/예산 검색 분리, 공유 flight follower timeout, partial cache 비오염, 상세 후보 공통 deadline·동일 제목 다른 저자 거절·usable partial fallback·502/404 구분, 도봉 남은 timeout 감소·후보 순서·실패 재시도, 상태 cache TTL/상한/복사/clear를 포함한다. mock clock 검증 통과와 실제 공급사 HTTP 경과 시간 검증을 구분한다.
 
 ## 공개 피드백
 

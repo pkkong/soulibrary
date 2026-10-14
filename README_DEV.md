@@ -98,7 +98,17 @@ LIBRARY_SEARCH_PORT=5001
 LIVE_SEARCH_TOTAL_TIMEOUT=5.8
 LIVE_SEARCH_LIBRARY_TIMEOUT=4.5
 LIVE_SEARCH_MAX_WORKERS=40
+LIVE_DETAIL_TOTAL_TIMEOUT=8
+STATUS_CACHE_SIZE=1024
+DOBONG_STATUS_TOTAL_TIMEOUT=12
+DOBONG_STATUS_ATTEMPT_TIMEOUT=4.5
 ```
+
+상세의 제목 후보 조회는 `LIVE_DETAIL_TOTAL_TIMEOUT`을 공유하는 monotonic deadline으로 수행합니다. 일반 검색의 `deadline=None` 경로는 기존 전체 예산과 cache/single-flight 계약을 유지합니다. 도봉 상태 조회는 전체 예산을 확인하며 각 시도에 남은 예산과 `DOBONG_STATUS_ATTEMPT_TIMEOUT` 중 작은 값을 사용합니다.
+
+검색/상세 cache의 기본 TTL은 `LIVE_SEARCH_TTL_SEC=600`, 일반 검색의 일부 결과 TTL은 `LIVE_SEARCH_PARTIAL_TTL_SEC=15`입니다. 호출자 deadline 때문에 불완전해진 검색 결과는 일반 검색 cache에 넣지 않습니다. 상태 API cache는 기존 `KYOBO_STATUS_TTL=120`과 새 `STATUS_CACHE_SIZE` 상한을 사용하는 TTLMemoryCache입니다. TTL은 외부 상태의 신선도를, 항목 수 상한은 warm process 메모리를 관리합니다.
+
+이 예산은 다음 후보 시작과 대기를 제어합니다. Requests의 socket inactivity timeout은 HTTP 응답 전체의 경과 시간 상한이 아니므로, 이미 실행 중인 HTTP 요청의 강제 중단이나 정확한 8초/12초 전체 응답을 보장하지 않습니다. [Requests timeout 공식 설명](https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts). 오류·부분 fallback·cache/flight 격리의 회귀 계약은 [service_observability.md](docs/service_observability.md)를 따릅니다.
 
 PostgreSQL 환경변수는 DB 없는 실시간 검색에는 필요하지 않습니다. 현재 운영에서 필요한 경우는 공유 서재 영속 저장처럼 production 기능을 지원할 때이며, 관리자/데이터 품질/로컬 DB 작업은 선택적 작업으로 분리합니다. 과거 SQLite 검색, DB rebuild, SQLite -> PostgreSQL 마이그레이션 흐름은 기본 운영 경로가 아닌 레거시/삭제 후보입니다.
 

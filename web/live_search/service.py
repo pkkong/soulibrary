@@ -32,6 +32,18 @@ _DETAIL_CACHE = TTLMemoryCache(ttl_seconds=LIVE_SEARCH_TTL_SEC, max_items=LIVE_D
 _INFLIGHT = {}
 _INFLIGHT_LOCK = threading.Lock()
 
+
+class LiveSearchDeadlineExceeded(TimeoutError):
+    """The caller's search budget expired; shared work may still be running."""
+
+
+def _remaining_budget(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise LiveSearchDeadlineExceeded("live_search_deadline_exceeded")
+    return remaining
+
+
 CONNECTOR_FACTORIES = {
     "Kyobo_New": KyoboNewConnector,
     "Kyobo": DobongKyoboConnector,
@@ -281,7 +293,8 @@ def _library_may_match_providers(code: str, cfg: dict, provider_labels: list[str
     return _provider_allows_result(provider_labels, {"platform": cfg.get("platform"), "library_code": code})
 
 
-def _search_libraries(query: str, field: str, library_codes: list[str], provider_labels: list[str]) -> tuple[list, list[dict]]:
+def _search_libraries(query: str, field: str, library_codes: list[str], provider_labels: list[str],
+                      *, deadline: float | None = None) -> tuple[list, list[dict]]:
     if not library_codes:
         return [], []
 
@@ -303,7 +316,11 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
                      "searched_libraries": 0, "successful_libraries": 0}]
 
     max_workers = max(1, min(LIVE_SEARCH_MAX_WORKERS, len(tasks)))
-    started = time.time()
+    started = time.monotonic()
+    fanout_deadline = started + LIVE_SEARCH_TOTAL_TIMEOUT
+    if deadline is not None:
+        _remaining_budget(deadline)
+        fanout_deadline = min(fanout_deadline, deadline)
 
     executor = ThreadPoolExecutor(max_workers=max_workers)
     futures = {}
@@ -321,6 +338,11 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
 
     try:
         for code, cfg, connector in tasks:
+            remaining = fanout_deadline - time.monotonic()
+            if remaining <= 0:
+                errors.append({"library_code": code, "platform": cfg.get("platform") or "",
+                               "error": "search_timeout"})
+                continue
             future = executor.submit(
                 connector.search_library,
                 code,
@@ -328,11 +350,11 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
                 query,
                 field,
                 LIVE_SEARCH_PER_LIBRARY_LIMIT,
-                LIVE_SEARCH_LIBRARY_TIMEOUT,
+                min(LIVE_SEARCH_LIBRARY_TIMEOUT, remaining) if deadline is not None else LIVE_SEARCH_LIBRARY_TIMEOUT,
             )
             futures[future] = (code, cfg.get("platform") or getattr(connector, "platform", ""))
 
-        for future in as_completed(futures, timeout=LIVE_SEARCH_TOTAL_TIMEOUT):
+        for future in as_completed(futures, timeout=max(0, fanout_deadline - time.monotonic())):
             collect(future)
     except TimeoutError:
         for future, (code, platform) in futures.items():
@@ -346,16 +368,20 @@ def _search_libraries(query: str, field: str, library_codes: list[str], provider
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
 
-    elapsed_ms = int((time.time() - started) * 1000)
+    elapsed_ms = int((time.monotonic() - started) * 1000)
     platforms = sorted({cfg.get("platform") or "Unknown" for _code, cfg, _connector in tasks})
     return results, [{"platform": "all", "platforms": platforms, "elapsed_ms": elapsed_ms, "errors": errors[:10],
                      "error_count": len(errors), "failed_libraries": [error["library_code"] for error in errors],
                      "searched_libraries": len(tasks), "successful_libraries": len(tasks) - len(errors)}]
 
 
-def _search_payload(query: str, field: str, providers: list[str], libraries: list[str]) -> dict:
+def _search_payload(query: str, field: str, providers: list[str], libraries: list[str],
+                    *, deadline: float | None = None) -> dict:
     library_codes = _selected_library_codes(libraries)
-    raw_results, diagnostics = _search_libraries(query, field, library_codes, providers)
+    if deadline is None:
+        raw_results, diagnostics = _search_libraries(query, field, library_codes, providers)
+    else:
+        raw_results, diagnostics = _search_libraries(query, field, library_codes, providers, deadline=deadline)
     merged_items = merge_live_results(raw_results)
     partial = any(diagnostic.get("error_count") or diagnostic.get("errors") for diagnostic in diagnostics)
     scope_limited = bool(providers or libraries)
@@ -387,6 +413,8 @@ def live_search(
     limit: int = 20,
     offset: int = 0,
     refine: str = "",
+    *,
+    deadline: float | None = None,
 ):
     query = (query or "").strip()
     field = field if field in {"title_author", "title", "author", "publisher"} else "title_author"
@@ -408,21 +436,40 @@ def live_search(
         cached = _CACHE.get(cache_key)
         if cached:
             return _slice_response(cached, refine, limit, offset, True)
-        future = _INFLIGHT.get(cache_key)
+        if deadline is not None:
+            _remaining_budget(deadline)
+        # Budgeted work can join normal work, but a normal request must not
+        # inherit a shorter caller's fanout or deadline.
+        flight_key = cache_key
+        future = _INFLIGHT.get(flight_key)
+        if future is None and deadline is not None:
+            flight_key = (cache_key, "budgeted")
+            future = _INFLIGHT.get(flight_key)
         leader = future is None
         if leader:
             future = Future()
-            _INFLIGHT[cache_key] = future
+            _INFLIGHT[flight_key] = future
 
     if not leader:
-        payload = future.result(timeout=max(1, LIVE_SEARCH_TOTAL_TIMEOUT) + 2)
+        wait_seconds = max(1, LIVE_SEARCH_TOTAL_TIMEOUT) + 2
+        if deadline is not None:
+            wait_seconds = min(wait_seconds, _remaining_budget(deadline))
+        try:
+            payload = future.result(timeout=wait_seconds)
+        except TimeoutError as exc:
+            if deadline is not None:
+                raise LiveSearchDeadlineExceeded("live_search_deadline_exceeded") from exc
+            raise
         return _slice_response(payload, refine, limit, offset, False)
 
     try:
-        payload = _search_payload(query, field, providers, libraries)
+        if deadline is None:
+            payload = _search_payload(query, field, providers, libraries)
+        else:
+            payload = _search_payload(query, field, providers, libraries, deadline=deadline)
         if not payload["meta"]["partial"]:
             _CACHE.set(cache_key, payload)
-        elif payload["items"]:
+        elif payload["items"] and deadline is None:
             _CACHE.set(cache_key, payload, ttl_seconds=LIVE_SEARCH_PARTIAL_TTL_SEC)
         future.set_result(payload)
     except BaseException as exc:
@@ -430,5 +477,6 @@ def live_search(
         raise
     finally:
         with _INFLIGHT_LOCK:
-            _INFLIGHT.pop(cache_key, None)
+            if _INFLIGHT.get(flight_key) is future:
+                _INFLIGHT.pop(flight_key, None)
     return _slice_response(payload, refine, limit, offset, False)
