@@ -1,7 +1,7 @@
 import argparse
 import json
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 
@@ -52,6 +52,87 @@ AUTOMATION_LEVEL = {
     "target_keyword": "draft_only",
     "query_mapping": "draft_only",
     "search_ux": "draft_only",
+}
+
+
+PUBLIC_OPPORTUNITY_TEXT = {
+    "indexing": (
+        "색인 상태 개선 후보",
+        "색인 상태와 사이트의 기술 설정을 검토할 항목입니다.",
+        "canonical, robots, fetch 상태와 내부 링크를 점검하고 필요한 수정을 검토하세요.",
+    ),
+    "index_monitor": (
+        "색인 상태 관찰 후보",
+        "색인 상태 확인 또는 후속 관찰이 필요한 항목입니다.",
+        "Search Console 권한과 API 상태를 확인하고 주간 색인 점검을 이어가세요.",
+    ),
+    "technical": (
+        "사이트 기술 점검 후보",
+        "사이트 응답, 색인 설정 또는 연결 자원을 점검할 항목입니다.",
+        "비공개 기술 점검 근거를 확인하고 smoke와 production 점검을 거쳐 수정안을 검토하세요.",
+    ),
+    "ctr": (
+        "검색 결과 문구 개선 후보",
+        "검색 의도와 검색 결과 문구의 적합성을 검토할 항목입니다.",
+        "비공개 분석에서 대상 항목을 확인하고 제목, 설명과 내부 링크 개선안을 검토하세요.",
+    ),
+    "ranking": (
+        "검색 의도와 콘텐츠 연결 검토 후보",
+        "검색 의도, 콘텐츠와 내부 링크의 연결을 검토할 항목입니다.",
+        "비공개 분석에서 대상 항목을 확인하고 의도 보강과 관련 내부 링크를 검토하세요.",
+    ),
+    "query_theme": (
+        "검색 의도 묶음 검토 후보",
+        "관련 검색 의도를 하나의 개선 작업으로 묶을지 검토할 항목입니다.",
+        "비공개 분석에서 검색 의도를 확인하고 페이지, 문구와 내부 링크 개선안을 사람 검토용으로 정리하세요.",
+    ),
+    "target_page": (
+        "목표 페이지 개선 후보",
+        "추적 대상 페이지의 검색 의도와 사용자 경험을 검토할 항목입니다.",
+        "비공개 분석에서 대상 페이지를 확인하고 검색 결과 문구, 제목과 검색 연결을 검토하세요.",
+    ),
+    "target_keyword": (
+        "목표 키워드 개선 후보",
+        "추적 대상 검색 의도와 연결 콘텐츠를 검토할 항목입니다.",
+        "비공개 분석에서 대상 검색 의도를 확인하고 제목, 문구와 내부 링크 개선안을 검토하세요.",
+    ),
+    "query_mapping": (
+        "검색어와 페이지 연결 검토 후보",
+        "검색 의도에 맞는 기존 안내 페이지 연결을 검토할 항목입니다.",
+        "비공개 분석에서 대상 항목을 확인하고 기존 랜딩 또는 블로그 연결과 검토된 안내 글의 필요성을 검토하세요.",
+    ),
+    "search_ux": (
+        "검색 사용자 경험 점검 후보",
+        "검색 화면의 첫 결과 경험과 다음 행동을 검토할 항목입니다.",
+        "비공개 분석에서 대상 흐름을 확인하고 모바일 결과 적합성, 빈 상태와 다음 행동을 검토하세요.",
+    ),
+}
+PUBLIC_ITEM_GUARDRAILS = (
+    "블로그, 랜딩 문구, 이미지, UI 변경은 자동 발행하지 않습니다.",
+    "페이지나 콘텐츠 변경은 smoke test와 사람 검토 게이트를 통과해야 합니다.",
+)
+PUBLIC_PLAN_GUARDRAILS = (
+    "블로그, 랜딩 문구, 이미지, UI 변경은 자동 발행하지 않습니다.",
+    "이 계획은 사람 검토용 SEO 작업 큐이며 발행 결정이 아닙니다.",
+)
+PUBLIC_COVERAGE_STATES = {
+    "Submitted and indexed",
+    "Indexed, not submitted in sitemap",
+    "Indexed",
+    "URL is unknown to Google",
+    "Crawled - currently not indexed",
+    "Discovered - currently not indexed",
+    "Excluded by 'noindex' tag",
+    "Excluded by ‘noindex’ tag",
+    "Blocked by robots.txt",
+    "Page with redirect",
+    "Not found (404)",
+    "Soft 404",
+    "Server error (5xx)",
+    "Alternate page with proper canonical tag",
+    "Duplicate without user-selected canonical",
+    "Duplicate, Google chose different canonical than user",
+    "Duplicate, submitted URL not selected as canonical",
 }
 
 
@@ -135,21 +216,8 @@ def public_type_label(value):
         "target_keyword": "목표 키워드",
         "query_mapping": "검색어-페이지 연결",
         "search_ux": "검색 사용자 경험",
+        "review": "검토 항목",
     }.get(value or "", value or "검토 항목")
-
-
-def public_title(item, index):
-    kind = item.get("type")
-    titles = {
-        "ctr": "검색 결과 문구 개선 후보",
-        "ranking": "순위 상승 후보",
-        "query_mapping": "검색어-페이지 연결 개선 후보",
-        "search_ux": "검색 사용자 경험 점검 후보",
-        "target_keyword": "목표 키워드 개선 후보",
-    }
-    if kind in {"ctr", "ranking", "query_mapping", "search_ux", "target_keyword"}:
-        return f"{index}. [{item['priority']}] {titles.get(kind, public_type_label(kind))}"
-    return f"{index}. [{item['priority']}] {item['title']}"
 
 
 def indexing_opportunities(audit, min_unindexed_days):
@@ -510,40 +578,37 @@ def build_plan(audit, args):
     }
 
 
-def evidence_line(evidence, public=False):
+def evidence_line(evidence, public=False, kind=None):
     pieces = []
     if public:
-        if "impressions" in evidence:
-            impressions = int(evidence.get("impressions") or 0)
-            if impressions >= 500:
-                pieces.append("노출: 500회 이상")
-            elif impressions >= 100:
-                pieces.append("노출: 100회 이상")
-            elif impressions >= 20:
-                pieces.append("노출: 20회 이상")
-            elif impressions > 0:
-                pieces.append("노출: 20회 미만")
-        if "clicks" in evidence:
-            clicks = int(evidence.get("clicks") or 0)
-            pieces.append("클릭 있음" if clicks > 0 else "클릭 없음")
-        if "position" in evidence:
-            position = float(evidence.get("position") or 0)
-            if position and position <= 3:
-                pieces.append("순위: 상위권")
-            elif position and position <= 10:
-                pieces.append("순위: 1페이지권")
-            elif position and position <= 30:
-                pieces.append("순위: 개선 여지 있음")
-            elif position:
-                pieces.append("순위: 낮음")
-        for key in ("verdict", "coverage_state", "unindexed_days", "status_code"):
-            if key in evidence and evidence[key] not in (None, ""):
-                pieces.append(f"{key}: {evidence[key]}")
-        if evidence.get("broken_images"):
-            pieces.append(f"broken images: {len(evidence['broken_images'])}")
-        if evidence.get("broken_internal_links"):
-            pieces.append(f"broken internal links: {len(evidence['broken_internal_links'])}")
-        return "; ".join(pieces) or "요약 근거만 공개 표시합니다."
+        if kind not in {"indexing", "index_monitor", "technical"}:
+            return "상세 근거는 비공개 분석에서 확인하세요."
+        if not isinstance(evidence, dict):
+            return "상세 근거는 비공개 분석에서 확인하세요."
+        verdict = evidence.get("verdict")
+        if isinstance(verdict, str) and verdict in {"VERDICT_UNSPECIFIED", "PASS", "PARTIAL", "FAIL", "NEUTRAL"}:
+            pieces.append(f"verdict: {verdict}")
+        coverage = evidence.get("coverage_state")
+        if isinstance(coverage, str) and coverage in PUBLIC_COVERAGE_STATES:
+            pieces.append(f"coverage_state: {coverage}")
+        elif coverage:
+            pieces.append("coverage_state: 확인 필요")
+        for key, minimum, maximum in (("unindexed_days", 0, 36500), ("status_code", 100, 599)):
+            value = evidence.get(key)
+            if type(value) is int and minimum <= value <= maximum:
+                pieces.append(f"{key}: {value}")
+        for key in (
+            "ok", "indexable", "meta_description_present", "canonical_matches_final_url", "in_static_sitemap"
+        ):
+            if type(evidence.get(key)) is bool:
+                pieces.append(f"{key}: {str(evidence[key]).lower()}")
+        if evidence.get("error"):
+            pieces.append("error: reported")
+        for key, label in (("broken_images", "broken images"), ("broken_internal_links", "broken internal links")):
+            value = evidence.get(key)
+            if isinstance(value, (list, tuple)) and value:
+                pieces.append(f"{label}: {len(value)}")
+        return "; ".join(pieces) or "상세 근거는 비공개 분석에서 확인하세요."
     for key in (
         "impressions",
         "clicks",
@@ -568,6 +633,8 @@ def evidence_line(evidence, public=False):
 
 
 def render_markdown(plan, public=False):
+    if public:
+        plan = sanitize_plan(plan)
     lines = [
         f"# SEO Growth Queue - {plan['generated_date']}",
         "",
@@ -579,7 +646,11 @@ def render_markdown(plan, public=False):
         "",
         "## Notice",
         "",
-        "- 이 이슈는 공개 저장소에 올라가도 되도록 Search Console 원시 검색어/페이지 지표를 제거하거나 요약합니다.",
+        (
+            "- 이 공개 계획에는 Search Console 원시 검색어, 페이지 주소와 검색 성과 지표를 포함하지 않습니다."
+            if public
+            else "- 이 이슈는 공개 저장소에 올라가도 되도록 Search Console 원시 검색어/페이지 지표를 제거하거나 요약합니다."
+        ),
         "- 원본 Search Console JSON은 GitHub Actions artifact, issue, PR, 저장소에 남기지 않습니다.",
         "",
         "## Guardrails",
@@ -590,11 +661,8 @@ def render_markdown(plan, public=False):
     if not plan["opportunities"]:
         lines.append("No opportunities crossed the configured thresholds in this run.")
     for index, item in enumerate(plan["opportunities"], start=1):
-        heading = (
-            public_title(item, index)
-            if public
-            else f"{index}. [{item['priority']}] {item['title']}"
-        )
+        heading = f"{index}. [{item['priority']}] {item['title']}"
+        summary = item["evidence_summary"] if public else evidence_line(item.get("evidence", {}))
         lines.extend(
             [
                 f"### {heading}",
@@ -605,7 +673,7 @@ def render_markdown(plan, public=False):
                 f"- 항목별 확인: {', '.join(item.get('required_checks') or [])}",
                 "- 공통 게이트: scripts/smoke_test.py, git diff --check, production live smoke after merge",
                 f"- 왜 중요한가: {item['rationale']}",
-                f"- 근거: {evidence_line(item.get('evidence', {}), public=public)}",
+                f"- 근거: {summary}",
                 f"- 다음 행동: {item['suggested_action']}",
                 "",
             ]
@@ -613,19 +681,57 @@ def render_markdown(plan, public=False):
     return "\n".join(lines).rstrip() + "\n"
 
 
+def public_date(value, timestamp=False):
+    if not isinstance(value, str) or len(value) > 40:
+        return None
+    try:
+        if timestamp:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).isoformat()
+        return date.fromisoformat(value).isoformat()
+    except ValueError:
+        return None
+
+
+def public_priority(value):
+    return value if isinstance(value, str) and value in {"P1", "P2", "P3"} else "P3"
+
+
 def sanitize_plan(plan):
-    sanitized = {key: value for key, value in plan.items() if key != "opportunities"}
-    sanitized["opportunities"] = []
+    # Public output is rebuilt from a closed contract; audit text is never copied.
+    period_days = plan.get("period_days")
+    sanitized = {
+        "schema_version": "seo_opportunity_plan.v1",
+        "generated_date": public_date(plan.get("generated_date")) or "unknown",
+        "source_audit_generated_at": public_date(plan.get("source_audit_generated_at"), timestamp=True),
+        "site_url": "https://www.soulib.kr",
+        "base_url": "https://www.soulib.kr",
+        "period_days": period_days if type(period_days) is int and 0 < period_days <= 3650 else None,
+        "dry_run_source": bool(plan.get("dry_run_source")),
+        "guardrails": list(PUBLIC_PLAN_GUARDRAILS),
+        "opportunities": [],
+    }
     for index, item in enumerate(plan.get("opportunities", []), start=1):
+        kind = item.get("type")
+        if not isinstance(kind, str) or kind not in PUBLIC_OPPORTUNITY_TEXT:
+            kind = "review"
+        title, rationale, action = PUBLIC_OPPORTUNITY_TEXT.get(
+            kind,
+            ("SEO 검토 후보", "비공개 분석의 검토 항목입니다.", "비공개 분석을 확인하고 사람 검토 절차로 개선안을 정리하세요."),
+        )
+        priority = public_priority(item.get("priority"))
         public_item = {
-            key: value
-            for key, value in item.items()
-            if key not in {"evidence", "title", "rationale", "suggested_action"}
+            "id": f"{kind}-{index}",
+            "type": kind,
+            "priority": priority,
+            "title": title,
+            "rationale": rationale,
+            "suggested_action": action,
+            "automation_level": AUTOMATION_LEVEL.get(kind, "draft_only"),
+            "required_roles": list(ROLE_MAP.get(kind, ("Growth Analyst", "QA/Release Worker"))),
+            "required_checks": list(CHECK_MAP.get(kind, ("scripts/smoke_test.py", "git diff --check"))),
+            "guardrails": list(PUBLIC_ITEM_GUARDRAILS),
+            "evidence_summary": evidence_line(item.get("evidence", {}), public=True, kind=kind),
         }
-        public_item["title"] = public_title(item, index).split("] ", 1)[-1]
-        public_item["rationale"] = item.get("rationale")
-        public_item["suggested_action"] = item.get("suggested_action")
-        public_item["evidence_summary"] = evidence_line(item.get("evidence", {}), public=True)
         sanitized["opportunities"].append(public_item)
     return sanitized
 
@@ -674,7 +780,7 @@ def main():
     if args.markdown:
         print(render_markdown(plan, public=args.public_summary), end="")
     else:
-        print(json.dumps(plan, ensure_ascii=False, indent=2))
+        print(json.dumps(sanitize_plan(plan) if args.public_summary else plan, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

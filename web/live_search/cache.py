@@ -34,3 +34,7 @@ class TTLMemoryCache:
                     oldest_key = min(self._items, key=lambda k: self._items[k][0])
                     self._items.pop(oldest_key, None)
             self._items[key] = (now + ttl_seconds, copy.deepcopy(value))
+
+    def clear(self):
+        with self._lock:
+            self._items.clear()

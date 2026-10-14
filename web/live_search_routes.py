@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import copy
+import os
 import re
+import time
 import traceback
 from urllib.parse import urlencode
 
 from flask import Blueprint, jsonify, render_template, request
 
 from live_search.normalizer import normalize_author, normalize_text, normalize_title_for_group
-from live_search.service import get_cached_live_detail, live_search, set_cached_live_detail
+from live_search.service import LiveSearchDeadlineExceeded, get_cached_live_detail, live_search, set_cached_live_detail
 from seo_books import record_search_results
 
 
 live_search_bp = Blueprint("live_search", __name__)
+LIVE_DETAIL_TOTAL_TIMEOUT = max(0.1, float(os.environ.get("LIVE_DETAIL_TOTAL_TIMEOUT", "8")))
 
 
 def _counts_need_hydration(query: str, item: dict, meta: dict | None = None) -> bool:
@@ -299,22 +302,50 @@ def _pop_live_detail_complete(book: dict) -> bool:
 def _find_complete_live_book(target: dict, fallback: dict | None = None):
     if not target.get("title"):
         return _copy_live_book(fallback, _is_complete_fallback(fallback))
+    if fallback and not (
+        _same_book_family_with_author(target, fallback) or _safe_loose_detail_match(target, fallback)
+    ):
+        fallback = None
     candidates = []
+    deadline = time.monotonic() + LIVE_DETAIL_TOTAL_TIMEOUT
+    budget_exhausted = False
+    search_incomplete = False
     for query in _title_search_candidates(target["title"]):
-        payload = live_search(
-            query=query,
-            field="title",
-            providers_raw="",
-            libraries_raw="",
-            limit=100,
-            offset=0,
-        )
+        if time.monotonic() >= deadline:
+            budget_exhausted = True
+            break
+        try:
+            payload = live_search(
+                query=query,
+                field="title",
+                providers_raw="",
+                libraries_raw="",
+                limit=100,
+                offset=0,
+                deadline=deadline,
+            )
+        except LiveSearchDeadlineExceeded:
+            budget_exhausted = True
+            break
         meta = payload.get("meta") or {}
         search_complete = not (meta.get("partial") or meta.get("scope_limited") or any(
             diagnostic.get("error_count") or diagnostic.get("errors")
             for diagnostic in meta.get("diagnostics") or []
         ))
+        search_incomplete = search_incomplete or not search_complete
         candidates.extend((item, search_complete and not item.get("counts_partial")) for item in payload.get("items") or [])
+        if not search_complete and time.monotonic() >= deadline:
+            budget_exhausted = True
+            break
+
+    def finish(book, complete):
+        usable = bool(book and (book.get("libraries") or _library_count(book)))
+        if not usable:
+            if budget_exhausted:
+                raise LiveSearchDeadlineExceeded("live_detail_deadline_exceeded")
+            if search_incomplete:
+                raise RuntimeError("live_detail_search_incomplete")
+        return _copy_live_book(book, complete and not budget_exhausted)
 
     family_matches = [(item, complete) for item, complete in candidates if _same_book_family_with_author(target, item)]
     if fallback and _same_book_family_with_author(target, fallback):
@@ -324,7 +355,7 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
             family_matches,
             key=lambda entry: (_library_count(entry[0]), int(entry[1]), _match_score(target, entry[0])),
         )
-        return _copy_live_book(best, complete)
+        return finish(best, complete)
 
     ranked = sorted(
         [(item, complete) for item, complete in candidates if _safe_loose_detail_match(target, item)],
@@ -333,10 +364,10 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
     )
     best, complete = ranked[0] if ranked else (None, False)
     if not best:
-        return _copy_live_book(fallback, _is_complete_fallback(fallback))
+        return finish(fallback, _is_complete_fallback(fallback))
     if fallback and _library_count(fallback) > _library_count(best) and _same_book_family_with_author(target, fallback):
-        return _copy_live_book(fallback, _is_complete_fallback(fallback))
-    return _copy_live_book(best, complete)
+        return finish(fallback, _is_complete_fallback(fallback))
+    return finish(best, complete)
 
 
 def _detail_hydrate_url(cache_key: str, target: dict, fallback: dict | None = None) -> str:
