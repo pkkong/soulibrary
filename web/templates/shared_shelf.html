@@ -39,7 +39,6 @@
         <section class="app-section shelf-panel shared-shelf-summary" aria-label="공유 서재 요약">
             <div class="shared-summary-row">
                 <span>총 {{ shelf.books|length }}권</span>
-                <span id="shared-availability-summary">소장 정보 확인 가능</span>
             </div>
             <div id="shared-copy-status" class="shelf-share-status" aria-live="polite"></div>
         </section>
@@ -57,6 +56,6 @@
     window.__SHARED_SHELF__ = {{ shelf|tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260526a') }}"></script>
-<script src="{{ url_for('static', filename='js/shared_shelf.js', v='20260519b') }}"></script>
+<script src="{{ url_for('static', filename='js/shared_shelf.js', v='20261014a') }}"></script>
 {% endif %}
 {% endblock %}

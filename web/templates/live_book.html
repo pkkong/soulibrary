@@ -3,9 +3,9 @@
 {% if seo_book %}
 {% set page_title = seo_book.title ~ " 전자도서관 검색 - 서울 전자도서관 통합검색" %}
 {% elif book %}
-{% set page_title = book.title ~ " - 실시간 상세" %}
+{% set page_title = book.title ~ " - Soulib" %}
 {% else %}
-{% set page_title = "실시간 도서 상세" %}
+{% set page_title = "책 정보" %}
 {% endif %}
 
 {% block title %}{{ page_title }}{% endblock %}
@@ -89,7 +89,7 @@
                 <div class="detail-section-head">
                     <div class="detail-section-title">소장 도서관</div>
                 </div>
-                <p class="detail-status-note" data-detail-status-note role="status" aria-live="polite"{% if not book.counts_partial %} hidden{% endif %}>{% if book.counts_partial %}일부 도서관 정보만 표시됩니다.{% endif %}</p>
+                <p class="detail-status-note" data-detail-status-note role="status" aria-live="polite" hidden></p>
 
                 {% include "partials/live_library_groups.html" %}
             </div>
@@ -106,6 +106,7 @@
     (function () {
         const BOOK_TITLE = {{ book.title|tojson }};
         const DETAIL_HYDRATE_URL = {{ (detail_hydrate_url or "")|tojson }};
+        const INITIAL_PARTIAL_REASONS = {{ (book.counts_partial_reasons or [])|tojson }};
         const TEXT = {
             available: "대출가능",
             reservable: "예약",
@@ -322,6 +323,14 @@
             }
         }
 
+        function updateDetailFailureNote(reasons) {
+            const note = document.querySelector("[data-detail-status-note]");
+            if (!note) return;
+            const failed = Array.isArray(reasons) && reasons.some(reason => reason === "upstream_failure" || reason === "deadline");
+            note.hidden = !failed;
+            note.textContent = failed ? "일부 도서관의 소장 정보를 불러오지 못했습니다." : "";
+        }
+
         async function hydrateFullDetail() {
             if (!DETAIL_HYDRATE_URL) return false;
             const note = document.querySelector("[data-detail-status-note]");
@@ -335,22 +344,24 @@
                 current.outerHTML = data.groups_html;
                 applyHydratedBook(data.book || {}, true);
                 window.dispatchEvent(new CustomEvent("soulib:live-book-hydrated", {detail: data.book || {}}));
-                if (note) {
-                    const partial = !!(data.counts_partial || (data.book && data.book.counts_partial));
-                    note.hidden = !partial;
-                    note.textContent = partial ? "일부 도서관을 확인하지 못했습니다. 보유 정보가 더 있을 수 있습니다." : "";
-                }
+                const reasons = [data.counts_partial_reasons, data.book && data.book.counts_partial_reasons]
+                    .flatMap(value => Array.isArray(value) ? value : []);
+                updateDetailFailureNote(reasons);
                 return true;
             } catch (err) {
-                if (note) {
-                    note.hidden = false;
-                    note.textContent = "도서관 정보를 모두 확인하지 못했습니다. 표시된 정보는 일부일 수 있습니다.";
-                }
                 const placeholder = document.querySelector("[data-library-placeholder]");
-                if (placeholder) {
+                const hasExistingGroups = !!document.querySelector("[data-live-library-groups] .lib-group-row");
+                if (hasExistingGroups || !placeholder) {
+                    if (note) {
+                        note.hidden = false;
+                        note.textContent = hasExistingGroups ? "일부 도서관의 소장 정보를 불러오지 못했습니다." : "소장 정보를 불러오지 못했습니다.";
+                    }
+                } else {
+                    if (note) { note.hidden = true; note.textContent = ""; }
+                    placeholder.classList.remove("is-loading");
                     placeholder.classList.add("is-error");
                     placeholder.removeAttribute("aria-hidden");
-                    placeholder.textContent = "도서관 정보를 불러오지 못했습니다.";
+                    placeholder.textContent = "소장 정보를 불러오지 못했습니다.";
                 }
                 applyHydratedBook({}, true);
                 return false;
@@ -365,6 +376,7 @@
             });
         } else {
             initStatuses(document);
+            updateDetailFailureNote(INITIAL_PARTIAL_REASONS);
         }
     })();
 </script>

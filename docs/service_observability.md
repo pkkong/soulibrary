@@ -63,10 +63,12 @@
 
 - `vercel.json -> index.py -> web/app_search.py`와 DB 없는 실시간 검색을 기준으로 한다. 공유 서재의 Postgres 필요성과 검색의 DB 의존성을 혼동하지 않는다.
 - cache miss와 hit, 같은 검색 동시 요청, connector 예외·total timeout·library timeout, 결과 item/detail cache 수명과 크기 제한을 점검한다.
-- 검색 scope, timeout, provider error로 불완전한 응답을 완전한 보유 현황으로 표시하지 않는다. 부분 0건과 전체 조회 실패는 완전한 검색 완료 0건과 구분한다.
+- 필터·넓은 검색의 scope 제한, 상세 추가 조회 중, 실제 timeout/provider error를 원인별로 구분한다. 불완전한 응답을 완전한 보유 현황으로 표시하지 않되 범위 제한을 도서관 실패로 설명하지 않는다. 부분 0건과 전체 조회 실패는 완전한 검색 완료 0건과 구분한다.
+- 로딩 경과 시간이나 `partial`/`counts_partial` 하나만으로 실패 문구를 만들지 않는다. 실제 응답에서 확인한 실패 범위·개수만 안내하고 정상 scope 제한·조회 중·실제 실패의 표시 조건을 회귀로 검증한다.
 - 응답 시간은 endpoint, 조건, cache 상태, 측정 환경·표본 수를 기록한다. 단일 샘플을 SLA나 p95로 일반화하지 않는다.
 - `python scripts/smoke_test.py`, `git diff --check`, 실제 `/api/live_search` live smoke를 수행한다. mock 응답 검증과 외부 도서관 연결 검증 결과를 구분한다.
 - [UX_UI_Guide.md](UX_UI_Guide.md)에 따라 초기·완료 0건·부분 결과·전체 실패·재시도와 360px/430px/desktop 화면, dialog 이름·Tab 순환·Escape·포커스 복귀를 확인한다.
+- 문구 회귀는 정상 검색·필터·넓은 검색·상세 추가 조회 전후에 실패 안내가 잘못 나오지 않는지와 실제 실패가 빠지지 않는지를 함께 확인한다. 실패 안내는 검색 한곳·상세 소장 도서관 한곳에 두고 banner/타이머 중복과 내부 구현 용어를 검수한다.
 
 ### 상세·상태 조회의 시간 예산과 cache 계약
 

@@ -2,7 +2,6 @@ const sharedShelf = window.__SHARED_SHELF__ || {};
 const sharedItems = document.getElementById("shared-shelf-items");
 const sharedCopyList = document.getElementById("shared-copy-list");
 const sharedCopyStatus = document.getElementById("shared-copy-status");
-const sharedAvailabilitySummary = document.getElementById("shared-availability-summary");
 const shelf = window.SoulibShelf;
 
 function cleanText(value) {
@@ -32,26 +31,8 @@ function coverHtml(book, className) {
     `;
 }
 
-function renderAvailabilitySummary(books) {
-    const totals = books.reduce((acc, book) => {
-        const counts = book.counts || {};
-        acc.total += Number(counts.total || 0);
-        acc.kyobo += Number(counts.kyobo || 0);
-        acc.yes24 += Number(counts.yes24 || 0);
-        acc.other += Number(counts.other || 0);
-        return acc;
-    }, { total: 0, kyobo: 0, yes24: 0, other: 0 });
-    if (!sharedAvailabilitySummary) return;
-    if (!totals.total) {
-        sharedAvailabilitySummary.textContent = "상세에서 도서관 확인";
-        return;
-    }
-    sharedAvailabilitySummary.textContent = `소장 정보 ${totals.total.toLocaleString()}건 · 교보 ${totals.kyobo.toLocaleString()} · YES24 ${totals.yes24.toLocaleString()} · 기타 ${totals.other.toLocaleString()}`;
-}
-
 function renderBooks() {
     const books = Array.isArray(sharedShelf.books) ? sharedShelf.books : [];
-    renderAvailabilitySummary(books);
     if (!sharedItems) return;
     if (!books.length) {
         sharedItems.innerHTML = `<div class="shelf-empty">표시할 책이 없습니다.</div>`;

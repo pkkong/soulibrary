@@ -45,9 +45,8 @@
         <div class="search-feedback" id="search-feedback" role="status" aria-live="polite" hidden>
             <p id="search-feedback-text"></p>
             <div class="search-feedback-actions">
-                <button type="button" id="search-retry" hidden>다시 시도</button>
+                <button type="button" id="search-retry" hidden>다시 검색</button>
                 <button type="button" id="search-reset-filters" hidden>필터 해제</button>
-                <a href="/blog/ebook-library-no-results-check" id="search-feedback-guide" hidden>검색 결과가 없을 때</a>
             </div>
         </div>
 
@@ -97,7 +96,7 @@
 </script>
 <script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260526a') }}"></script>
 <script src="{{ url_for('static', filename='js/shelf_picker.js', v='20261012a') }}"></script>
-<script src="{{ url_for('static', filename='js/search.js', v='live20261012a') }}"></script>
+<script src="{{ url_for('static', filename='js/search.js', v='live20261014a') }}"></script>
 {% endblock %}
 
 {% block scripts %}

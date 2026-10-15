@@ -27,6 +27,10 @@ push/merge to main
 -> python scripts/live_smoke.py https://www.soulib.kr
 ```
 
+Vercel 함수 지역은 `vercel.json`의 `regions: ["icn1"]`(서울)로 명시한다. 공유 서재의 Supabase 지역은 아래의 `ap-northeast-2`(서울)를 기준으로 한다.
+
+지역 설정을 바꾼 뒤에는 배포 후 `vercel inspect`에서 실제 function region을 확인한다. 같은 고정 검색어·필터·cache 조건으로 변경 전후를 비교하고 표본 수를 기록하며, 공유 서재 create/read도 live smoke로 검증한다. 단일 비교를 p95나 일반적인 성능 개선으로 보고하지 않고 자세한 비교 결과는 ignored artifact에 보존한다. 설정 변경과 실제 배포·지역 검증 완료를 구분한다.
+
 자동배포에 필요한 GitHub Actions secrets:
 
 ```text

@@ -107,3 +107,69 @@ production.analytics.setOptOut(false);
 assert.equal(production.analytics.track('report_success'), true);
 assert.equal(production.events.at(-1)[2].success, true);
 console.log('frontend_regression_test: ok (analytics isolation, redaction, allowed search terms, opt-out)');
+
+// Run the real copy helpers against isolated DOM records; no browser or network.
+function copyFunction(text, name) {
+    const start = text.indexOf(`function ${name}(`);
+    assert(start >= 0, `missing copy helper ${name}`);
+    const body = text.slice(start).match(/\)\s*\{/);
+    assert(body, `missing function body ${name}`);
+    let end = start + body.index + body[0].indexOf('{'), depth = 1;
+    while (depth && ++end < text.length) {
+        if (text[end] === '{') depth++;
+        else if (text[end] === '}') depth--;
+    }
+    assert.equal(depth, 0);
+    return text.slice(start, end + 1);
+}
+const searchSource = fs.readFileSync(path.join(__dirname, '../web/static/js/search.js'), 'utf8');
+const searchHelpers = ['showSearchFeedback', 'hasSearchFilters', 'failedSearchLibraryCount', 'showSearchOutcome']
+    .map(name => copyFunction(searchSource, name)).join('\n');
+function searchCopy(meta, resultCount, filters = []) {
+    const records = Object.fromEntries(['status', 'search-feedback', 'search-feedback-text', 'search-retry',
+        'search-reset-filters'].map(id => [id, {textContent: '', hidden: true}]));
+    records.status.textContent = `검색 결과 ${resultCount}권`;
+    const context = vm.createContext({document: {getElementById: id => records[id]},
+        currentMeta: meta, currentResults: Array.from({length: resultCount}, () => ({})),
+        selectedField: 'title_author', selectedProviders: new Set(filters), selectedLibraries: new Set(), refineQueryText: ''});
+    vm.runInContext(searchHelpers + '\nshowSearchOutcome();', context);
+    return records;
+}
+for (const meta of [{}, {scope_limited: true}, {partial: false, failed_libraries: []},
+    {counts_partial_reasons: ['query_scope']}, {partial: true, failed_libraries: [], scope_limited: true}]) {
+    const records = searchCopy(meta, 1);
+    assert.equal(records['search-feedback'].hidden, true, 'scope/pending flags must not imply upstream failure');
+    assert.equal(records['search-retry'].hidden, true);
+}
+let records = searchCopy({partial: false}, 0);
+assert.match(records['search-feedback-text'].textContent, /검색 결과가 없습니다/);
+assert.equal(records.status.textContent, '검색 결과 0권');
+assert.equal(records['search-reset-filters'].hidden, true);
+records = searchCopy({scope_limited: true}, 0, ['교보']);
+assert.equal(records['search-reset-filters'].hidden, false);
+const failures = {partial: true, failed_libraries: ['mapo', 'seongbuk'], searched_libraries: 3, successful_libraries: 1};
+records = searchCopy(failures, 1);
+assert.equal(records['search-feedback-text'].textContent, '2곳의 검색 결과를 불러오지 못했습니다.');
+assert.equal(records.status.textContent, '검색 결과 1권');
+assert.equal(records['search-retry'].hidden, false);
+records = searchCopy(failures, 0);
+assert.equal(records.status.textContent, '', 'incomplete zero results must not claim a completed zero');
+assert.equal(records['search-feedback-text'].textContent, '2곳의 검색 결과를 불러오지 못했습니다.');
+records = searchCopy({partial: true, searched_libraries: 3, successful_libraries: 0, failed_libraries: []}, 0);
+assert.equal(records.status.textContent, '');
+assert.equal(records['search-feedback-text'].textContent, '검색 결과를 불러오지 못했습니다.');
+for (const diagnostics of [[{error_count: 2}], [{errors: [{library_code: 'mapo'}, {library_code: 'seongbuk'}]}]]) {
+    records = searchCopy({partial: true, failed_libraries: [], diagnostics}, 1);
+    assert.equal(records['search-feedback-text'].textContent, '2곳의 검색 결과를 불러오지 못했습니다.', 'legacy diagnostic errors must survive an empty additive array');
+}
+const detailSource = fs.readFileSync(path.join(__dirname, '../web/templates/live_book.html'), 'utf8');
+const detailHelper = copyFunction(detailSource, 'updateDetailFailureNote');
+for (const [reasons, hidden] of [[[], true], [['scope_limited'], true], [['query_scope'], true],
+    [['upstream_failure'], false], [['deadline'], false], [['scope_limited', 'upstream_failure', 'deadline'], false]]) {
+    const note = {hidden: false, textContent: ''};
+    const context = vm.createContext({document: {querySelector: () => note}, reasons});
+    vm.runInContext(detailHelper + '\nupdateDetailFailureNote(reasons);', context);
+    assert.equal(note.hidden, hidden);
+    assert.equal(note.textContent, hidden ? '' : '일부 도서관의 소장 정보를 불러오지 못했습니다.');
+}
+console.log('frontend status-copy regression: ok (complete zero, real failures, diagnostic compatibility, scope/pending, detail provenance)');

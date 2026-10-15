@@ -650,6 +650,77 @@ def assert_seo_public_projection_contract():
         assert json.loads(private_stdout.stdout) == private_cli, "default stdout must preserve the private plan"
 
 
+def assert_partial_provenance_contract():
+    title = "검증책"
+    result = LiveSearchResult(title=title, author="작가", library_code="mapo", library_name="마포", library_short="마포", platform="Kyobo_New")
+    success = [{"errors": [], "error_count": 0, "failed_libraries": [], "searched_libraries": 1, "successful_libraries": 1}]
+    cases = [(title, "", "", []), ("검증", "", "", ["query_scope"]),
+             (title, "교보", "", ["scope_limited"]), ("검증", "교보", "", ["scope_limited", "query_scope"])]
+    for query, providers, libraries, expected in cases:
+        with patch.object(live_service, "_CACHE", TTLMemoryCache(600)), \
+                patch.object(live_service, "_DETAIL_CACHE", TTLMemoryCache(600)), \
+                patch.object(live_service, "_search_libraries", return_value=([result], success)):
+            payload = live_service.live_search(query, "title", providers_raw=providers, libraries_raw=libraries)
+            item = live_search_routes._attach_summary_urls(payload, query)["items"][0]
+            assert item["counts_partial_reasons"] == expected and item["failed_libraries"] == []
+            assert not payload["meta"]["partial"] and "upstream_failure" not in item["counts_partial_reasons"]
+    placeholder = live_search_routes._placeholder_live_book({"title": title})
+    assert placeholder["counts_partial"] and placeholder["counts_partial_reasons"] == [] and placeholder["failed_libraries"] == []
+    unknown = live_service.counts_partial_provenance(title, {"title": title, "counts_partial": True})
+    assert unknown == {"counts_partial": True, "counts_partial_reasons": [], "failed_libraries": []}
+    legacy_errors = {"partial": True, "failed_libraries": [], "diagnostics": [{"error_count": 2, "errors": [{"library_code": "mapo"}, {"library_code": "seongbuk"}]}]}
+    provenance = live_service.counts_partial_provenance(title, {"title": title}, legacy_errors)
+    assert provenance["counts_partial_reasons"] == ["upstream_failure"] and provenance["failed_libraries"] == ["mapo", "seongbuk"]
+
+    class Connector:
+        def search_library(self, code, cfg, query, field, limit, timeout):
+            if code == "seongbuk":
+                raise RuntimeError("synthetic upstream failure")
+            return [result]
+    for codes, total in [("mapo,seongbuk", 1), ("seongbuk", 0)]:
+        with patch.object(live_service, "_CACHE", TTLMemoryCache(600)), \
+                patch.object(live_service, "_DETAIL_CACHE", TTLMemoryCache(600)), \
+                patch.object(live_service, "_connector_for_library", return_value=Connector()):
+            payload = live_service.live_search(title, "title", libraries_raw=codes)
+        assert payload["total"] == total and payload["meta"]["partial"]
+        assert payload["meta"]["failed_libraries"] == ["seongbuk"]
+        if total:
+            assert payload["items"][0]["counts_partial_reasons"] == ["upstream_failure", "scope_limited"]
+
+    target = {"title": "검증책 : 부제", "author": "올바른 작가"}
+    item = {**target, "counts": {"total": 1}, "libraries": [{"code": "mapo"}]}
+    richer = {**item, "title": title, "counts": {"total": 4}}
+    def search(*, query, **kwargs):
+        return {"items": [item], "meta": legacy_errors} if query == target["title"] else {"items": [richer], "meta": {}}
+    with patch.object(live_search_routes, "live_search", side_effect=search):
+        selected = live_search_routes._find_complete_live_book(target)
+    assert selected["counts"]["total"] == 4 and selected["_live_detail_complete"]
+    assert selected["counts_partial_reasons"] == [] and selected["failed_libraries"] == []
+    fallback = {**item, "counts": {"total": 9}, "counts_partial": True,
+                "counts_partial_reasons": ["upstream_failure"], "failed_libraries": ["yongsan"]}
+    with patch.object(live_search_routes, "live_search", return_value={"items": [item], "meta": legacy_errors}):
+        selected = live_search_routes._find_complete_live_book(target, fallback)
+    assert selected["counts_partial_reasons"] == ["upstream_failure"] and selected["failed_libraries"] == ["yongsan"]
+    for endpoint in ("live_book_summary", "live_book_detail"):
+        with patch.object(live_search_routes, "get_cached_live_detail", return_value=copy.deepcopy(fallback)), \
+                patch.object(live_search_routes, "live_search", side_effect=live_service.LiveSearchDeadlineExceeded("deadline")):
+            response = app.test_client().get(f"/api/{endpoint}?title={quote(target['title'])}&author={quote(target['author'])}")
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["counts_partial_reasons"] == ["upstream_failure", "deadline"]
+        assert payload["failed_libraries"] == ["yongsan"]
+        if endpoint == "live_book_detail":
+            assert payload["book"]["counts_partial_reasons"] == payload["counts_partial_reasons"]
+            assert payload["book"]["failed_libraries"] == payload["failed_libraries"]
+    config = live_service.LIBRARIES["dobong"]
+    assert config["platform"] == "Kyobo_New" and "/elibrary-front/" in config["homepage_url"]
+    assert "dobong" not in live_service.SPECIAL_CONNECTOR_FACTORIES
+    modern = {"code": "dobong", "platform_code": "Kyobo_New", "brcd": "QA", "ctts_dvsn_code": "001", "ctgr_id": "001"}
+    assert live_search_routes._status_kind(modern) == "kyobo" and live_search_routes._status_supported(modern)
+    legacy = {"code": "dobong", "platform_code": "Kyobo", "brcd": "QA"}
+    assert live_search_routes._status_kind(legacy) == "dobong" and live_search_routes._status_supported(legacy)
+
+
 def main():
     shared_shelves_tmp = Path(os.environ["SHARED_SHELVES_FILE"])
     shared_shelves_tmp.unlink(missing_ok=True)
@@ -659,6 +730,7 @@ def main():
     assert_detail_deadline_contract()
     assert_status_budget_cache_contract()
     assert_seo_public_projection_contract()
+    assert_partial_provenance_contract()
 
     cover_choice = merge_live_results(
         [
@@ -706,7 +778,7 @@ def main():
         raise AssertionError("search page title should keep the service name")
     if "책 제목이나 저자를 검색하세요." not in search_body:
         raise AssertionError("search page should keep the concise empty state")
-    if "search.js?v=live20261012a" not in search_body:
+    if "search.js?v=live20261014a" not in search_body:
         raise AssertionError("search page should use the current search asset")
 
     blog = assert_response(client, "/blog")
