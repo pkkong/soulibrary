@@ -286,7 +286,7 @@ async function shareActiveList() {
         await copyShareUrl();
     } catch (err) {
         console.error(err);
-        shelfShareStatus.textContent = err.message || "공유 링크를 만들지 못했습니다.";
+        shelfShareStatus.textContent = "공유 링크를 만들지 못했습니다. 다시 시도해주세요.";
     } finally {
         shelfShare.disabled = false;
     }

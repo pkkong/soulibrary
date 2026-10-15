@@ -2103,8 +2103,8 @@ body.has-topbar .search-top {
     font-size: 14px;
     line-height: 1.55;
 }
-.search-feedback p { margin: 0; }
-.search-feedback-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
+.search-feedback p { display: inline; margin: 0; }
+.search-feedback-actions { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; margin-left: 12px; }
 .search-feedback-actions button,
 .search-feedback-actions a {
     display: inline-flex;

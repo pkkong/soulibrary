@@ -70,6 +70,40 @@ PROVIDER_FILTER_ORDER = {
 }
 
 
+COUNTS_PARTIAL_REASONS = ("upstream_failure", "scope_limited", "query_scope", "deadline")
+
+
+def _failure_codes(values) -> list[str]:
+    return list(dict.fromkeys(code for code in values or [] if isinstance(code, str) and code))
+
+
+def counts_partial_provenance(query: str, item: dict, meta: dict | None = None) -> dict:
+    meta = meta or {}
+    diagnostics = meta.get("diagnostics") or []
+    failed_libraries = _failure_codes([
+        *(item.get("failed_libraries") or []),
+        *(meta.get("failed_libraries") or []),
+        *(code for diagnostic in diagnostics for code in diagnostic.get("failed_libraries") or []),
+        *(error.get("library_code") for diagnostic in diagnostics for error in diagnostic.get("errors") or []),
+    ])
+    reasons = {reason for reason in item.get("counts_partial_reasons") or [] if reason in COUNTS_PARTIAL_REASONS}
+    if failed_libraries or meta.get("partial") or any(
+        diagnostic.get("error_count") or diagnostic.get("errors") for diagnostic in diagnostics
+    ):
+        reasons.add("upstream_failure")
+    if meta.get("scope_limited"):
+        reasons.add("scope_limited")
+    query_key, title_key = normalize_text(query), normalize_text(item.get("title"))
+    if query_key and title_key and query_key != title_key:
+        reasons.add("query_scope")
+    return {
+        # A legacy partial flag without provenance is deliberately left generic.
+        "counts_partial": bool(item.get("counts_partial") or reasons),
+        "counts_partial_reasons": [reason for reason in COUNTS_PARTIAL_REASONS if reason in reasons],
+        "failed_libraries": failed_libraries,
+    }
+
+
 def _split_csv(value: str) -> list[str]:
     return [part.strip() for part in (value or "").split(",") if part.strip()]
 
@@ -385,23 +419,24 @@ def _search_payload(query: str, field: str, providers: list[str], libraries: lis
     merged_items = merge_live_results(raw_results)
     partial = any(diagnostic.get("error_count") or diagnostic.get("errors") for diagnostic in diagnostics)
     scope_limited = bool(providers or libraries)
+    meta = {
+        "mode": "live",
+        "cache_hit": False,
+        "partial": partial,
+        "scope_limited": scope_limited,
+        "connectors": sorted({platform for diagnostic in diagnostics for platform in diagnostic.get("platforms", [])}),
+        "searched_libraries": sum(diagnostic.get("searched_libraries", len(library_codes)) for diagnostic in diagnostics),
+        "successful_libraries": sum(diagnostic.get("successful_libraries", 0) for diagnostic in diagnostics),
+        "failed_libraries": _failure_codes(code for diagnostic in diagnostics for code in diagnostic.get("failed_libraries", [])),
+        "diagnostics": diagnostics,
+    }
     for item in merged_items:
-        item["counts_partial"] = bool(partial or scope_limited or normalize_text(query) != normalize_text(item.get("title")))
+        item.update(counts_partial_provenance(query, item, meta))
     return {
         "total": len(merged_items),
         "items": merged_items,
         "filters": _filters_from_items(merged_items),
-        "meta": {
-            "mode": "live",
-            "cache_hit": False,
-            "partial": partial,
-            "scope_limited": scope_limited,
-            "connectors": sorted({platform for diagnostic in diagnostics for platform in diagnostic.get("platforms", [])}),
-            "searched_libraries": sum(diagnostic.get("searched_libraries", len(library_codes)) for diagnostic in diagnostics),
-            "successful_libraries": sum(diagnostic.get("successful_libraries", 0) for diagnostic in diagnostics),
-            "failed_libraries": [code for diagnostic in diagnostics for code in diagnostic.get("failed_libraries", [])],
-            "diagnostics": diagnostics,
-        },
+        "meta": meta,
     }
 
 

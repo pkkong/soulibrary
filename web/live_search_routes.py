@@ -10,7 +10,14 @@ from urllib.parse import urlencode
 from flask import Blueprint, jsonify, render_template, request
 
 from live_search.normalizer import normalize_author, normalize_text, normalize_title_for_group
-from live_search.service import LiveSearchDeadlineExceeded, get_cached_live_detail, live_search, set_cached_live_detail
+from live_search.service import (
+    COUNTS_PARTIAL_REASONS,
+    LiveSearchDeadlineExceeded,
+    counts_partial_provenance,
+    get_cached_live_detail,
+    live_search,
+    set_cached_live_detail,
+)
 from seo_books import record_search_results
 
 
@@ -18,21 +25,12 @@ live_search_bp = Blueprint("live_search", __name__)
 LIVE_DETAIL_TOTAL_TIMEOUT = max(0.1, float(os.environ.get("LIVE_DETAIL_TOTAL_TIMEOUT", "8")))
 
 
-def _counts_need_hydration(query: str, item: dict, meta: dict | None = None) -> bool:
-    meta = meta or {}
-    if item.get("counts_partial") or meta.get("partial") or meta.get("scope_limited"):
-        return True
-    query_key = normalize_text(query)
-    title_key = normalize_text(item.get("title"))
-    return bool(query_key and title_key and query_key != title_key)
-
-
 def _attach_summary_urls(payload: dict, query: str) -> dict:
     for item in payload.get("items") or []:
         if not isinstance(item, dict) or not item.get("title"):
             continue
-        needs_hydration = _counts_need_hydration(query, item, payload.get("meta"))
-        item["counts_partial"] = needs_hydration
+        item.update(counts_partial_provenance(query, item, payload.get("meta")))
+        needs_hydration = item["counts_partial"]
         if not needs_hydration:
             item.pop("summary_url", None)
             continue
@@ -285,12 +283,13 @@ def _copy_live_book(book: dict | None, complete: bool):
     if not book:
         return None
     copied = copy.deepcopy(book)
+    copied.update(counts_partial_provenance("", copied))
     copied[_LIVE_DETAIL_COMPLETE_KEY] = bool(complete)
     return copied
 
 
 def _is_complete_fallback(book: dict | None) -> bool:
-    return bool(book and not book.get("counts_partial"))
+    return bool(book and not counts_partial_provenance("", book)["counts_partial"])
 
 
 def _pop_live_detail_complete(book: dict) -> bool:
@@ -328,12 +327,12 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
             budget_exhausted = True
             break
         meta = payload.get("meta") or {}
-        search_complete = not (meta.get("partial") or meta.get("scope_limited") or any(
-            diagnostic.get("error_count") or diagnostic.get("errors")
-            for diagnostic in meta.get("diagnostics") or []
-        ))
+        search_complete = not counts_partial_provenance("", {}, meta)["counts_partial"]
         search_incomplete = search_incomplete or not search_complete
-        candidates.extend((item, search_complete and not item.get("counts_partial")) for item in payload.get("items") or [])
+        for item in payload.get("items") or []:
+            candidate = copy.deepcopy(item)
+            candidate.update(counts_partial_provenance(query, candidate, meta))
+            candidates.append((candidate, search_complete and not candidate["counts_partial"]))
         if not search_complete and time.monotonic() >= deadline:
             budget_exhausted = True
             break
@@ -345,7 +344,12 @@ def _find_complete_live_book(target: dict, fallback: dict | None = None):
                 raise LiveSearchDeadlineExceeded("live_detail_deadline_exceeded")
             if search_incomplete:
                 raise RuntimeError("live_detail_search_incomplete")
-        return _copy_live_book(book, complete and not budget_exhausted)
+        copied = _copy_live_book(book, complete and not budget_exhausted)
+        if copied and budget_exhausted:
+            reasons = set(copied["counts_partial_reasons"]) | {"deadline"}
+            copied["counts_partial_reasons"] = [reason for reason in COUNTS_PARTIAL_REASONS if reason in reasons]
+            copied["counts_partial"] = True
+        return copied
 
     family_matches = [(item, complete) for item, complete in candidates if _same_book_family_with_author(target, item)]
     if fallback and _same_book_family_with_author(target, fallback):
@@ -398,6 +402,8 @@ def _placeholder_live_book(target: dict) -> dict | None:
         "counts": {"kyobo": 0, "yes24": 0, "other": 0, "total": 0},
         "libraries": [],
         "counts_partial": True,
+        "counts_partial_reasons": [],
+        "failed_libraries": [],
     }
 
 
@@ -424,6 +430,8 @@ def api_live_book_summary():
                 "publisher": book.get("publisher") or "",
                 "counts": book.get("counts") or {},
                 "counts_partial": not _pop_live_detail_complete(book),
+                "counts_partial_reasons": book.get("counts_partial_reasons") or [],
+                "failed_libraries": book.get("failed_libraries") or [],
                 "live_detail_url": book.get("live_detail_url") or "",
                 "live_detail_key": book.get("live_detail_key") or "",
             }
@@ -464,6 +472,8 @@ def api_live_book_detail():
                     "image_candidates": decorated.get("image_candidates") or [],
                     "counts": decorated.get("counts") or {},
                     "counts_partial": decorated.get("counts_partial", False),
+                    "counts_partial_reasons": decorated.get("counts_partial_reasons") or [],
+                    "failed_libraries": decorated.get("failed_libraries") or [],
                     "libraries": decorated.get("libraries") or [],
                     "live_detail_key": decorated.get("live_detail_key") or cache_key,
                     "live_detail_url": decorated.get("live_detail_url") or "",
@@ -471,6 +481,8 @@ def api_live_book_detail():
                 "groups_html": render_template("partials/live_library_groups.html", book=decorated),
                 "counts": decorated.get("counts") or {},
                 "counts_partial": decorated.get("counts_partial", False),
+                "counts_partial_reasons": decorated.get("counts_partial_reasons") or [],
+                "failed_libraries": decorated.get("failed_libraries") or [],
                 "live_detail_key": decorated.get("live_detail_key") or cache_key,
             }
         )

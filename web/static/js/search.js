@@ -60,7 +60,6 @@ function showSearchFeedback(text, options = {}) {
     document.getElementById("search-feedback-text").textContent = text || "";
     document.getElementById("search-retry").hidden = !options.retry;
     document.getElementById("search-reset-filters").hidden = !options.reset;
-    document.getElementById("search-feedback-guide").hidden = !options.guide;
     feedback.hidden = !text;
 }
 
@@ -68,14 +67,23 @@ function hasSearchFilters() {
     return selectedField !== "title_author" || selectedProviders.size > 0 || selectedLibraries.size > 0 || !!refineQueryText;
 }
 
+function failedSearchLibraryCount() {
+    if (Array.isArray(currentMeta.failed_libraries) && currentMeta.failed_libraries.length) return currentMeta.failed_libraries.length;
+    return (Array.isArray(currentMeta.diagnostics) ? currentMeta.diagnostics : []).reduce((count, diagnostic) => {
+        const errors = Array.isArray(diagnostic.errors) ? diagnostic.errors.length : 0;
+        return count + Math.max(Number(diagnostic.error_count) || 0, errors);
+    }, 0);
+}
+
 function showSearchOutcome() {
-    if (currentMeta.partial && currentMeta.successful_libraries === 0 && Number(currentMeta.searched_libraries) > 0) {
-        document.getElementById("status").textContent = "검색을 완료하지 못했습니다.";
-        showSearchFeedback("도서관 정보를 확인하지 못했습니다. 잠시 뒤 다시 시도해주세요.", {retry: true, reset: hasSearchFilters()});
-    } else if (currentMeta.partial) {
-        showSearchFeedback("일부 도서관을 확인하지 못했습니다. 다시 시도하면 결과가 더 나올 수 있습니다.", {retry: true, reset: hasSearchFilters(), guide: !currentResults.length});
+    const failedCount = failedSearchLibraryCount();
+    const allFailed = currentMeta.partial && currentMeta.successful_libraries === 0 && Number(currentMeta.searched_libraries) > 0;
+    if (currentMeta.partial && (failedCount > 0 || allFailed)) {
+        if (!currentResults.length) document.getElementById("status").textContent = "";
+        const message = allFailed || !failedCount ? "검색 결과를 불러오지 못했습니다." : `${failedCount}곳의 검색 결과를 불러오지 못했습니다.`;
+        showSearchFeedback(message, {retry: true});
     } else if (!currentResults.length) {
-        showSearchFeedback("검색 결과가 없습니다. 제목 일부나 저자로 다시 검색해보세요.", {reset: hasSearchFilters(), guide: true});
+        showSearchFeedback("검색 결과가 없습니다. 제목을 줄이거나 저자로 검색해보세요.", {reset: hasSearchFilters()});
     } else {
         showSearchFeedback("");
     }
@@ -294,8 +302,7 @@ function applyFilters(reset = true) {
     const prefix = currentQueryText ? `'${currentQueryText}'` : "";
     const refineLabel = refineQueryText ? ` + '${refineQueryText}'` : "";
     const label = prefix ? `${prefix}${refineLabel} ` : "";
-    const scope = currentMeta.partial ? "확인된 검색 결과" : "검색 결과";
-    document.getElementById('status').innerText = `${label}${scope} ${countText}권`;
+    document.getElementById('status').innerText = `${label}검색 결과 ${countText}권`;
     updateFilterSummary();
 
     const loadMoreBtn = document.getElementById('load-more');
@@ -309,6 +316,8 @@ function applyFilters(reset = true) {
 }
 
 async function fetchSearch(query, refine) {
+    const retryButton = document.getElementById("search-retry");
+    let restoreRetryFocus = document.activeElement === retryButton;
     if (searchController) searchController.abort();
     if (loadMoreController) loadMoreController.abort();
     loadMoreInFlight = false;
@@ -340,15 +349,12 @@ async function fetchSearch(query, refine) {
         renderedBooksByShelfKey.clear();
         summaryHydrateStarted.clear();
     }
-    statusDiv.textContent = "도서관에서 검색 중입니다…";
+    statusDiv.textContent = "검색 중…";
     resultsDiv.setAttribute("aria-busy", "true");
     loader.style.display = keepResults ? "none" : "block";
     loadMoreBtn.style.display = "none";
     syncSearchPageUrl(query, refine);
     trackSearch("search_start", searchMetrics);
-    const slowTimer = setTimeout(() => {
-        if (generation === searchGeneration) statusDiv.textContent = "일부 도서관 응답이 늦어지고 있습니다…";
-    }, 8000);
     try {
         const response = await fetch(`${SEARCH_API_ENDPOINT}?${params}`, {signal: controller.signal});
         if (!response.ok) throw new Error("http");
@@ -368,17 +374,25 @@ async function fetchSearch(query, refine) {
         trackSearch("search_result", {...searchMetrics, result_count: totalCount, duration_ms: performance.now() - started,
             partial: !!currentMeta.partial, failed_library_count: Array.isArray(failedLibraries) ? failedLibraries.length : Number(failedLibraries || 0)});
     } catch (error) {
-        if (error.name === "AbortError" || generation !== searchGeneration) return;
-        statusDiv.textContent = "검색을 완료하지 못했습니다.";
-        showSearchFeedback("도서관에 연결하지 못했습니다. 잠시 뒤 다시 시도해주세요.", {retry: true, reset: hasSearchFilters()});
+        if (error.name === "AbortError" || generation !== searchGeneration) {
+            restoreRetryFocus = false;
+            return;
+        }
+        statusDiv.textContent = "";
+        showSearchFeedback("검색 결과를 불러오지 못했습니다.", {retry: true});
         const errorType = error.name === "TypeError" ? "network" : error.name === "SyntaxError" ? "invalid_response" : error.message;
         trackSearch("search_error", {...searchMetrics, duration_ms: performance.now() - started, error_type: errorType});
     } finally {
-        clearTimeout(slowTimer);
         if (generation === searchGeneration) {
             loader.style.display = "none";
             resultsDiv.removeAttribute("aria-busy");
             searchController = null;
+            if (restoreRetryFocus && !controller.signal.aborted && document.activeElement === document.body) {
+                const focusTarget = !retryButton.hidden ? retryButton : document.getElementById("query");
+                if (focusTarget && !focusTarget.closest("[hidden], [inert]") && focusTarget.getClientRects().length) {
+                    focusTarget.focus({preventScroll: true});
+                }
+            }
         }
     }
 }

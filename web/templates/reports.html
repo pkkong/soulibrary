@@ -68,7 +68,7 @@
     <section class="reports-list" aria-labelledby="reports-list-title">
         <div class="reports-list-head">
             <h2 id="reports-list-title">최근 접수</h2>
-            <span data-reports-count>{{ reports_count_label }}</span>
+            <span data-reports-count{% if reports_unavailable or reports_loading %} hidden{% endif %}>{{ reports_count_label if not reports_unavailable and not reports_loading else "" }}</span>
         </div>
         <div data-reports-list-body>
             {% include "partials/report_recent_list.html" %}
@@ -98,16 +98,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const recentCount = document.querySelector("[data-reports-count]");
     if (recentBody && !document.querySelector(".report-submitted-card")) {
         fetch("/api/reports/recent", {headers: {"Accept": "application/json"}})
-            .then((res) => res.json())
+            .then(async (res) => {
+                const data = await res.json();
+                if (!res.ok || data.unavailable) throw new Error("reports_unavailable");
+                return data;
+            })
             .then((data) => {
                 if (data.html) recentBody.innerHTML = data.html;
-                if (recentCount && data.count_label) recentCount.textContent = data.count_label;
+                if (recentCount && data.count_label) {
+                    recentCount.textContent = data.count_label;
+                    recentCount.hidden = false;
+                }
             })
             .catch(() => {
                 if (recentBody) {
                     recentBody.innerHTML = '<div class="report-empty">최근 접수 목록을 불러오지 못했습니다.</div>';
                 }
-                if (recentCount) recentCount.textContent = "확인 필요";
+                if (recentCount) { recentCount.textContent = ""; recentCount.hidden = true; }
             });
     }
 });
