@@ -1,0 +1,40 @@
+name: Inspect existing library deployment access
+
+on:
+  push:
+    branches:
+      - codex/library-connectivity-recovery
+    paths:
+      - .github/workflows/library-connectivity-probe.yml
+      - scripts/library_connectivity_probe.py
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: library-connectivity-probe
+  cancel-in-progress: true
+
+jobs:
+  inspect-existing-project:
+    if: github.repository == 'pkkong/soulibrary' && github.ref == 'refs/heads/codex/library-connectivity-recovery'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out reviewed probe
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Read existing Vercel project settings
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: python scripts/library_connectivity_probe.py
