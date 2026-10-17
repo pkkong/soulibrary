@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -45,6 +46,7 @@ CLI_FAILURE_PATTERNS = (
     ("cli_environment_missing", r"no value specified for env variable|environment variable[^\n]{0,80}(?:missing|required|not found)"),
     ("cli_invalid_target", r"anonymous deployments always target production|(?:invalid|unknown)[^\n]{0,50}(?:target|environment)|(?:target|environment)[^\n]{0,100}(?:not available|does not exist|not found)|not a valid target directory"),
     ("cli_incompatible_options", r"(?:cannot|can't|can not)[^\n]{0,30}(?:combine|use)[^\n]{0,120}--|must be used (?:with|without)|mutually exclusive|incompatible[^\n]{0,60}(?:flag|option)|(?:flag|option)[^\n]{0,60}incompatible"),
+    ("cli_git_author_access", r"git (?:commit )?author[^\n]{0,160}(?:access|member|team|permission)|commit author[^\n]{0,160}(?:access|team|permission)"),
     ("cli_scope_error", r"(?:team|scope)[^\n]{0,100}(?:not found|does not exist|not have access|not authorized|permission)|(?:not have access|not authorized)[^\n]{0,100}(?:team|scope)|team_not_found|scope_not_found"),
     ("cli_project_access", r"could not retrieve project settings|project[^\n]{0,100}(?:not found|does not exist|access|permission)|not authorized|not permitted|forbidden|insufficient_scope"),
     ("cli_project_unlinked", r"no linked project found|not linked to (?:a |an )?project|not linked to a vercel project|run[^\n]{0,40}vercel link"),
@@ -54,6 +56,12 @@ CLI_FAILURE_PATTERNS = (
     ("cli_build_failed", r"build[^\n]{0,80}(?:failed|error)|(?:failed|error)[^\n]{0,80}(?:build|compile)|command[^\n]{0,100}exited with"),
     ("cli_network_error", r"econnreset|econnrefused|enotfound|etimedout|fetch failed|network error|request timed out|certificate[^\n]{0,80}(?:invalid|expired|verify)"),
 )
+
+
+class CliDeployFailure(inspect.ProbeFailure):
+    def __init__(self, kind, details):
+        super().__init__(kind)
+        self.details = details  # Already allowlisted and redacted; never raw output.
 
 
 def require(condition, kind):
@@ -106,6 +114,57 @@ def cli_failure_kind(stdout, stderr, private_values=()):
     return "cli_deploy_failed"
 
 
+def cli_private_values(environ, secret):
+    values = [secret]
+    for name, value in environ.items():
+        if name in ("VERCEL_ORG_ID", "VERCEL_PROJECT_ID") or re.search(r"TOKEN|SECRET|KEY|PASS|AUTH", name, re.I):
+            if isinstance(value, str) and value:
+                values.append(value)
+    return tuple(sorted(set(values), key=len, reverse=True))
+
+
+def cli_failure_details(stdout, stderr, return_code, private_values):
+    """Expose at most one safe error sentence, never arbitrary CLI output."""
+    raw = str(stdout or "") + "\n" + str(stderr or "")
+    details = {"cliReturnCode": return_code if type(return_code) is int and -255 <= return_code <= 255 else None,
+               "cliOutputChars": len(raw)}
+    private_pattern = re.compile("|".join(re.escape(value) for value in private_values if value)) if any(private_values) else None
+
+    def redact_private(value):
+        return private_pattern.sub("<redacted>", value) if private_pattern else value
+
+    value = redact_private(raw)
+    value = re.sub(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-_])", "", value)
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    value = "".join(char for char in value if char == "\n" or not unicodedata.category(char).startswith("C"))
+    value = redact_private(value)
+    if len(value) > 1024 * 1024:
+        value = value[:512 * 1024] + "\n" + value[-512 * 1024:]
+    for line in value.splitlines():
+        match = re.fullmatch(r"\s*(?:>\s*)?(?:error\s*:|\[error\]\s*:?)\s*(.{1,2000})", line, re.I)
+        if not match:
+            continue
+        candidate = match.group(1).strip()
+        # Error-prefixed documents, environment dumps and source are still not diagnostics.
+        if (candidate.startswith(("{", "[", "```")) or "{" in candidate or "}" in candidate
+                or re.search(r"</?(?!(?:redacted|url|email|query)>)[A-Za-z][A-Za-z0-9:_-]*(?:\s[^>]*)?/?>|<!|<\?", candidate, re.I)
+                or re.search(r"\b[A-Z_][A-Z0-9_]{2,}\s*=", candidate)
+                or re.search(r"process\.env|os\.environ|environment(?: variables)?\s*[:={]", candidate, re.I)
+                or re.search(r"^(?:def|class|function|const|let|var|import|from|raise|return)\s|^[A-Za-z_]\w*\(", candidate)):
+            continue
+        candidate = re.sub(r"\b[A-Za-z][A-Za-z0-9+.-]{1,20}://[^\s<>\"']+", "<url>", candidate)
+        candidate = re.sub(r"\b(?:eyJ[A-Za-z0-9_-]*|[A-Za-z0-9_-]{8,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "<redacted>", candidate)
+        candidate = re.sub(r"[^\s<>\"']+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "<email>", candidate)
+        candidate = re.sub(r"\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?::[0-9]+)?(?:[/?#][^\s<>\"']*)?", "<url>", candidate)
+        candidate = re.sub(r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])", "<redacted>", candidate)
+        candidate = re.sub(r"[?&][^\s<>\"']+", "<query>", candidate)
+        candidate = re.sub(r"\s+", " ", candidate).strip()
+        if candidate:
+            details["cliDiagnostic"] = candidate[:400]
+            break
+    return details
+
+
 def deploy_preview(environ, secret, run=subprocess.run):
     child_env = dict(environ)
     child_env.update({
@@ -128,8 +187,9 @@ def deploy_preview(environ, secret, run=subprocess.run):
             result = run(args, cwd=ROOT, env=child_env, capture_output=True,
                          text=True, timeout=420, check=False)
             if result.returncode != 0:
-                private = (secret,) + tuple(environ.get(name, "") for name in ("VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID"))
-                raise inspect.ProbeFailure(cli_failure_kind(result.stdout, result.stderr, private))
+                private = cli_private_values(environ, secret)
+                details = cli_failure_details(result.stdout, result.stderr, result.returncode, private)
+                raise CliDeployFailure(cli_failure_kind(result.stdout, result.stderr, private), details)
             return safe_url(result.stdout.strip())
     except subprocess.TimeoutExpired:
         raise inspect.ProbeFailure("cli_timeout") from None
@@ -321,6 +381,8 @@ def preview(environ, opener=None, run=subprocess.run, mask=None):
         report["allFourSearchesRecovered"] = set(CODES) <= verified_search
     except inspect.ProbeFailure as exc:
         report["errorKind"] = exc.kind
+        if isinstance(exc, CliDeployFailure):
+            report.update(exc.details)
     except Exception:
         report["errorKind"] = "unexpected_error"
     finally:
