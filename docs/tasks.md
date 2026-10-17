@@ -49,6 +49,7 @@
 - 개발자스럽거나 AI스러운 상태 문구 지적은 [UX_UI_Guide.md](UX_UI_Guide.md)의 문구·표시 조건 검수로 돌아간다. 필터·넓은 검색·상세 조회 중과 실제 실패를 구분하고, 정상/실패/0건의 모바일·데스크톱 회귀를 확인한다. 단어 교체나 경고 일괄 삭제만으로 완료하지 않는다.
 - 원인 불명 버그는 Explorer가 먼저 재현과 영향 범위를 찾고, 구현 Worker는 별도로 둔다.
 - 배포 감시는 성공하면 자동화를 멈추고, 평시 Ops Watcher는 과도하게 자주 돌리지 않는다.
+- 로그인 요청 전 기존 connector·CLI·CI의 승인된 접근 경로를 확인하고 가능한 작업을 계속한다. 브라우저 세션 만료나 새 인프라의 추가 권한 요건을 기존 배포 전체의 차단으로 단정하지 않는다. 실제 접근 불가 판단과 최소 사용자 조치 기준은 [AGENTS.md](../AGENTS.md#배포와-운영-감시)를 따른다.
 - SEO 자동 개선은 `측정 -> 진단 -> 저위험 자동 수정 후보 -> 콘텐츠/UX 개선안 -> QA -> 배포 검증` 루프로 운영한다.
 - SEO 자동화의 기본 권한은 GitHub issue, Growth Queue, 자동 점검 결과와 사람 검토용 초안까지이며 글/랜딩 문구/이미지/UI 자동 발행은 금지한다.
 - SEO 작업은 Growth Analyst, Technical SEO Worker, Content Writer, Editor/Fact Checker, QA/Release Worker 역할을 분리한다.

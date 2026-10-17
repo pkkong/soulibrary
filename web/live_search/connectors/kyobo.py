@@ -5,6 +5,7 @@ import requests
 from lxml import html as lxml_html
 
 from live_search.models import LiveSearchResult
+from live_search.relay import fetch_page, operation_deadline, relay_enabled, validate_search_document
 from utils.http import DEFAULT_HEADERS, TLSAdapter, _build_ssl_context
 
 
@@ -81,6 +82,8 @@ class KyoboNewConnector:
         url = f"{base_url}{_search_path(base_path)}"
         results = []
         seen = set()
+        use_relay = relay_enabled(lib_code)
+        deadline = operation_deadline(timeout) if use_relay else None
         search_fields = FIELD_TO_SCH_CLSTS.get(field, FIELD_TO_SCH_CLSTS["title_author"])
         for sch_clst in search_fields:
             params = {
@@ -90,20 +93,26 @@ class KyoboNewConnector:
                 "recordCount": str(max(1, min(int(limit or 20), 50))),
                 "dvsnCheck": "001",
             }
-            response = self._session().get(
-                url,
-                params=params,
-                headers=DEFAULT_HEADERS,
-                timeout=timeout,
-                verify=False,
-            )
+            if use_relay:
+                response = fetch_page(lib_code, "kyobo_search", {
+                    "query": query, "field": sch_clst,
+                    "limit": max(1, min(int(limit or 20), 50)),
+                }, deadline)
+            else:
+                response = self._session().get(
+                    url,
+                    params=params,
+                    headers=DEFAULT_HEADERS,
+                    timeout=timeout,
+                    verify=False,
+                )
             response.raise_for_status()
-            for result in self._parse_results(
-                response.text,
-                base_url=base_url,
-                lib_code=lib_code,
-                config=config,
-            ):
+            parsed = self._parse_results(
+                response.text, base_url=base_url, lib_code=lib_code, config=config,
+            )
+            if use_relay:
+                validate_search_document(response, lib_code, parsed)
+            for result in parsed:
                 identifiers = result.identifiers or {}
                 key = identifiers.get("brcd") or f"{result.title}|{result.author}|{result.publisher}"
                 if key in seen:

@@ -46,6 +46,9 @@ jobs:
       - name: Run smoke test
         run: python scripts/smoke_test.py
 
+      - name: Run offline library relay regressions
+        run: python scripts/library_relay_regression_test.py
+
       - name: Set up Node for frontend regression
         uses: actions/setup-node@v4
         with:

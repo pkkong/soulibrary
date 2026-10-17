@@ -5,6 +5,7 @@ from lxml import html as lxml_html
 
 from live_search.connectors.common import absolute_url, make_session, origin_from_url, request_headers, text
 from live_search.models import LiveSearchResult
+from live_search.relay import fetch_page, operation_deadline, relay_enabled, validate_search_document
 
 
 FIELD_TO_ORDER = {
@@ -48,7 +49,9 @@ class Yes24Connector:
         if not base_url:
             return []
 
-        session = make_session()
+        use_relay = relay_enabled(lib_code)
+        deadline = operation_deadline(timeout) if use_relay else None
+        session = None if use_relay else make_session()
         results = []
         seen = set()
         for srch_order in FIELD_TO_ORDER.get(field, FIELD_TO_ORDER["title_author"]):
@@ -57,14 +60,20 @@ class Yes24Connector:
                 "src_key": query,
             }
             url = f"{base_url}/search/?{urlencode(params)}"
-            response = session.get(
-                url,
-                headers=request_headers(base_url),
-                timeout=timeout,
-                verify=False,
-            )
+            if use_relay:
+                response = fetch_page(lib_code, "yes24_search", {"query": query, "field": srch_order}, deadline)
+            else:
+                response = session.get(
+                    url,
+                    headers=request_headers(base_url),
+                    timeout=timeout,
+                    verify=False,
+                )
             response.raise_for_status()
-            for result in self._parse_results(response.text, base_url, lib_code, config):
+            parsed = self._parse_results(response.text, base_url, lib_code, config)
+            if use_relay:
+                validate_search_document(response, lib_code, parsed)
+            for result in parsed:
                 goods_id = (result.identifiers or {}).get("goods_id") or ""
                 key = goods_id or f"{result.title}|{result.author}|{result.publisher}"
                 if key in seen:

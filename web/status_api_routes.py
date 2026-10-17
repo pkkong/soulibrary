@@ -21,6 +21,7 @@ from adapters.status_parsers import (
 )
 from config import LIBRARIES
 from live_search.cache import TTLMemoryCache
+from live_search.relay import fetch_page, operation_deadline, relay_enabled, yes24_status_html
 from utils.http import DEFAULT_HEADERS, DOBONG_HEADERS, get_status_session
 
 status_api_bp = Blueprint("status_api", __name__)
@@ -152,9 +153,17 @@ def api_kyobo_status():
     if not detail_url:
         return jsonify({"error": "invalid_library"}), 400
 
+    use_relay = relay_enabled(library_code)
+    deadline = operation_deadline(7) if use_relay else None
     try:
-        session = get_status_session()
-        res = session.get(detail_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
+        if use_relay:
+            res = fetch_page(library_code, "kyobo_detail", {
+                "brcd": brcd, "ctts_dvsn_code": ctts_dvsn_code,
+                "ctgr_id": ctgr_id, "sntn_auth_code": sntn_auth_code,
+            }, deadline)
+        else:
+            session = get_status_session()
+            res = session.get(detail_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
         status = parse_kyobo_status(res.text)
         if not status:
@@ -163,8 +172,11 @@ def api_kyobo_status():
         STATUS_CACHE.set(cache_key, payload)
         return jsonify(payload)
     except Exception as e:
-        print(f"[status error] {e}")
-        print(traceback.format_exc())
+        if use_relay:
+            print("[status error] library_relay_status_failed")
+        else:
+            print(f"[status error] {e}")
+            print(traceback.format_exc())
         return jsonify({"library_code": library_code, "brcd": brcd, "status": None}), 502
 
 
@@ -187,23 +199,39 @@ def api_yes24_status():
     fallback_url = list_url
 
     status = None
+    use_relay = relay_enabled(library_code)
+    deadline = operation_deadline(7) if use_relay else None
     try:
-        session = get_status_session()
-        res = session.get(detail_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
+        if use_relay:
+            res = fetch_page(library_code, "yes24_detail", {"goods_id": goods_id}, deadline)
+        else:
+            session = get_status_session()
+            res = session.get(detail_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
-        status = parse_yes24_status(res.text, goods_id)
+        html = yes24_status_html(res, "yes24_detail", goods_id) if use_relay else res.text
+        status = parse_yes24_status(html, goods_id)
     except Exception as e:
-        print(f"[status error] {e}")
-        print(traceback.format_exc())
+        if use_relay:
+            print("[status error] library_relay_status_failed")
+        else:
+            print(f"[status error] {e}")
+            print(traceback.format_exc())
 
     if not status:
         try:
-            res = get_status_session().get(fallback_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
+            if use_relay:
+                res = fetch_page(library_code, "yes24_list", {}, deadline)
+            else:
+                res = get_status_session().get(fallback_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
             res.raise_for_status()
-            status = parse_yes24_status(res.text, goods_id)
+            html = yes24_status_html(res, "yes24_list", goods_id) if use_relay else res.text
+            status = parse_yes24_status(html, goods_id)
         except Exception as e:
-            print(f"[status error] {e}")
-            print(traceback.format_exc())
+            if use_relay:
+                print("[status error] library_relay_status_failed")
+            else:
+                print(f"[status error] {e}")
+                print(traceback.format_exc())
 
     if not status:
         return jsonify({"library_code": library_code, "goods_id": goods_id, "status": None}), 502
