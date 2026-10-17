@@ -38,6 +38,22 @@ ERRORS = frozenset({
     "transport_error", "upstream_http", "redirect", "body_too_large",
     "invalid_document", "invalid_response", "busy",
 })
+CLI_FAILURE_PATTERNS = (
+    ("cli_invalid_token", r"invalid[_ -]token|token[^\n]{0,100}(?:not valid|invalid|expired|revoked)|(?:invalid|expired|revoked)[^\n]{0,80}token"),
+    ("cli_authentication_required", r"no existing credentials|no credentials|authentication[_ -]required|missing[_ -]credentials|not authenticated"),
+    ("cli_unknown_option", r"unknown (?:or unexpected )?(?:option|argument)|unexpected (?:option|argument)|unrecognized (?:option|argument)"),
+    ("cli_environment_missing", r"no value specified for env variable|environment variable[^\n]{0,80}(?:missing|required|not found)"),
+    ("cli_invalid_target", r"anonymous deployments always target production|(?:invalid|unknown)[^\n]{0,50}(?:target|environment)|(?:target|environment)[^\n]{0,100}(?:not available|does not exist|not found)|not a valid target directory"),
+    ("cli_incompatible_options", r"(?:cannot|can't|can not)[^\n]{0,30}(?:combine|use)[^\n]{0,120}--|must be used (?:with|without)|mutually exclusive|incompatible[^\n]{0,60}(?:flag|option)|(?:flag|option)[^\n]{0,60}incompatible"),
+    ("cli_scope_error", r"(?:team|scope)[^\n]{0,100}(?:not found|does not exist|not have access|not authorized|permission)|(?:not have access|not authorized)[^\n]{0,100}(?:team|scope)|team_not_found|scope_not_found"),
+    ("cli_project_access", r"could not retrieve project settings|project[^\n]{0,100}(?:not found|does not exist|access|permission)|not authorized|not permitted|forbidden|insufficient_scope"),
+    ("cli_project_unlinked", r"no linked project found|not linked to (?:a |an )?project|not linked to a vercel project|run[^\n]{0,40}vercel link"),
+    ("cli_deploy_limit", r"rate[_ -]?limit|too many requests|too many deployments|deployment[_ -]limit|no more than [0-9]+[^\n]{0,50}functions|exceeded[^\n]{0,100}(?:limit|quota)|limit[^\n]{0,80}(?:exceeded|reached)"),
+    ("cli_region_unsupported", r"(?:invalid|unsupported|not supported)[^\n]{0,80}region|region[^\n]{0,80}(?:not available|not supported|invalid|not allowed)"),
+    ("cli_configuration_error", r"couldn't (?:find|parse)[^\n]{0,100}(?:config|json)|invalid[^\n]{0,80}(?:configuration|vercel\.json|config)|(?:vercel\.json|configuration)[^\n]{0,100}(?:invalid|error|not found)|must be (?:inside|within)|outside (?:the )?project|(?:path|directory)[^\n]{0,100}does not exist"),
+    ("cli_build_failed", r"build[^\n]{0,80}(?:failed|error)|(?:failed|error)[^\n]{0,80}(?:build|compile)|command[^\n]{0,100}exited with"),
+    ("cli_network_error", r"econnreset|econnrefused|enotfound|etimedout|fetch failed|network error|request timed out|certificate[^\n]{0,80}(?:invalid|expired|verify)"),
+)
 
 
 def require(condition, kind):
@@ -74,6 +90,22 @@ def production_snapshot(project, team_id, project_id):
     }
 
 
+def cli_failure_kind(stdout, stderr, private_values=()):
+    """Only fixed enums may leave this boundary, never raw/sanitized excerpts."""
+    value = str(stdout or "") + "\n" + str(stderr or "")
+    for private in private_values:
+        if private:
+            value = value.replace(private, "<redacted>")
+    if len(value) > 1024 * 1024:
+        value = value[:512 * 1024] + "\n" + value[-512 * 1024:]
+    # Color and control bytes should not split fixed diagnostic phrases.
+    value = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", value)
+    for kind, pattern in CLI_FAILURE_PATTERNS:
+        if re.search(pattern, value, re.I):
+            return kind
+    return "cli_deploy_failed"
+
+
 def deploy_preview(environ, secret, run=subprocess.run):
     child_env = dict(environ)
     child_env.update({
@@ -95,7 +127,9 @@ def deploy_preview(environ, secret, run=subprocess.run):
                 args.extend(["--env", name, "--build-env", name])
             result = run(args, cwd=ROOT, env=child_env, capture_output=True,
                          text=True, timeout=420, check=False)
-            require(result.returncode == 0, "cli_deploy_failed")
+            if result.returncode != 0:
+                private = (secret,) + tuple(environ.get(name, "") for name in ("VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID"))
+                raise inspect.ProbeFailure(cli_failure_kind(result.stdout, result.stderr, private))
             return safe_url(result.stdout.strip())
     except subprocess.TimeoutExpired:
         raise inspect.ProbeFailure("cli_timeout") from None
