@@ -307,8 +307,13 @@ def fetch_upstream(payload):
     url, headers = page_recipe(payload)
     deadline = operation_deadline(payload["budget_ms"] / 1000)
     try:
-        with make_session() as session:
-            with session.get(url, headers=headers, timeout=_request_timeout(deadline), verify=False,
+        # Songpa's public host accepts the modern, certificate-verified default
+        # TLS session. Keep the other libraries' existing transport unchanged.
+        strict_tls = payload["library_code"] == "songpa_owned"
+        session_factory = requests.Session if strict_tls else make_session
+        with session_factory() as session:
+            session.trust_env = False
+            with session.get(url, headers=headers, timeout=_request_timeout(deadline), verify=strict_tls,
                              allow_redirects=False, stream=True) as upstream:
                 if 300 <= upstream.status_code < 400:
                     raise RelayError("redirect")

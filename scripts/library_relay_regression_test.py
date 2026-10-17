@@ -168,6 +168,35 @@ class RelayTests(unittest.TestCase):
         self.assertNotIn("Cookie", options["headers"])
         self.assertLessEqual(options["timeout"].total, 4)
 
+    def test_songpa_relay_uses_strict_tls_only_and_sanitizes_errors(self):
+        modern = session_with("get", StreamResponse(YES24_RESULT.encode()))
+        with patch.object(relay.requests, "Session", return_value=modern) as factory, patch.object(relay, "make_session") as legacy:
+            value = relay.fetch_upstream(payload("songpa_owned", "yes24_search", {"query": "검증", "field": "total"}))
+        self.assertTrue(value["ok"])
+        factory.assert_called_once_with()
+        legacy.assert_not_called()
+        modern.mount.assert_not_called()
+        self.assertFalse(modern.trust_env)
+        self.assertTrue(modern.get.call_args.kwargs["verify"])
+        self.assertFalse(modern.get.call_args.kwargs["allow_redirects"])
+        self.assertLessEqual(modern.get.call_args.kwargs["timeout"].total, 4)
+        for code in ("seongbuk", "yeongdeungpo", "gangseo"):
+            upstream = session_with("get", StreamResponse(KYOBO_RESULT.encode()))
+            sample = payload() if code == "seongbuk" else payload(code, "yes24_search", {"query": "검증", "field": "total"})
+            with patch.object(relay, "make_session", return_value=upstream) as legacy, patch.object(relay.requests, "Session") as factory:
+                self.assertTrue(relay.fetch_upstream(sample)["ok"])
+            legacy.assert_called_once_with()
+            factory.assert_not_called()
+            self.assertFalse(upstream.get.call_args.kwargs["verify"])
+        modern.get.side_effect = requests.exceptions.SSLError("SONGPA-URL-SECRET-CANARY")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out), patch.object(relay.requests, "Session", return_value=modern):
+            result = self.signed_post(payload("songpa_owned", "yes24_search", {"query": "검증", "field": "total"}))
+        self.assertEqual(result.status_code, 502)
+        self.assertEqual(result.json["error"], "transport_error")
+        self.assertNotIn("CANARY", result.get_data(as_text=True) + out.getvalue())
+        self.assertFalse(relay.relay_enabled("songpa_owned"))
+
     def test_upstream_errors_size_and_timeout(self):
         cases = [(StreamResponse(b"", 302), "redirect"), (StreamResponse(b"", 429), "upstream_http"),
                  (StreamResponse(b"{}", headers={"Content-Type": "application/json"}), "invalid_document"),
