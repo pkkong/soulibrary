@@ -56,12 +56,14 @@ def credentials(environ):
     return token, team_id, project_id
 
 
-def request_metadata(resource, token, team_id, project_id, opener):
+def request_metadata(resource, token, team_id, project_id, opener, deployment_host=None):
     # No caller-provided URLs, extra query arguments, redirects, or proxy envs.
     if resource == "project":
         url = f"{API_ORIGIN}/v9/projects/{project_id}?{urllib.parse.urlencode({'teamId': team_id})}"
     elif resource == "team":
         url = f"{API_ORIGIN}/v2/teams/{team_id}"
+    elif resource == "deployment" and isinstance(deployment_host, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]*\.vercel\.app", deployment_host):
+        url = f"{API_ORIGIN}/v13/deployments/{deployment_host}?{urllib.parse.urlencode({'teamId': team_id})}"
     else:
         raise ProbeFailure("invalid_resource")
     req = urllib.request.Request(

@@ -7,14 +7,24 @@ on:
     paths:
       - .github/workflows/library-connectivity-probe.yml
       - scripts/library_connectivity_probe.py
-  workflow_dispatch: {}
+      - scripts/library_relay_release.py
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inspect existing access or test one isolated relay preview
+        type: choice
+        required: true
+        default: inspect
+        options:
+          - inspect
+          - preview
 
 permissions:
   contents: read
 
 concurrency:
   group: library-connectivity-probe
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   inspect-existing-project:
@@ -38,3 +48,41 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: python scripts/library_connectivity_probe.py
+
+  test-isolated-preview:
+    needs: inspect-existing-project
+    # Every push remains read-only; preview requires explicit manual selection.
+    if: >-
+      github.repository == 'pkkong/soulibrary' &&
+      github.ref == 'refs/heads/codex/library-connectivity-recovery' &&
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out reviewed relay
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install existing parser dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install reviewed Vercel CLI
+        run: npm install --global vercel@64.2.0
+
+      - name: Test isolated Seoul relay preview
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: python scripts/library_relay_release.py --mode preview
