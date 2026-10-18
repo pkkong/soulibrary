@@ -4,6 +4,7 @@
 Default mode only inspects metadata. Preview mode never modifies production.
 Manual prepare/activate/disable only update four production relay variables;
 none of these modes deploys production or changes project/protection settings.
+Retain adds one fixed non-production alias without a production deploy or settings change.
 Raw CLI/API responses and page content must never be printed or persisted.
 """
 
@@ -35,6 +36,7 @@ CODES = ("seongbuk", "yeongdeungpo", "songpa_owned", "gangseo")
 REQUIRED_CODES = CODES[:2]
 STATUS_CODES = (*REQUIRED_CODES, "gangseo")
 STAGED_CODE_VALUES = ("seongbuk,yeongdeungpo", "seongbuk,yeongdeungpo,gangseo")
+RETAIN_ALIAS = "soulib-library-relay.vercel.app"
 MAIN_REF = "refs/heads/main"
 PRODUCTION_KEYS = frozenset({"LIBRARY_RELAY_URL", "LIBRARY_RELAY_SECRET", "LIBRARY_RELAY_CODES", "LIBRARY_RELAY_ENABLED"})
 FIXED_QUERY = "프로젝트 헤일메리"
@@ -552,15 +554,125 @@ def toggle(environ, mode, opener=None):
     return report
 
 
+def relay_alias(action, token, team_id, project_id, opener, deployment_id=None):
+    """Only inspect the fixed alias or assign it to a verified deployment ID.
+
+    Contracts: vercel.com/docs/rest-api/aliases/{get-an-alias,assign-an-alias}
+    """
+    inspect.credentials({"VERCEL_TOKEN": token, "VERCEL_ORG_ID": team_id, "VERCEL_PROJECT_ID": project_id})
+    require(action in ("get", "assign"), "invalid_alias_operation")
+    data = None
+    if action == "assign":
+        require(isinstance(deployment_id, str) and bool(re.fullmatch(r"dpl_[A-Za-z0-9]{1,128}", deployment_id)), "invalid_alias_deployment")
+        path = f"/v2/deployments/{deployment_id}/aliases"
+        data = json.dumps({"alias": RETAIN_ALIAS}).encode("utf-8")
+    else:
+        require(deployment_id is None, "invalid_alias_operation")
+        path = f"/v4/aliases/{RETAIN_ALIAS}"
+    url = inspect.API_ORIGIN + path + "?" + urllib.parse.urlencode({"teamId": team_id})
+    request = urllib.request.Request(url, data=data, method="POST" if data else "GET", headers={
+        "Authorization": "Bearer " + token, "Accept": "application/json", "Content-Type": "application/json",
+    })
+    try:
+        with opener.open(request, timeout=inspect.TIMEOUT_SECONDS) as response:
+            if response.status != 200:
+                status = response.status if type(response.status) is int and 100 <= response.status <= 599 else None
+                raise inspect.ProbeFailure("alias_unexpected_status", status)
+            declared = response.headers.get("Content-Length")
+            if declared is not None:
+                require(0 <= int(declared) <= inspect.MAX_RESPONSE_BYTES, "alias_response_too_large")
+            raw = response.read(inspect.MAX_RESPONSE_BYTES + 1)
+            require(len(raw) <= inspect.MAX_RESPONSE_BYTES, "alias_response_too_large")
+            payload = json.loads(raw)
+        require(isinstance(payload, dict) and payload.get("alias") == RETAIN_ALIAS, "alias_invalid_response")
+        # Creator details, bypass settings, certificates and raw IDs never leave a report.
+        return {name: payload.get(name) for name in ("alias", "projectId", "deploymentId", "oldDeploymentId", "redirect", "deletedAt")}
+    except urllib.error.HTTPError as exc:
+        status = exc.code if type(exc.code) is int and 100 <= exc.code <= 599 else None
+        exc.close()
+        if action == "get" and status == 404:
+            return None
+        raise inspect.ProbeFailure("alias_http_error", status) from None
+    except TimeoutError:
+        raise inspect.ProbeFailure("alias_timeout") from None
+    except urllib.error.URLError:
+        raise inspect.ProbeFailure("alias_network_error") from None
+    except (ValueError, UnicodeError):
+        raise inspect.ProbeFailure("alias_invalid_response") from None
+
+
+def retain(environ, relay_url, opener=None):
+    """Retain one existing non-production relay by adding one fixed custom alias."""
+    manual_context(environ, MAIN_REF)
+    url = safe_url(relay_url)
+    require(url != "https://" + RETAIN_ALIAS, "immutable_relay_url_required")
+    token, team_id, project_id = inspect.credentials(environ)
+    opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}), inspect.NoRedirects())
+    before = inspect.request_metadata("project", token, team_id, project_id, opener)
+    baseline = production_snapshot(before, team_id, project_id)
+    report = {"mode": "retain", "ok": False, "productionMutationsRequested": False,
+              "productionDeploymentRequested": False, "aliasMutationRequested": False,
+              "retentionExceptionVerified": False, "productionPreserved": False}
+    try:
+        deployment = inspect.request_metadata("deployment", token, team_id, project_id, opener,
+                                              deployment_host=urllib.parse.urlparse(url).hostname)
+        deployment_id = deployment.get("id") or deployment.get("uid")
+        require((deployment.get("projectId") or inspect.object_field(deployment, "project").get("id")) == project_id
+                and deployment.get("target") is None and deployment.get("readyState") == "READY"
+                and inspect.allowed_regions(deployment.get("regions")) == ["icn1"]
+                and isinstance(deployment_id, str) and bool(re.fullmatch(r"dpl_[A-Za-z0-9]{1,128}", deployment_id))
+                and deployment_id != baseline["targetId"]
+                and RETAIN_ALIAS not in (baseline["targetAliases"] or [])
+                and RETAIN_ALIAS != baseline["targetUrl"], "relay_identity_mismatch")
+        status, health, _ = read_json_response(opener, urllib.request.Request(url + "/health"), maximum=8192)
+        require(status == 200 and health.get("ok") is True and health.get("mode") == "library-relay"
+                and health.get("region") == "icn1", "relay_health_or_access_failed")
+        existing = relay_alias("get", token, team_id, project_id, opener)
+        if existing is not None:
+            require(existing["projectId"] == project_id and existing["deploymentId"] == deployment_id
+                    and not existing["redirect"] and not existing["deletedAt"], "alias_target_conflict")
+        else:
+            current = inspect.request_metadata("project", token, team_id, project_id, opener)
+            require(production_snapshot(current, team_id, project_id) == baseline, "production_changed_before_retain")
+            report["aliasMutationRequested"] = True
+            assigned = relay_alias("assign", token, team_id, project_id, opener, deployment_id)
+            require(assigned["oldDeploymentId"] in (None, deployment_id), "alias_previous_target_conflict")
+        verified = relay_alias("get", token, team_id, project_id, opener)
+        require(verified is not None and verified["projectId"] == project_id and verified["deploymentId"] == deployment_id
+                and not verified["redirect"] and not verified["deletedAt"], "alias_verification_failed")
+        status, health, _ = read_json_response(opener, urllib.request.Request("https://" + RETAIN_ALIAS + "/health"), maximum=8192)
+        require(status == 200 and health.get("ok") is True and health.get("mode") == "library-relay"
+                and health.get("region") == "icn1", "alias_health_or_access_failed")
+        report.update({"retentionExceptionVerified": True, "retainedAlias": RETAIN_ALIAS})
+    except inspect.ProbeFailure as exc:
+        report["errorKind"] = exc.kind
+        if exc.status is not None:
+            report["errorHttpStatus"] = exc.status
+    except Exception:
+        report["errorKind"] = "unexpected_error"
+    finally:
+        try:
+            after = inspect.request_metadata("project", token, team_id, project_id, opener)
+            report["productionPreserved"] = production_snapshot(after, team_id, project_id) == baseline
+        except Exception:
+            report["productionVerificationError"] = "verification_failed"
+    report["ok"] = bool(report["productionPreserved"] and report["retentionExceptionVerified"] and not report.get("errorKind"))
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("inspect", "preview", "prepare", "activate", "disable"), default="inspect")
+    parser.add_argument("--mode", choices=("inspect", "preview", "prepare", "activate", "disable", "retain"), default="inspect")
+    parser.add_argument("--relay-url", default="", help="Existing immutable relay preview URL; retain mode only")
     args = parser.parse_args()
     try:
+        require(args.mode == "retain" or not args.relay_url, "unexpected_relay_url")
         if args.mode == "inspect":
             report = inspect.probe(os.environ)
         elif args.mode in ("preview", "prepare"):
             report = preview(os.environ, mode=args.mode, mask=lambda value: print("::add-mask::" + value, flush=True))
+        elif args.mode == "retain":
+            report = retain(os.environ, args.relay_url)
         else:
             report = toggle(os.environ, args.mode)
     except inspect.ProbeFailure as exc:

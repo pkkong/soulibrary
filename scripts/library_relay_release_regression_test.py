@@ -71,6 +71,28 @@ class EnvironmentAPI:
         return Response({"created": created, "failed": []}, 201)
 
 
+class AliasAPI:
+    def __init__(self, existing=None):
+        self.existing, self.calls, self.writes = copy.deepcopy(existing), [], []
+
+    def open(self, request, timeout):
+        self.calls.append(request)
+        parsed = urllib.parse.urlparse(request.full_url)
+        assert parsed.scheme == "https" and parsed.netloc == "api.vercel.com"
+        assert urllib.parse.parse_qs(parsed.query) == {"teamId": [TEAM]}
+        assert request.get_header("Authorization") == "Bearer " + TOKEN
+        if request.get_method() == "GET":
+            assert parsed.path == "/v4/aliases/" + release.RETAIN_ALIAS
+            if self.existing is None:
+                raise urllib.error.HTTPError(request.full_url, 404, SECRET, {}, None)
+            return Response(self.existing, 200)
+        assert request.get_method() == "POST" and parsed.path == "/v2/deployments/dpl_relay/aliases"
+        assert json.loads(request.data) == {"alias": release.RETAIN_ALIAS}
+        self.writes.append(request)
+        self.existing = {"alias": release.RETAIN_ALIAS, "projectId": PROJECT, "deploymentId": "dpl_relay"}
+        return Response({"alias": release.RETAIN_ALIAS, "created": "now", "uid": "aliasIdCanary"}, 200)
+
+
 class ReleaseGuards(unittest.TestCase):
     def prepare(self, api, proof=True, extra_records=()):
         def metadata(resource, *args, **kwargs):
@@ -89,6 +111,25 @@ class ReleaseGuards(unittest.TestCase):
     def assert_private(self, report):
         for private in (SECRET, TOKEN, TEAM, PROJECT, "envIdCanary"):
             self.assertNotIn(private, json.dumps(report))
+
+    def retain(self, api, deployment=None, health_region="icn1", changed=False):
+        project_reads = 0
+        def metadata(resource, *args, **kwargs):
+            nonlocal project_reads
+            if resource == "project":
+                project_reads += 1
+                result = copy.deepcopy(PROJECT_DATA)
+                if changed and project_reads > 1:
+                    result["targets"]["production"]["id"] = "dpl_changed"
+                return result
+            return {"id": "dpl_relay", "projectId": PROJECT, "target": None, "readyState": "READY", "regions": ["icn1"], **(deployment or {})}
+        def health(opener, request, **kwargs):
+            self.assertIsNone(request.get_header("Authorization"))
+            self.assertIn(request.full_url, (URL + "/health", "https://" + release.RETAIN_ALIAS + "/health"))
+            return 200, {"ok": True, "mode": "library-relay", "region": health_region}, 0
+        with mock.patch.object(release.inspect, "request_metadata", side_effect=metadata), \
+                mock.patch.object(release, "read_json_response", side_effect=health):
+            return release.retain({**ENV, "GITHUB_REF": release.MAIN_REF}, URL, opener=api)
 
     def test_prepare_off_first_and_only_four_keys(self):
         api = EnvironmentAPI([row("EXISTING_UNRELATED")])
@@ -206,6 +247,56 @@ class ReleaseGuards(unittest.TestCase):
             self.assertFalse(report["ok"])
             self.assertEqual(report["errorHttpStatus"], 403 if isinstance(failure, Exception) else 202)
             self.assert_private(report)
+
+    def test_retain_only_fixed_alias_and_idempotent_same_target(self):
+        for existing in (None, {"alias": release.RETAIN_ALIAS, "projectId": PROJECT, "deploymentId": "dpl_relay"}):
+            api = AliasAPI(existing)
+            report = self.retain(api)
+            self.assertTrue(report["ok"] and report["retentionExceptionVerified"] and report["productionPreserved"])
+            self.assertFalse(report["productionMutationsRequested"] or report["productionDeploymentRequested"])
+            self.assertEqual(len(api.writes), 1 if existing is None else 0)
+            self.assert_private(report)
+            self.assertNotIn("dpl_", json.dumps(report))
+            self.assertNotIn("aliasIdCanary", json.dumps(report))
+
+    def test_retain_wrong_owner_production_region_or_existing_alias_never_writes(self):
+        for deployment in ({"projectId": "prj_other"}, {"target": "production"}, {"id": "dpl_current"},
+                           {"readyState": "ERROR"}, {"regions": ["iad1"]}):
+            api = AliasAPI()
+            self.assertFalse(self.retain(api, deployment=deployment)["ok"])
+            self.assertEqual(api.calls, [])
+        for extra in ({"projectId": "prj_other"}, {"deploymentId": "dpl_other"}, {"redirect": "other.example"}):
+            api = AliasAPI({"alias": release.RETAIN_ALIAS, "projectId": PROJECT, "deploymentId": "dpl_relay", **extra})
+            self.assertFalse(self.retain(api)["ok"])
+            self.assertEqual(api.writes, [])
+        for options in ({"health_region": "iad1"}, {"changed": True}):
+            api = AliasAPI()
+            self.assertFalse(self.retain(api, **options)["ok"])
+            self.assertEqual(api.writes, [])
+
+    def test_retain_manual_main_and_safe_url_before_requests(self):
+        valid = {**ENV, "GITHUB_REF": release.MAIN_REF}
+        for change in ({"GITHUB_REF": release.BRANCH_REF}, {"GITHUB_EVENT_NAME": "push"}, {"GITHUB_REPOSITORY": "other/repo"}):
+            api = AliasAPI()
+            with self.assertRaisesRegex(release.inspect.ProbeFailure, "ci_context_required"):
+                release.retain({**valid, **change}, URL, opener=api)
+            self.assertEqual(api.calls, [])
+        for url in ("https://attacker.example", URL + "?token=canary", "https://" + release.RETAIN_ALIAS, "http://relay-test.vercel.app"):
+            with self.assertRaises(release.inspect.ProbeFailure):
+                release.retain(valid, url, opener=AliasAPI())
+
+    def test_retain_failed_post_verification_does_not_claim_retention(self):
+        class ChangedAlias(AliasAPI):
+            def open(self, request, timeout):
+                response = super().open(request, timeout)
+                if request.get_method() == "POST":
+                    self.existing["deploymentId"] = "dpl_unexpected"
+                return response
+        report = self.retain(ChangedAlias())
+        self.assertFalse(report["ok"] or report["retentionExceptionVerified"])
+        self.assertTrue(report["productionPreserved"] and report["aliasMutationRequested"])
+        self.assertEqual(report["errorKind"], "alias_verification_failed")
+        self.assert_private(report)
 
 
 if __name__ == "__main__":

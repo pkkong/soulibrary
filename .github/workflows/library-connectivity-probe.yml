@@ -21,6 +21,12 @@ on:
           - prepare
           - activate
           - disable
+          - retain
+      relay_url:
+        description: Existing immutable relay preview URL for retain mode only
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -132,3 +138,34 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           RELAY_RELEASE_MODE: ${{ inputs.mode }}
         run: python scripts/library_relay_release.py --mode "$RELAY_RELEASE_MODE"
+
+  retain-relay-preview:
+    needs: inspect-existing-project
+    # One fixed non-production alias only; no production deploy or environment write.
+    if: >-
+      github.repository == 'pkkong/soulibrary' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'retain'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out reviewed release helper
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run offline release staging guards
+        run: python scripts/library_relay_release_regression_test.py
+
+      - name: Retain verified relay preview
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          RELAY_RETAIN_URL: ${{ inputs.relay_url }}
+        run: python scripts/library_relay_release.py --mode retain --relay-url "$RELAY_RETAIN_URL"
