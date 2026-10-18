@@ -1,4 +1,4 @@
-name: Inspect existing library deployment access
+name: Inspect or stage selective library relay
 
 on:
   push:
@@ -11,13 +11,16 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Inspect existing access or test one isolated relay preview
+        description: Inspect, test preview, prepare disabled config, or stage activation/rollback
         type: choice
         required: true
         default: inspect
         options:
           - inspect
           - preview
+          - prepare
+          - activate
+          - disable
 
 permissions:
   contents: read
@@ -28,7 +31,10 @@ concurrency:
 
 jobs:
   inspect-existing-project:
-    if: github.repository == 'pkkong/soulibrary' && github.ref == 'refs/heads/codex/library-connectivity-recovery'
+    if: >-
+      github.repository == 'pkkong/soulibrary' &&
+      (github.ref == 'refs/heads/codex/library-connectivity-recovery' ||
+       (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -55,7 +61,8 @@ jobs:
     if: >-
       github.repository == 'pkkong/soulibrary' &&
       github.ref == 'refs/heads/codex/library-connectivity-recovery' &&
-      github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.mode == 'preview' || inputs.mode == 'prepare')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -71,6 +78,9 @@ jobs:
 
       - name: Install existing parser dependencies
         run: python -m pip install -r requirements.txt
+
+      - name: Run offline release staging guards
+        run: python scripts/library_relay_release_regression_test.py
 
       - name: Run offline library relay regressions
         run: python scripts/library_relay_regression_test.py
@@ -88,4 +98,37 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: python scripts/library_relay_release.py --mode preview
+          RELAY_RELEASE_MODE: ${{ inputs.mode }}
+        run: python scripts/library_relay_release.py --mode "$RELAY_RELEASE_MODE"
+
+  stage-production-switch:
+    needs: inspect-existing-project
+    # Config only: existing production deployment is never created or promoted here.
+    if: >-
+      github.repository == 'pkkong/soulibrary' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.mode == 'activate' || inputs.mode == 'disable')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out reviewed release helper
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run offline release staging guards
+        run: python scripts/library_relay_release_regression_test.py
+
+      - name: Stage production relay switch
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          RELAY_RELEASE_MODE: ${{ inputs.mode }}
+        run: python scripts/library_relay_release.py --mode "$RELAY_RELEASE_MODE"

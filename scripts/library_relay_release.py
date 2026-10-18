@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Create and test one isolated preview using existing CI credentials.
 
-Default mode only inspects metadata. Preview mode never modifies production,
-project environment variables, protection settings, domains, or paid services.
+Default mode only inspects metadata. Preview mode never modifies production.
+Manual prepare/activate/disable only update four production relay variables;
+none of these modes deploys production or changes project/protection settings.
 Raw CLI/API responses and page content must never be printed or persisted.
 """
 
@@ -32,6 +33,8 @@ BRANCH_REF = "refs/heads/codex/library-connectivity-recovery"
 CLI_VERSION = "64.2.0"
 CODES = ("seongbuk", "yeongdeungpo", "songpa_owned", "gangseo")
 REQUIRED_CODES = CODES[:2]
+MAIN_REF = "refs/heads/main"
+PRODUCTION_KEYS = frozenset({"LIBRARY_RELAY_URL", "LIBRARY_RELAY_SECRET", "LIBRARY_RELAY_CODES", "LIBRARY_RELAY_ENABLED"})
 FIXED_QUERY = "프로젝트 헤일메리"
 MAX_ENVELOPE = 3 * 1024 * 1024
 ERRORS = frozenset({
@@ -67,6 +70,97 @@ class CliDeployFailure(inspect.ProbeFailure):
 def require(condition, kind):
     if not condition:
         raise inspect.ProbeFailure(kind)
+
+
+def manual_context(environ, ref):
+    require(environ.get("GITHUB_ACTIONS") == "true"
+            and environ.get("GITHUB_REPOSITORY") == "pkkong/soulibrary"
+            and environ.get("GITHUB_REF") == ref
+            and environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch", "ci_context_required")
+
+
+def production_env(action, token, team_id, project_id, opener, key=None, value=None):
+    """Fixed project env endpoint; return metadata only, never decrypted values.
+
+    Contracts: vercel.com/docs/rest-api/projects/create-one-or-more-environment-variables
+               vercel.com/docs/rest-api/projects/retrieve-the-environment-variables-of-a-project-by-id-or-name
+    """
+    inspect.credentials({"VERCEL_TOKEN": token, "VERCEL_ORG_ID": team_id, "VERCEL_PROJECT_ID": project_id})
+    require(action in ("list", "upsert"), "invalid_env_operation")
+    query = {"teamId": team_id, "decrypt": "false"} if action == "list" else {"teamId": team_id, "upsert": "true"}
+    data = None
+    if action == "upsert":
+        require(key in PRODUCTION_KEYS and isinstance(value, str), "invalid_env_operation")
+        valid = ((key == "LIBRARY_RELAY_ENABLED" and value in ("0", "1"))
+                 or (key == "LIBRARY_RELAY_CODES" and value == "seongbuk,yeongdeungpo")
+                 or (key == "LIBRARY_RELAY_SECRET" and bool(re.fullmatch(r"[0-9a-f]{64}", value)))
+                 or (key == "LIBRARY_RELAY_URL" and safe_url(value) == value))
+        require(valid, "invalid_env_value")
+        data = json.dumps({"key": key, "value": value, "type": "encrypted", "target": ["production"]}).encode("utf-8")
+    else:
+        require(key is None and value is None, "invalid_env_operation")
+    url = f"{inspect.API_ORIGIN}/v10/projects/{project_id}/env?{urllib.parse.urlencode(query)}"
+    request = urllib.request.Request(url, data=data, method="GET" if data is None else "POST", headers={
+        "Authorization": "Bearer " + token, "Accept": "application/json", "Content-Type": "application/json",
+        "User-Agent": "soulib-relay-release/1.0",
+    })
+    try:
+        with opener.open(request, timeout=inspect.TIMEOUT_SECONDS) as response:
+            if response.status != (200 if action == "list" else 201):
+                status = response.status if type(response.status) is int and 100 <= response.status <= 599 else None
+                raise inspect.ProbeFailure("env_unexpected_status", status)
+            declared = response.headers.get("Content-Length")
+            if declared is not None:
+                require(0 <= int(declared) <= inspect.MAX_RESPONSE_BYTES, "env_response_too_large")
+            raw = response.read(inspect.MAX_RESPONSE_BYTES + 1)
+            require(len(raw) <= inspect.MAX_RESPONSE_BYTES, "env_response_too_large")
+            payload = json.loads(raw)
+        if action == "list":
+            rows = payload.get("envs") if isinstance(payload, dict) else payload
+            require(isinstance(rows, list), "env_invalid_response")
+        else:
+            require(isinstance(payload, dict) and payload.get("failed") == [], "env_upsert_failed")
+            created = payload.get("created")
+            rows = created if isinstance(created, list) else [created]
+            require(len(rows) == 1, "env_invalid_response")
+        metadata = []
+        for row in rows:
+            require(isinstance(row, dict) and isinstance(row.get("key"), str), "env_invalid_response")
+            # Deliberately discard value, legacyValue, vsmValue, content hints and IDs.
+            metadata.append({name: row.get(name) for name in ("key", "type", "target", "gitBranch", "customEnvironmentIds", "system")})
+        if action == "upsert":
+            require(metadata[0]["key"] == key and production_row(metadata[0]), "env_upsert_unverified")
+        return metadata
+    except urllib.error.HTTPError as exc:
+        status = exc.code if type(exc.code) is int and 100 <= exc.code <= 599 else None
+        exc.close()
+        raise inspect.ProbeFailure("env_http_error", status) from None
+    except TimeoutError:
+        raise inspect.ProbeFailure("env_timeout") from None
+    except urllib.error.URLError:
+        raise inspect.ProbeFailure("env_network_error") from None
+    except (ValueError, UnicodeError):
+        raise inspect.ProbeFailure("env_invalid_response") from None
+
+
+def production_row(row):
+    return (row.get("type") == "encrypted" and row.get("target") == ["production"]
+            and not row.get("gitBranch") and not row.get("customEnvironmentIds") and not row.get("system"))
+
+
+def prepared_keys(metadata, required=False):
+    selected = {}
+    for row in metadata:
+        target = row.get("target")
+        require(isinstance(target, list), "env_invalid_metadata")
+        if "production" not in target:
+            continue
+        require(row["key"] != "LIBRARY_RELAY_MODE", "production_relay_mode_present")
+        if row["key"] in PRODUCTION_KEYS:
+            require(row["key"] not in selected and production_row(row), "env_scope_conflict")
+            selected[row["key"]] = row
+    require(not required or set(selected) == PRODUCTION_KEYS, "production_config_not_prepared")
+    return selected
 
 
 def safe_url(value):
@@ -343,9 +437,9 @@ def check_libraries(opener, url, secret):
     return records
 
 
-def preview(environ, opener=None, run=subprocess.run, mask=None):
-    require(environ.get("GITHUB_ACTIONS") == "true" and environ.get("GITHUB_REPOSITORY") == "pkkong/soulibrary"
-            and environ.get("GITHUB_REF") == BRANCH_REF, "ci_context_required")
+def preview(environ, opener=None, run=subprocess.run, mask=None, mode="preview"):
+    require(mode in ("preview", "prepare"), "invalid_release_mode")
+    manual_context(environ, BRANCH_REF)
     token, team_id, project_id = inspect.credentials(environ)
     opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}), inspect.NoRedirects())
     before = inspect.request_metadata("project", token, team_id, project_id, opener)
@@ -355,8 +449,11 @@ def preview(environ, opener=None, run=subprocess.run, mask=None):
     secret = secrets.token_hex(32)
     if mask:
         mask(secret)
-    report = {"mode": "preview", "ok": False, "productionMutationsRequested": False,
+    report = {"mode": mode, "ok": False, "productionMutationsRequested": False,
               "previewCreated": False, "productionPreserved": False, "records": []}
+    if mode == "prepare":
+        report.update({"productionConfigPrepared": False, "productionDeploymentRequested": False,
+                       "requiresProductionDeployment": True, "effectiveProductionRecoveryVerified": False})
     try:
         url = deploy_preview(environ, secret, run)
         require(not any(value in url for value in (token, team_id, project_id, secret)), "invalid_deployment_url")
@@ -379,8 +476,25 @@ def preview(environ, opener=None, run=subprocess.run, mask=None):
         verified_status = {row["libraryCode"] for row in report["records"] if row.get("hasStatus") and row["status"] == "ok" and row["region"] == "icn1"}
         report["readyForSelectiveRelay"] = set(REQUIRED_CODES) <= verified_search & verified_status
         report["allFourSearchesRecovered"] = set(CODES) <= verified_search
+        if mode == "prepare":
+            require(report["readyForSelectiveRelay"], "relay_verification_failed")
+            # Re-check current production immediately before the first config write.
+            current = inspect.request_metadata("project", token, team_id, project_id, opener)
+            require(production_snapshot(current, team_id, project_id) == baseline, "production_changed_before_prepare")
+            prepared_keys(production_env("list", token, team_id, project_id, opener))
+            report["productionMutationsRequested"] = True
+            # A partially completed preparation remains disabled for every new deployment.
+            production_env("upsert", token, team_id, project_id, opener, "LIBRARY_RELAY_ENABLED", "0")
+            report["productionConfigDisabled"] = True
+            for key, value in (("LIBRARY_RELAY_URL", url), ("LIBRARY_RELAY_SECRET", secret),
+                               ("LIBRARY_RELAY_CODES", "seongbuk,yeongdeungpo")):
+                production_env("upsert", token, team_id, project_id, opener, key, value)
+            prepared_keys(production_env("list", token, team_id, project_id, opener), required=True)
+            report["productionConfigPrepared"] = True
     except inspect.ProbeFailure as exc:
         report["errorKind"] = exc.kind
+        if exc.status is not None:
+            report["errorHttpStatus"] = exc.status
         if isinstance(exc, CliDeployFailure):
             report.update(exc.details)
     except Exception:
@@ -395,15 +509,53 @@ def preview(environ, opener=None, run=subprocess.run, mask=None):
     return report
 
 
+def toggle(environ, mode, opener=None):
+    """Stage one production switch; applying it requires a separate deployment."""
+    require(mode in ("activate", "disable"), "invalid_release_mode")
+    manual_context(environ, MAIN_REF)
+    token, team_id, project_id = inspect.credentials(environ)
+    opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}), inspect.NoRedirects())
+    before = inspect.request_metadata("project", token, team_id, project_id, opener)
+    baseline = production_snapshot(before, team_id, project_id)
+    config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
+    require(config.get("framework") == "flask" and config.get("regions") == ["iad1"], "source_configuration_changed")
+    report = {"mode": mode, "ok": False, "productionMutationsRequested": False,
+              "productionDeploymentRequested": False, "productionPreserved": False,
+              "requiresProductionDeployment": True, "effectiveProductionRecoveryVerified": False}
+    try:
+        metadata = production_env("list", token, team_id, project_id, opener)
+        prepared_keys(metadata, required=mode == "activate")
+        report["productionMutationsRequested"] = True
+        production_env("upsert", token, team_id, project_id, opener, "LIBRARY_RELAY_ENABLED", "1" if mode == "activate" else "0")
+        prepared_keys(production_env("list", token, team_id, project_id, opener), required=mode == "activate")
+        report["productionConfigEnabledForNextDeployment"] = mode == "activate"
+    except inspect.ProbeFailure as exc:
+        report["errorKind"] = exc.kind
+        if exc.status is not None:
+            report["errorHttpStatus"] = exc.status
+    except Exception:
+        report["errorKind"] = "unexpected_error"
+    finally:
+        try:
+            after = inspect.request_metadata("project", token, team_id, project_id, opener)
+            report["productionPreserved"] = production_snapshot(after, team_id, project_id) == baseline
+        except Exception:
+            report["productionVerificationError"] = "verification_failed"
+    report["ok"] = bool(report["productionPreserved"] and "productionConfigEnabledForNextDeployment" in report and not report.get("errorKind"))
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("inspect", "preview"), default="inspect")
+    parser.add_argument("--mode", choices=("inspect", "preview", "prepare", "activate", "disable"), default="inspect")
     args = parser.parse_args()
     try:
         if args.mode == "inspect":
             report = inspect.probe(os.environ)
+        elif args.mode in ("preview", "prepare"):
+            report = preview(os.environ, mode=args.mode, mask=lambda value: print("::add-mask::" + value, flush=True))
         else:
-            report = preview(os.environ, mask=lambda value: print("::add-mask::" + value, flush=True))
+            report = toggle(os.environ, args.mode)
     except inspect.ProbeFailure as exc:
         report = {"ok": False, "mode": args.mode, "errorKind": exc.kind, "productionMutationsRequested": False}
     except Exception:
