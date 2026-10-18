@@ -20,4 +20,4 @@ _prepend_sys_path(PROJECT_ROOT)
 _prepend_sys_path(WEB_ROOT)
 os.chdir(PROJECT_ROOT)
 
-from app_search import app  # noqa: E402,F401
+from app_entrypoint import app  # noqa: E402,F401

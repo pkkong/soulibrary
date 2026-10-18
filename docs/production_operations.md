@@ -31,6 +31,49 @@ Vercel 함수 지역은 `vercel.json`의 `regions: ["iad1"]`(미국)로 명시�
 
 지역 설정을 바꾼 뒤에는 배포 후 `vercel inspect`에서 실제 function region을 확인한다. 같은 고정 검색어·필터와 비교 가능한 cache 조건으로 변경 전후를 비교하고 표본 수를 기록한다. 전체 성공 수뿐 아니라 기관별 기존 성공의 새 실패와 실패 종류를 확인하며, 공유 서재 create/read도 live smoke로 검증한다. 단일 비교를 p95나 일반적인 성능 개선으로 보고하지 않고 자세한 비교 결과는 ignored artifact에 보존한다. 설정 변경과 실제 배포·지역 검증 완료를 구분한다.
 
+### 선택적 국내 연결 경로의 출시 조건
+
+메인 앱은 `iad1`을 유지한다. 국내 연결이 필요한 기관만 기존 Vercel 프로젝트의 별도 `icn1` preview를 통해 조회하는 relay를 시험한다. 새 프로젝트·유료 서비스·Supabase Edge Function을 만들거나 검색에 DB 의존성을 추가하지 않는다. 아래는 출시 게이트이며, 코드 작성·preview 배포·production 활성화·기관별 복구 확인을 각각 구분한다.
+
+| 설정 | 역할과 기본값 |
+|---|---|
+| `LIBRARY_RELAY_MODE` | `index.py -> web/app_entrypoint.py`에서 분기한다. `1`인 배포만 `web/library_relay_app.py`를 사용하며, 메인 production에는 설정하지 않아 기본 `web/app_search.py`를 사용한다. |
+| `LIBRARY_RELAY_ENABLED` | 메인 앱의 relay 사용 스위치. 기본 OFF이며 `1`일 때만 후보 기관을 선택한다. |
+| `LIBRARY_RELAY_CODES` | 실제 검색·상태 조회 검증을 통과한 기관 코드만 지정한다. 코드상 허용 범위는 `seongbuk`, `yeongdeungpo`, `songpa_owned`, `gangseo`다. |
+| `LIBRARY_RELAY_URL` | 검증한 고정 HTTPS preview의 base URL. production 도메인 alias를 이 배포로 옮기지 않는다. |
+| `LIBRARY_RELAY_SECRET` | 메인과 relay 서버만 공유하는 전용 HMAC secret. 다른 API/DB/deploy credential을 재사용하지 않는다. |
+
+secret은 서버 runtime env로만 주입하고 소스·파일·로그·브라우저·공개 artifact에 남기지 않는다. preview 보호가 있으면 승인된 정상적인 자동화 인증으로 호출할 수 있는지 먼저 확인하며, 인증을 생략하거나 보호 설정을 임의로 해제하지 않는다. HMAC 인증은 preview 접근 인증과 별도로 검증한다.
+
+출시 전에 다음을 확인한다.
+
+1. relay 배포의 mode·실제 `icn1` 지역·고정 URL을 확인하고, 메인 앱과 production 도메인이 기존 `iad1`에 남아 있는지 확인한다.
+2. 기관별 실제 검색과 같은 책의 상태 조회를 모두 검증한다. 기존 `icn1` 검색 성공이나 local/mock 통과를 새 relay 검증으로 대신하지 않는다. 강서는 검색과 같은 책의 상태 조회가 모두 통과할 때만 포함하고, 송파 소장은 이번 활성화에서 제외한다. 기관별 검증 결과와 미복구 범위를 별도로 보고한다.
+3. 기존 parser/cache와 기관 식별자를 유지한다. relay를 거치는 기관 작업의 최대 4.5초는 검색의 다중 필드 조회 또는 상태의 detail·list fallback이 공유하며, 기존 검색 fanout 5.8초 예산도 늘리지 않는다. 직접 조회의 기존 timeout은 변경하지 않는다. 실패·시간 초과를 정상 0건으로 바꾸지 않는다. 상세한 인증·응답·cache 검수는 [service_observability.md](service_observability.md)를 따른다.
+4. 활성화할 코드만 선택한 뒤 전체 34개 기관의 새 실패를 비교한다. 관악·동작·도봉의 검색과 상태, 공유 서재 create/read, sitemap XML, 기존 CI와 production live smoke를 확인한다.
+5. `LIBRARY_RELAY_ENABLED`를 OFF로 바꾸고 재배포하면 기존 직접 조회로 돌아오는지 확인한다. 되돌린 뒤 메인 mode·`iad1`·기존 성공 기관과 공유 서재를 다시 확인한다. 필요하면 이전 메인 deployment로 rollback한다.
+
+브라우저 로그인 만료 시에는 기존 connector·CLI 인증·CI 배포 권한부터 확인한다. 새 relay를 선택하면서 생긴 접근 요건과 기존 운영 배포 장애를 구분하고, 기존 권한으로 가능한 구현·검증은 계속한다. 모든 승인된 경로가 막힌 작업만 부족한 권한과 필요한 사용자 조치를 구체적으로 보고한다.
+
+#### 수동 출시와 복구 명령
+
+`.github/workflows/library-connectivity-probe.yml`은 `scripts/library_relay_release.py`를 실행한다. `inspect`는 기존 프로젝트를 읽고, `preview`는 production 설정을 바꾸지 않고 별도 preview를 배포·검증한다. `prepare`는 새 `icn1` preview에서 성북·영등포의 검색과 같은 책의 상태 조회가 모두 통과한 뒤 production에 `LIBRARY_RELAY_ENABLED=0`을 먼저 저장하고 URL·전용 HMAC secret·검증한 기관 코드를 저장한다. 강서는 검색과 같은 책의 상태 조회가 모두 통과할 때만 추가하고, 실패하면 성북·영등포만 준비한다. 송파 소장은 이번 활성화에서 제외한다. 이 단계의 성공은 production 복구 완료를 뜻하지 않는다.
+
+`prepare`는 아래 recovery branch에서만 실행된다. 재준비 전에는 검수한 최신 `main` 내용을 해당 branch에 반영하고, branch가 삭제됐다면 같은 이름으로 다시 만든다.
+
+| 단계 | 명령 |
+|---|---|
+| 비활성 설정 준비 | `gh workflow run library-connectivity-probe.yml --repo pkkong/soulibrary --ref codex/library-connectivity-recovery -f mode=prepare` |
+| 다음 배포에서 활성화 | `gh workflow run library-connectivity-probe.yml --repo pkkong/soulibrary --ref main -f mode=activate` |
+| production 배포 | `gh workflow run vercel-deploy.yml --repo pkkong/soulibrary --ref main` |
+| 다음 배포에서 비활성화 | `gh workflow run library-connectivity-probe.yml --repo pkkong/soulibrary --ref main -f mode=disable` |
+
+각 실행이 성공한 뒤 다음 단계로 진행한다. 출시 순서는 `prepare`로 OFF 준비 → 코드 merge와 자동배포 → OFF 상태의 live 검증 → `activate` → production 수동 배포 → 기관별 검색·상태 및 기존 성공 기관의 live 검증이다. `activate`와 `disable`은 `main`의 수동 실행에서 ENABLED 값만 저장하며, 실제 적용에는 별도 production 배포가 필요하다. 되돌릴 때도 `disable` → production 수동 배포 → 직접 조회 복귀 검증 순서로 진행한다.
+
+위 workflow는 기존 CI 인증으로 서버 환경변수를 관리한다. secret 값을 명령 인자나 파일에 넣거나 조회·복호화해 출력하지 않는다.
+
+### 기존 자동배포 인증
+
 자동배포에 필요한 GitHub Actions secrets:
 
 ```text
