@@ -37,7 +37,7 @@ Vercel 함수 지역은 `vercel.json`의 `regions: ["iad1"]`(미국)로 명시�
 
 | 설정 | 역할과 기본값 |
 |---|---|
-| `LIBRARY_RELAY_MODE` | `1`인 배포만 `index.py -> web/library_relay_app.py`를 사용한다. 메인 production에는 설정하지 않으며 기본 entrypoint는 `web/app_search.py`다. |
+| `LIBRARY_RELAY_MODE` | `index.py -> web/app_entrypoint.py`에서 분기한다. `1`인 배포만 `web/library_relay_app.py`를 사용하며, 메인 production에는 설정하지 않아 기본 `web/app_search.py`를 사용한다. |
 | `LIBRARY_RELAY_ENABLED` | 메인 앱의 relay 사용 스위치. 기본 OFF이며 `1`일 때만 후보 기관을 선택한다. |
 | `LIBRARY_RELAY_CODES` | 실제 검색·상태 조회 검증을 통과한 기관 코드만 지정한다. 코드상 허용 범위는 `seongbuk`, `yeongdeungpo`, `songpa_owned`, `gangseo`다. |
 | `LIBRARY_RELAY_URL` | 검증한 고정 HTTPS preview의 base URL. production 도메인 alias를 이 배포로 옮기지 않는다. |

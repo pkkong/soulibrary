@@ -1,5 +1,6 @@
 """Offline transport/auth/deadline/zero-result regressions for the library relay."""
 
+import ast
 import base64
 import contextlib
 import io
@@ -114,6 +115,16 @@ class RelayTests(unittest.TestCase):
             self.assertEqual(self.client.get(url).status_code, 404)
         check = subprocess.run([sys.executable, "-c", "import index,sys; assert 'app_search' not in sys.modules; assert 'db' not in sys.modules; assert len(list(index.app.url_map.iter_rules())) == 2"],
                                cwd=ROOT, env={**os.environ, "LIBRARY_RELAY_MODE": "1"}, capture_output=True)
+        self.assertEqual(check.returncode, 0, check.stderr.decode())
+
+    def test_entrypoint_has_unconditional_export_and_preserves_normal_app(self):
+        tree = ast.parse((ROOT / "index.py").read_text(encoding="utf-8"))
+        exports = [node for node in tree.body if isinstance(node, ast.ImportFrom)
+                   and node.module == "app_entrypoint"
+                   and any((alias.asname or alias.name) == "app" for alias in node.names)]
+        self.assertEqual(len(exports), 1)
+        check = subprocess.run([sys.executable, "-c", "import index,sys; assert 'app_search' in sys.modules; assert 'library_relay_app' not in sys.modules; routes = {r.rule for r in index.app.url_map.iter_rules()}; assert '/api/live_search' in routes; assert '/internal/library-page' not in routes"],
+                               cwd=ROOT, env={**os.environ, "LIBRARY_RELAY_MODE": "0"}, capture_output=True)
         self.assertEqual(check.returncode, 0, check.stderr.decode())
 
     def test_auth_and_invalid_payload_never_fetch(self):
