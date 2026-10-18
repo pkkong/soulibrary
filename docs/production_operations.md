@@ -61,14 +61,19 @@ secret은 서버 runtime env로만 주입하고 소스·파일·로그·브라�
 
 `prepare`는 아래 recovery branch에서만 실행된다. 재준비 전에는 검수한 최신 `main` 내용을 해당 branch에 반영하고, branch가 삭제됐다면 같은 이름으로 다시 만든다.
 
+별도 보존 정책이 없다면 Hobby preview의 기본 보존 기간은 30일이다. PR이 merge·close된 branch는 남겨 두어도 active branch 예외에 해당하지 않으며, non-production 배포에 custom alias가 연결되어 있으면 보존 예외가 적용된다. 근거: [Vercel Deployment Retention](https://vercel.com/docs/deployment-retention)(2026-09-16 갱신).
+
+`retain`은 `main`의 수동 실행으로 검증한 preview에 고정 custom alias `soulib-library-relay.vercel.app` 하나를 연결한다. 입력은 `prepare`가 검증한 고정 preview URL이며, production 환경변수의 URL을 alias로 바꾸지 않는다. 같은 프로젝트의 READY·`icn1` relay인지 확인하고 alias의 실제 대상과 `/health`를 재확인한다. 기존 alias가 다른 대상을 가리키면 덮어쓰지 않고 실패한다. production 도메인·배포 대상·지역·환경변수와 전체 보존 정책은 바꾸지 않는다. relay 사용 중에는 이 alias와 대상 preview를 삭제하거나 대상을 변경하지 않는다. 보존 조건 확인은 production 검색 복구 확인과 별개다.
+
 | 단계 | 명령 |
 |---|---|
 | 비활성 설정 준비 | `gh workflow run library-connectivity-probe.yml --repo pkkong/soulibrary --ref codex/library-connectivity-recovery -f mode=prepare` |
+| 검증한 preview 보존 | `gh workflow run library-connectivity-probe.yml --repo pkkong/soulibrary --ref main -f mode=retain -f relay_url='<prepare에서 검증한 고정 HTTPS preview URL>'` |
 | 다음 배포에서 활성화 | `gh workflow run library-connectivity-probe.yml --repo pkkong/soulibrary --ref main -f mode=activate` |
 | production 배포 | `gh workflow run vercel-deploy.yml --repo pkkong/soulibrary --ref main` |
 | 다음 배포에서 비활성화 | `gh workflow run library-connectivity-probe.yml --repo pkkong/soulibrary --ref main -f mode=disable` |
 
-각 실행이 성공한 뒤 다음 단계로 진행한다. 출시 순서는 `prepare`로 OFF 준비 → 코드 merge와 자동배포 → OFF 상태의 live 검증 → `activate` → production 수동 배포 → 기관별 검색·상태 및 기존 성공 기관의 live 검증이다. `activate`와 `disable`은 `main`의 수동 실행에서 ENABLED 값만 저장하며, 실제 적용에는 별도 production 배포가 필요하다. 되돌릴 때도 `disable` → production 수동 배포 → 직접 조회 복귀 검증 순서로 진행한다.
+각 실행이 성공한 뒤 다음 단계로 진행한다. 출시 순서는 `prepare`로 OFF 준비 → 코드 merge와 자동배포 → OFF 상태의 live 검증 → `retain`의 실제 alias 대상·health·production 보존 확인 → `activate` → production 수동 배포 → 기관별 검색·상태 및 기존 성공 기관의 live 검증이다. `activate`와 `disable`은 `main`의 수동 실행에서 ENABLED 값만 저장하며, 실제 적용에는 별도 production 배포가 필요하다. 되돌릴 때도 `disable` → production 수동 배포 → 직접 조회 복귀 검증 순서로 진행한다.
 
 위 workflow는 기존 CI 인증으로 서버 환경변수를 관리한다. secret 값을 명령 인자나 파일에 넣거나 조회·복호화해 출력하지 않는다.
 
