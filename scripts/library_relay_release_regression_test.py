@@ -72,12 +72,13 @@ class EnvironmentAPI:
 
 
 class ReleaseGuards(unittest.TestCase):
-    def prepare(self, api, proof=True):
+    def prepare(self, api, proof=True, extra_records=()):
         def metadata(resource, *args, **kwargs):
             return copy.deepcopy(PROJECT_DATA if resource == "project" else {
                 "projectId": PROJECT, "target": None, "readyState": "READY", "regions": ["icn1"]})
         records = [{"libraryCode": code, "status": "ok", "region": "icn1",
                     "hasIdentifier": True, "hasStatus": proof} for code in release.REQUIRED_CODES]
+        records.extend(extra_records)
         with mock.patch.object(release.inspect, "request_metadata", side_effect=metadata), \
                 mock.patch.object(release, "deploy_preview", return_value=URL), \
                 mock.patch.object(release, "read_json_response", return_value=(200, {"ok": True, "mode": "library-relay", "region": "icn1"}, 0)), \
@@ -114,6 +115,45 @@ class ReleaseGuards(unittest.TestCase):
             self.assertEqual(len(api.writes), failure)
             self.assertEqual(api.writes[0]["value"], "0")
             self.assert_private(report)
+
+    def test_gangseo_staged_only_with_search_and_status_pair(self):
+        search = {"libraryCode": "gangseo", "status": "ok", "region": "icn1", "hasIdentifier": True}
+        detail = {"libraryCode": "gangseo", "status": "ok", "region": "icn1", "hasStatus": True}
+        cases = [([search, detail], True), ([search], False),
+                 ([search, {**detail, "status": "failed", "hasStatus": False}], False),
+                 ([detail], False), ([search, {**detail, "region": "iad1"}], False)]
+        for records, include in cases:
+            api = EnvironmentAPI()
+            report = self.prepare(api, extra_records=records)
+            self.assertTrue(report["ok"])
+            expected = release.STAGED_CODE_VALUES[1 if include else 0]
+            self.assertEqual(api.writes[-1]["value"], expected)
+            self.assertEqual(report["preparedRelayCodes"], expected.split(","))
+            self.assert_private(report)
+        api = EnvironmentAPI()
+        report = self.prepare(api, extra_records=[{**search, "libraryCode": "songpa_owned"}, {**detail, "libraryCode": "songpa_owned"}])
+        self.assertTrue(report["ok"])
+        self.assertEqual(api.writes[-1]["value"], release.STAGED_CODE_VALUES[0])
+        for value in ("gangseo", "seongbuk,yeongdeungpo,songpa_owned", "seongbuk,yeongdeungpo,gangseo,songpa_owned"):
+            with self.assertRaises(release.inspect.ProbeFailure):
+                release.production_env("upsert", TOKEN, TEAM, PROJECT, EnvironmentAPI(), "LIBRARY_RELAY_CODES", value)
+
+    def test_optional_gangseo_status_uses_returned_id_and_three_detail_cap(self):
+        calls = []
+        def page(opener, url, secret, code, operation, params):
+            calls.append((code, operation, params))
+            return {"libraryCode": code, "operation": operation, "status": "ok", "region": "icn1"}, object()
+        def search(response, code):
+            return {"brcd": "test-brcd"} if code == "seongbuk" else {"goods_id": code + "-returned-id"}
+        with mock.patch.object(release, "page_check", side_effect=page), \
+                mock.patch.object(release, "parse_search", side_effect=search), \
+                mock.patch.object(release, "parse_status", return_value=True):
+            records = release.check_libraries(None, URL, SECRET)
+        details = [call for call in calls if call[1].endswith("_detail")]
+        self.assertEqual(len(calls), 7)
+        self.assertEqual([call[0] for call in details], ["seongbuk", "yeongdeungpo", "gangseo"])
+        self.assertEqual(details[-1], ("gangseo", "yes24_detail", {"goods_id": "gangseo-returned-id"}))
+        self.assertTrue(next(record for record in records if record["libraryCode"] == "gangseo" and "hasStatus" in record)["hasStatus"])
 
     def test_main_switch_requires_prepared_metadata_and_only_writes_enabled(self):
         env = {**ENV, "GITHUB_REF": release.MAIN_REF}

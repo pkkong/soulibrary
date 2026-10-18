@@ -86,7 +86,7 @@
 
 - 배포·활성화·rollback 조건은 [production_operations.md](production_operations.md)의 선택적 국내 연결 경로를 따른다. relay는 고정 기관의 공개 HTML을 운반하고 메인 앱이 기존 parser/cache를 사용한다. 메인 `iad1`과 relay `icn1`의 실제 지역, 코드별 사용 경로와 cache hit/miss를 증거에 남긴다.
 - Vercel CLI·공식 Flask detector의 entrypoint 인식 preflight와 runtime의 기본 앱·relay 두 모드 분리를 확인한다. detector 통과나 CLI 진단 개선을 preview 배포 완료로 보고하지 않는다.
-- 기본 OFF에서 시작하고 네 기관 allowlist 안에서도 실제 검색과 같은 책의 상태 조회가 모두 통과한 코드만 활성화한다. HTTP 200·문서 비어 있지 않음만으로 검색/상태 성공을 판정하지 않는다. 성북·영등포의 통과와 송파 소장·강서의 미복구를 따로 기록한다.
+- 기본 OFF에서 시작하고 네 기관 allowlist 안에서도 실제 검색과 같은 책의 상태 조회가 모두 통과한 코드만 활성화한다. HTTP 200·문서 비어 있지 않음만으로 검색/상태 성공을 판정하지 않는다. 성북·영등포를 필수 검증하고 강서는 검색과 같은 책의 상태 조회가 모두 통과할 때만 추가한다. 송파 소장은 이번 활성화에서 제외하며, 기관별 검증 결과와 미복구 범위를 따로 기록한다.
 - HMAC 누락·불일치·만료, relay 자기 호출, 임의 URL/기관/operation/매개변수, redirect, 비정상 content type·초과 body, 외부 실패·예산 소진을 거절하는지 검증한다. 전용 secret과 요청 원문·검색어·인증 header를 로그나 공개 artifact에 남기지 않는다. preview에는 승인된 정상적인 자동화 인증을 사용하고 인증을 생략하거나 보호 설정을 임의로 해제하지 않는다. 보호된 preview 접근 성공과 relay HMAC 검증 성공을 구분한다.
 - relay를 거치는 기관 작업의 최대 4.5초는 검색의 다중 필드 조회 또는 상태의 detail·list fallback이 공유하며, 전송·본문 수신도 남은 시간을 사용한다. 직접 조회의 기존 timeout은 변경하지 않고 기존 fanout 5.8초도 늘리지 않는지 확인한다. relay 실패는 기존 실패/partial 계약으로 전달하고 성공 cache를 실패 응답으로 덮거나 실패를 정상 0건으로 cache하지 않는다. mock deadline 검증과 실제 두 서버 간 경과 시간을 구분한다.
 - YES24 상태는 요청한 `goods_id`의 책 블록에서만 읽는지 검증한다. 목록 첫 책의 상태가 다른 책에 붙는 경우, detail 실패 뒤 목록 fallback에서 해당 책이 없는 경우, 여러 책의 상태가 다른 경우를 포함한다. relay용 보완만으로 기존 직접 조회 parser 전체를 검수했다고 보고하지 않으며, 직접 조회 경로의 같은 문제는 별도 잔여 점검으로 남긴다.

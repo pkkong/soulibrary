@@ -33,6 +33,8 @@ BRANCH_REF = "refs/heads/codex/library-connectivity-recovery"
 CLI_VERSION = "64.2.0"
 CODES = ("seongbuk", "yeongdeungpo", "songpa_owned", "gangseo")
 REQUIRED_CODES = CODES[:2]
+STATUS_CODES = (*REQUIRED_CODES, "gangseo")
+STAGED_CODE_VALUES = ("seongbuk,yeongdeungpo", "seongbuk,yeongdeungpo,gangseo")
 MAIN_REF = "refs/heads/main"
 PRODUCTION_KEYS = frozenset({"LIBRARY_RELAY_URL", "LIBRARY_RELAY_SECRET", "LIBRARY_RELAY_CODES", "LIBRARY_RELAY_ENABLED"})
 FIXED_QUERY = "프로젝트 헤일메리"
@@ -92,7 +94,7 @@ def production_env(action, token, team_id, project_id, opener, key=None, value=N
     if action == "upsert":
         require(key in PRODUCTION_KEYS and isinstance(value, str), "invalid_env_operation")
         valid = ((key == "LIBRARY_RELAY_ENABLED" and value in ("0", "1"))
-                 or (key == "LIBRARY_RELAY_CODES" and value == "seongbuk,yeongdeungpo")
+                 or (key == "LIBRARY_RELAY_CODES" and value in STAGED_CODE_VALUES)
                  or (key == "LIBRARY_RELAY_SECRET" and bool(re.fullmatch(r"[0-9a-f]{64}", value)))
                  or (key == "LIBRARY_RELAY_URL" and safe_url(value) == value))
         require(valid, "invalid_env_value")
@@ -418,8 +420,11 @@ def check_libraries(opener, url, secret):
             except Exception:
                 record.update({"status": "failed", "errorKind": "invalid_document"})
         records.append(record)
-    # At most two real detail/status requests; each uses an ID returned above.
-    for code in list(found)[:2]:
+    # At most three real details, only for required codes and optional Gangseo.
+    # Every status uses the identifier returned by that library's search.
+    for code in STATUS_CODES:
+        if code not in found:
+            continue
         identifiers = found[code]
         if code == "seongbuk":
             operation = "kyobo_detail"
@@ -478,6 +483,7 @@ def preview(environ, opener=None, run=subprocess.run, mask=None, mode="preview")
         report["allFourSearchesRecovered"] = set(CODES) <= verified_search
         if mode == "prepare":
             require(report["readyForSelectiveRelay"], "relay_verification_failed")
+            staged_codes = STAGED_CODE_VALUES[1] if "gangseo" in verified_search & verified_status else STAGED_CODE_VALUES[0]
             # Re-check current production immediately before the first config write.
             current = inspect.request_metadata("project", token, team_id, project_id, opener)
             require(production_snapshot(current, team_id, project_id) == baseline, "production_changed_before_prepare")
@@ -487,10 +493,11 @@ def preview(environ, opener=None, run=subprocess.run, mask=None, mode="preview")
             production_env("upsert", token, team_id, project_id, opener, "LIBRARY_RELAY_ENABLED", "0")
             report["productionConfigDisabled"] = True
             for key, value in (("LIBRARY_RELAY_URL", url), ("LIBRARY_RELAY_SECRET", secret),
-                               ("LIBRARY_RELAY_CODES", "seongbuk,yeongdeungpo")):
+                               ("LIBRARY_RELAY_CODES", staged_codes)):
                 production_env("upsert", token, team_id, project_id, opener, key, value)
             prepared_keys(production_env("list", token, team_id, project_id, opener), required=True)
             report["productionConfigPrepared"] = True
+            report["preparedRelayCodes"] = staged_codes.split(",")
     except inspect.ProbeFailure as exc:
         report["errorKind"] = exc.kind
         if exc.status is not None:
