@@ -17,7 +17,7 @@
 - 데이터 산출물: Git 미포함, 필요 시 별도 백업/작업 환경에서 생성
 - Phase 0 운영 경로 정리: 문서와 inventory만 갱신한 이전 단계. 현재 production은 Vercel + Supabase 기준
 - 운영 inventory: `docs/phase0_operating_inventory.md`
-- 연결 상태(2026-10-19 검증): main `iad1` + 선택적 `icn1` relay로 성북·영등포·강서 복구, 송파 소장형 `songpa_owned`는 미복구·relay 제외. 근거는 [송파 연결 인수인계](songpa_connectivity.md) 참고
+- 연결 상태(2026-10-19 검증): main `iad1` + 선택적 `icn1` relay 유지. 강서는 현재 검색·상태 조회 미복구이며, 송파 소장형 `songpa_owned`도 미복구·relay 제외. 송파 근거는 [송파 연결 인수인계](songpa_connectivity.md) 참고
 
 ## PostgreSQL/DB 코드 분류
 
@@ -104,12 +104,14 @@
 
 다섯 작업의 구현·독립 오프라인 회귀·main CUA 통합 검수는 완료했다. 릴리스 상태는 [PR #62](https://github.com/pkkong/soulibrary/pull/62)의 CI와 해당 merge commit의 production 배포·live smoke 결과에서 확인하고, 상세 근거는 ignored `artifacts/qa/20261019-service-integrity-report.md`에 기록한다. 계약은 [서비스 관측성](service_observability.md)과 [UX/UI 가이드](UX_UI_Guide.md)를 따른다. Bookcube·강남 상태 ID 부분 매칭과 서울도서관·서울교육청 JSON 첫 항목 선택은 별도 감사 대기이며, [송파 미복구](songpa_connectivity.md)도 별도 유지한다.
 
-신고 목록 후속(2026-10-19): 배포 후 최근 목록 HTTP 503을 확인했고, 이전 저장소 이름의 GitHub API 301과 redirect 거절을 재현했다. 실제 production의 이전 이름 설정 여부는 미확인이다. 알려진 이전 이름만 canonical 저장소로 매핑하는 코드 수정과 독립 신고·smoke 회귀는 통과했다. 후속 릴리스의 CI·배포 상태는 [PR #63](https://github.com/pkkong/soulibrary/pull/63)과 해당 merge commit의 production 배포에서, 실제 목록 HTTP 200 확인은 ignored 검수 보고서에서 확인한다.
+신고 목록 후속(2026-10-19): 배포 후 최근 목록 HTTP 503을 확인했고, 이전 저장소 이름의 GitHub API 301과 redirect 거절을 재현했다. 실제 production의 이전 이름 설정 여부는 미확인이다. 알려진 이전 이름만 canonical 저장소로 매핑하는 코드 수정과 독립 신고·smoke 회귀는 통과했다. [PR #63](https://github.com/pkkong/soulibrary/pull/63)의 `bf4caf0` [production 재실행](https://github.com/pkkong/soulibrary/actions/runs/39256713238)은 배포·live smoke를 통과했으며, 실제 최근 목록 HTTP 200·`unavailable=false`와 CUA 목록 화면 확인을 완료했다.
+
+강서 연결 후속(2026-10-19): 현재 검색의 relay 예산 소진과 상태 조회 HTTP 502로 미복구다. PR #62 이전 고정 배포에서도 같은 실패를 재현했으므로 새 parser 회귀로 단정하지 않으며, 연결 원인은 미확정으로 남긴다.
 
 ### 나머지 감사 항목
 
 1. GSC 인증 유지·재만료·실수집 검증, GA 내부 방문/QA 실제 제외, 맞춤항목 처리와 미완성 기간 이후 집계 확인. 이벤트 실수집은 원시 수치를 공개하지 않고 ignored 보고서에 근거를 남긴다
 2. 검색 cache/동시 요청/partial 신뢰는 앞선 QA·배포를 확인했다. 후속 deadline/cache 변경도 회귀를 통과했다. 릴리즈는 CI·배포·live smoke까지 확인한다.
 3. 상세 후보 공통 deadline, 도봉 fallback 협력형 시간 예산, 상태 TTL cache 상한은 구현·QA 완료. 실행 중 HTTP 강제 중단/전체 hard wall과 공급사별 TLS 예외 범위는 남은 한계이며 별도 조사한다
-4. 신고 신뢰 보완의 배포 후 읽기 검증과 과거 공개 신고의 개인정보 점검. 이번 코드가 과거 개인정보를 자동 제거하지는 않음
+4. 신고 목록의 후속 production 읽기 검증은 완료했으며 과거 공개 신고의 개인정보는 별도 점검. 이번 코드가 과거 개인정보를 자동 제거하지는 않음
 5. 기능별 회귀가 확보된 뒤 `app_search.py`와 공통 CSS를 점진적으로 분리. 대규모 구조 변경과 디자인 변경을 한 번에 섞지 않는다
