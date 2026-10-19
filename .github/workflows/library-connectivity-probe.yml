@@ -22,6 +22,7 @@ on:
           - activate
           - disable
           - retain
+          - songpa-diagnose
       relay_url:
         description: Existing immutable relay preview URL for retain mode only
         type: string
@@ -40,6 +41,7 @@ jobs:
     if: >-
       github.repository == 'pkkong/soulibrary' &&
       (github.ref == 'refs/heads/codex/library-connectivity-recovery' ||
+       (github.ref == 'refs/heads/codex/songpa-connection-fix' && github.event_name == 'workflow_dispatch') ||
        (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -169,3 +171,44 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           RELAY_RETAIN_URL: ${{ inputs.relay_url }}
         run: python scripts/library_relay_release.py --mode retain --relay-url "$RELAY_RETAIN_URL"
+
+  diagnose-songpa-connection:
+    needs: inspect-existing-project
+    # Isolated diagnostic only: manual dispatch on the exact recovery branch.
+    if: >-
+      github.repository == 'pkkong/soulibrary' &&
+      github.ref == 'refs/heads/codex/songpa-connection-fix' &&
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'songpa-diagnose'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out reviewed diagnostic
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal diagnostic dependencies
+        run: python -m pip install Flask requests
+
+      - name: Run offline Songpa diagnostic regressions
+        run: python scripts/songpa_probe_regression_test.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install reviewed Vercel CLI
+        run: npm install --global vercel@64.2.0
+
+      - name: Run one isolated Seoul Songpa diagnostic
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: python scripts/songpa_connectivity_probe.py
