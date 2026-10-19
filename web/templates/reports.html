@@ -100,14 +100,17 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch("/api/reports/recent", {headers: {"Accept": "application/json"}})
             .then(async (res) => {
                 const data = await res.json();
-                if (!res.ok || data.unavailable) throw new Error("reports_unavailable");
+                if (!data || typeof data.html !== "string" || !data.html.trim()) throw new Error("reports_unavailable");
                 return data;
             })
             .then((data) => {
                 if (data.html) recentBody.innerHTML = data.html;
-                if (recentCount && data.count_label) {
+                if (recentCount && data.count_label && !data.unavailable) {
                     recentCount.textContent = data.count_label;
                     recentCount.hidden = false;
+                } else if (recentCount) {
+                    recentCount.textContent = "";
+                    recentCount.hidden = true;
                 }
             })
             .catch(() => {

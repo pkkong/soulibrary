@@ -11,12 +11,13 @@ import json
 import os
 import re
 import time
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import urlencode, urlparse
 
 import requests
 from lxml import html as lxml_html
 from urllib3.util import Timeout
 
+from adapters.status_parsers import parse_yes24_status
 from live_search.connectors.common import make_session, request_headers
 
 RELAY_PATH = "/internal/library-page"
@@ -262,44 +263,14 @@ def validate_search_document(response, library_code, results):
 
 
 def yes24_status_html(response, operation, goods_id):
-    """Give the existing status parser only the requested book's verified stat.
-
-    List pages contain other books first. The legacy parser scans the first stat
-    before checking goods_id, so narrow the input here on the relay path only.
-    """
+    """Verify the requested book and keep its identity for subsequent parsing."""
     validate_document(response)
     _string(goods_id, 32, r"[0-9]+")
-    try:
-        doc = lxml_html.fromstring(response.text, parser=lxml_html.HTMLParser(remove_comments=True))
-
-        def matches_detail(value):
-            parsed = urlparse(value)
-            return (parsed.path in ("/ebook/detail", "/ebook/detail/")
-                    and parse_qs(parsed.query).get("goods_id") == [goods_id])
-
-        if operation == "yes24_list":
-            books = doc.xpath("//div[contains(concat(' ',normalize-space(@class),' '),' ebook-list ')]"
-                              "//div[contains(concat(' ',normalize-space(@class),' '),' bx ')]")
-            selected = [book for book in books if any(matches_detail(href) for href in book.xpath(".//a/@href"))]
-        elif operation == "yes24_detail":
-            selected = doc.xpath("//div[contains(concat(' ',normalize-space(@class),' '),' ebook-view ')]")
-            references = doc.xpath("//input[@name='return_url']/@value")
-            if not any(matches_detail(value) for value in references):
-                raise RelayError("invalid_document")
-        else:
-            raise RelayError("invalid_request")
-        if len(selected) != 1:
-            raise RelayError("invalid_document")
-        stats = selected[0].xpath(".//div[contains(concat(' ',normalize-space(@class),' '),' stat ')]")
-        if len(stats) != 1:
-            raise RelayError("invalid_document")
-        stat = lxml_html.tostring(stats[0], encoding="unicode")
-        for label in ("보유", "대출", "예약"):
-            if not re.search(r"<li>\s*" + label + r"\s*<strong>[0-9]+</strong>", stat):
-                raise RelayError("invalid_document")
-        return stat
-    except (ValueError, TypeError, IndexError):
-        raise RelayError("invalid_document") from None
+    if operation not in ("yes24_list", "yes24_detail"):
+        raise RelayError("invalid_request")
+    if parse_yes24_status(response.text, goods_id, operation) is None:
+        raise RelayError("invalid_document")
+    return response.text
 
 
 def fetch_upstream(payload):

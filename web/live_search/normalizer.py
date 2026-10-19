@@ -1,4 +1,5 @@
 import re
+from html import unescape
 from urllib.parse import urlencode
 
 from live_search.covers import best_cover_url, compact_cover_candidates, cover_candidates_for_item
@@ -55,13 +56,28 @@ def normalize_title_for_group(value: str) -> str:
     return normalize_text(title) or normalize_text(value)
 
 
-def normalize_author(value: str) -> str:
-    text = str(value or "")
+_AUTHOR_ROLES = r"(?:지은이|글쓴이|옮긴이|지음|옮김|저자|역자|공저|공역|저|글|역)"
+
+
+def _primary_author(value: str) -> str:
+    text = unescape(str(value or ""))
+    # Some catalogs wrap names in literal <...>; remove known HTML tags first
+    # so both <한강> 저 and <span>한강</span> 저 retain the author's name.
+    text = re.sub(r"</?(?:a|b|br|em|i|span|strong)(?:\s[^<>]*)?/?>", " ", text, flags=re.I)
     text = re.split(r"[/,;|·]", text, maxsplit=1)[0]
     text = re.sub(r"\([^)]*\)", "", text)
     text = re.sub(r"\[[^\]]*\]", "", text)
-    text = re.sub(r"(지은이|지음|저자|저|글쓴이|글|옮긴이|옮김|역자|역)", "", text)
-    normalized = normalize_text(text)
+    # An explicit wrapper is also a metadata boundary: <한강>저 is unambiguous.
+    text = re.sub(rf">\s*{_AUTHOR_ROLES}\s*$", ">", text)
+    text = text.replace("<", "").replace(">", "")
+    text = " ".join(text.split())
+    text = re.sub(rf"^{_AUTHOR_ROLES}(?:\s*[:：]\s*|\s+)", "", text)
+    text = re.sub(rf"\s+{_AUTHOR_ROLES}$", "", text)
+    return text.strip()
+
+
+def normalize_author(value: str) -> str:
+    normalized = normalize_text(_primary_author(value))
     author_aliases = {
         "andyweir": "앤디위어",
         "freidamcfadden": "프리다맥파든",
@@ -74,12 +90,7 @@ def normalize_author(value: str) -> str:
 
 
 def clean_author_display(value: str) -> str:
-    text = str(value or "").strip()
-    text = re.split(r"[/,;|·]", text, maxsplit=1)[0]
-    text = re.sub(r"\([^)]*\)", "", text)
-    text = re.sub(r"\[[^\]]*\]", "", text)
-    text = re.sub(r"(지은이|지음|저자|저|글쓴이|글|옮긴이|옮김|역자|역)", "", text)
-    text = " ".join(text.split())
+    text = _primary_author(value)
     if normalize_author(text) == "프리다맥파든":
         return "프리다 맥파든"
     return text

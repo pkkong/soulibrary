@@ -1,6 +1,7 @@
 const PAGE_SIZE = 20;
 const SEARCH_PARAMS = new URLSearchParams(window.location.search);
 const SEARCH_API_ENDPOINT = "/api/live_search";
+const libraryPreferences = window.SoulibLibraryPreferences;
 const PROVIDER_LABELS = {
     "교보": "교보",
     "교보문고": "교보",
@@ -36,7 +37,10 @@ let currentMeta = {};
 let lastSuccessParams = "";
 let currentFilters = { providers: [], libraries: [] };
 let selectedProviders = new Set();
-let selectedLibraries = new Set();
+let selectedLibraries = new Set(libraryPreferences ? libraryPreferences.selection(SEARCH_PARAMS) : []);
+let librariesExplicit = SEARCH_PARAMS.has("libraries");
+let tempRememberLibraries = false;
+let tempLibrariesDirty = false;
 let selectedField = "title_author"; // search field: title+author
 let tempSelectedProviders = new Set();
 let tempSelectedLibraries = new Set();
@@ -279,6 +283,7 @@ function resetFilters() {
     selectedField = "title_author";
     selectedProviders.clear();
     selectedLibraries.clear();
+    librariesExplicit = true;
     refineQueryText = "";
     if (refineToggle) refineToggle.checked = false;
     if (searchTopInput) {
@@ -286,6 +291,7 @@ function resetFilters() {
         searchTopInput.placeholder = "검색어를 입력하세요";
     }
     updateFilterSummary();
+    updateLibraryScope();
     if (currentQueryText) fetchSearch(currentQueryText, "");
 }
 
@@ -405,7 +411,7 @@ function syncSearchPageUrl(query, refine) {
     if (selectedField && selectedField !== "title_author") params.set("field", selectedField);
     if (refine) params.set("refine", refine);
     if (selectedProviders.size > 0) params.set("providers", [...selectedProviders].join(","));
-    if (selectedLibraries.size > 0) params.set("libraries", [...selectedLibraries].join(","));
+    if (selectedLibraries.size > 0 || librariesExplicit) params.set("libraries", [...selectedLibraries].join(","));
     const nextUrl = params.toString() ? `/search?${params.toString()}` : "/search";
     window.history.replaceState({}, "", nextUrl);
     if (window.SoulibPageLoading && typeof window.SoulibPageLoading.syncReportLinks === "function") {
@@ -591,12 +597,13 @@ window.addEventListener("soulib:shelf-changed", syncShelfButtons);
 document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(window.location.search);
     const q = (params.get("q") || "").trim();
-    if (!q) return;
-
     selectedProviders = new Set((params.get("providers") || "").split(",").filter(Boolean));
-    selectedLibraries = new Set((params.get("libraries") || "").split(",").filter(Boolean));
+    selectedLibraries = new Set(libraryPreferences ? libraryPreferences.selection(params) : (params.get("libraries") || "").split(",").filter(Boolean));
     const field = (params.get("field") || "").trim();
     if (_isValidSearchField(field)) selectedField = field;
+    updateFilterSummary();
+    updateLibraryScope();
+    if (!q) return;
     refineQueryText = (params.get("refine") || "").trim();
 
     const input = document.getElementById("query");
@@ -672,6 +679,9 @@ function openFilterSheet(type) {
     tempSelectedProviders = new Set(selectedProviders);
     tempSelectedLibraries = new Set(selectedLibraries);
     tempSelectedField = selectedField;
+    tempRememberLibraries = !!(libraryPreferences && libraryPreferences.names().length);
+    tempLibrariesDirty = false;
+    document.getElementById("remember-libraries").checked = tempRememberLibraries;
     const titleEl = document.getElementById("sheet-title");
     const labelEl = document.getElementById("sheet-label");
     const optsEl = document.getElementById("sheet-options");
@@ -713,11 +723,24 @@ function applySheet() {
     selectedField = tempSelectedField || "title_author";
     selectedProviders = new Set(tempSelectedProviders);
     selectedLibraries = new Set(tempSelectedLibraries);
+    librariesExplicit = true;
+    if (tempLibrariesDirty && libraryPreferences && !libraryPreferences.save(selectedLibraries, tempRememberLibraries)) {
+        const notice = document.getElementById("library-preference-status");
+        notice.hidden = false;
+        notice.textContent = "이 브라우저에서는 도서관 선택을 기억할 수 없습니다.";
+    } else {
+        document.getElementById("library-preference-status").hidden = true;
+    }
     closeSheet();
+    updateLibraryScope();
+    updateFilterSummary();
+    syncSearchPageUrl(currentQueryText, refineQueryText);
     if (currentQueryText) {
         fetchSearch(currentQueryText, refineQueryText);
     } else {
-        applyFilters();
+        document.getElementById("status").textContent = "";
+        showSearchFeedback("");
+        setSearchEmpty(true);
     }
 }
 
@@ -726,6 +749,7 @@ function renderSheetOptions(type) {
     const optsEl = document.getElementById("sheet-options");
     labelEl.textContent = SHEET_LABELS[type] || "";
     optsEl.innerHTML = "";
+    document.getElementById("sheet-remember").hidden = type !== "library";
     if (type === "field") {
         const options = [
             { value: "title_author", label: "제목+저자(기본)" },
@@ -750,9 +774,10 @@ function renderSheetOptions(type) {
             `);
         });
     } else if (type === "library") {
-        const items = currentFilters.libraries.length
-            ? currentFilters.libraries
-            : Array.from(new Set(currentResults.flatMap(r => extractLibraries(r).map(l => l.short || l.name)))).sort();
+        const available = [...Object.keys(LIB_URLS), ...currentFilters.libraries,
+            ...currentResults.flatMap(r => extractLibraries(r).map(l => l.short || l.name))];
+        const items = libraryPreferences ? libraryPreferences.options(available, tempSelectedLibraries)
+            : [...new Set([...available, ...tempSelectedLibraries])].sort();
         items.forEach(val => {
             const checked = tempSelectedLibraries.has(val) ? "checked" : "";
             optsEl.insertAdjacentHTML("beforeend", `
@@ -770,6 +795,7 @@ function renderSheetOptions(type) {
                 if (e.target.checked) tempSelectedProviders.add(value);
                 else tempSelectedProviders.delete(value);
             } else if (t === "library") {
+                tempLibrariesDirty = true;
                 if (e.target.checked) tempSelectedLibraries.add(value);
                 else tempSelectedLibraries.delete(value);
             }
@@ -801,6 +827,25 @@ function updateFilterSummary() {
     filterSummary.classList.toggle("has-filters", active);
     filterSummary.setAttribute("aria-label", active ? "필터 (선택됨)" : "필터");
 }
+
+function updateLibraryScope() {
+    const row = document.getElementById("library-scope");
+    row.hidden = !selectedLibraries.size;
+    document.getElementById("library-scope-label").textContent = `도서관 ${selectedLibraries.size}곳`;
+}
+
+document.getElementById("remember-libraries").addEventListener("change", event => {
+    tempRememberLibraries = event.target.checked;
+    tempLibrariesDirty = true;
+});
+document.getElementById("library-scope-all").addEventListener("click", () => {
+    selectedLibraries = new Set();
+    librariesExplicit = true;
+    updateLibraryScope();
+    updateFilterSummary();
+    syncSearchPageUrl(currentQueryText, refineQueryText);
+    if (currentQueryText) fetchSearch(currentQueryText, refineQueryText);
+});
 
 document.getElementById("search-retry").addEventListener("click", () => {
     if (currentQueryText) fetchSearch(currentQueryText, refineQueryText);

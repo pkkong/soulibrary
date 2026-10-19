@@ -49,6 +49,12 @@ jobs:
       - name: Run offline library relay regressions
         run: python scripts/library_relay_regression_test.py
 
+      - name: Check book status and author identity
+        run: python scripts/search_integrity_regression_test.py
+
+      - name: Check report resolution and pagination
+        run: python scripts/report_integrity_regression_test.py
+
       - name: Set up Node for frontend regression
         uses: actions/setup-node@v4
         with:
@@ -56,6 +62,9 @@ jobs:
 
       - name: Check analytics collection contract
         run: node scripts/frontend_regression_test.cjs
+
+      - name: Check preferred libraries and shelf backup
+        run: node scripts/convenience_regression_test.cjs
 
   deploy:
     if: github.event_name != 'pull_request'

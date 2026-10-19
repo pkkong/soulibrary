@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 import os
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -16,7 +18,21 @@ DEFAULT_GITHUB_REPO = "pkkong/soulibrary"
 REPORT_TITLE_PREFIX = "[오류신고]"
 REPORT_STORE_ERROR = "최근 접수 목록을 잠시 불러오지 못했습니다."
 REPORT_SAVE_ERROR = "신고를 접수하지 못했습니다. 잠시 후 다시 시도해주세요."
+REPORT_LIST_PARTIAL_NOTICE = "최근 접수 목록을 모두 불러오지 못했습니다. 잠시 후 다시 확인해주세요."
+REPORT_LIST_PAGE_SIZE = 100
+REPORT_LIST_MAX_PAGES = 5
+REPORT_LIST_BUDGET_SECONDS = 8.0
+REPORT_RESOLUTION_MAX_LOOKUPS = 3
+RESOLUTION_AUTHOR_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
 KST = timezone(timedelta(hours=9), "Asia/Seoul")
+
+
+class ReportListUnavailable(RuntimeError):
+    """A bounded list read ended before enough reports or the end was found."""
+
+    def __init__(self, reports):
+        super().__init__("Recent report list could not be fully read.")
+        self.reports = reports
 
 
 def _clean(value: str, limit: int) -> str:
@@ -55,7 +71,7 @@ def _api_report_summary(report: dict) -> dict:
         "page_url": report.get("page_url") or "",
         "issue_number": report.get("issue_number"),
         "issue_url": report.get("issue_url") or "",
-        "status": report.get("status") or "open",
+        "status": report.get("status") or "unknown",
         "status_label": report.get("status_label") or _status_label(report.get("status")),
         "created_at": _api_report_datetime(report.get("created_at")),
         "updated_at": _api_report_datetime(report.get("updated_at")),
@@ -71,6 +87,8 @@ def _to_kst(value):
             value = datetime.fromisoformat(value)
         except ValueError:
             return None
+    elif not isinstance(value, datetime):
+        return None
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(KST)
@@ -150,17 +168,16 @@ def _github_issue_labels() -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def _status_label(state: str | None) -> str:
+def _status_label(state: str | None, resolved: bool = False) -> str:
+    if state == "open":
+        return "접수됨"
     if state == "closed":
-        return "처리 완료"
-    return "접수됨"
+        return "해결됨" if resolved else "종료됨"
+    return "확인 중"
 
 
 def _customer_resolution_message(message: str) -> str:
-    summary = _clean(message, 80)
-    if summary:
-        return f"신고해주신 '{summary}' 문제를 확인했고, 필요한 조치를 완료했습니다. 알려주셔서 감사합니다."
-    return "신고해주신 문제를 확인했고, 필요한 조치를 완료했습니다. 알려주셔서 감사합니다."
+    return "신고하신 문제를 해결했습니다."
 
 
 def _extract_section(body: str, heading: str) -> str:
@@ -189,30 +206,48 @@ def _category_from_title(title: str) -> str:
     return "오류"
 
 
-def _latest_resolution_time(issue: dict):
-    if issue.get("state") != "closed" or not issue.get("comments"):
+def _latest_resolution_time(issue: dict, timeout: float | None = None):
+    if (
+        issue.get("state") != "closed"
+        or issue.get("state_reason") != "completed"
+        or not issue.get("comments")
+    ):
         return None
-    comments_url = issue.get("comments_url")
-    if not comments_url:
-        issue_number = issue.get("number")
-        if not issue_number:
-            return None
-        comments_url = f"https://api.github.com/repos/{_github_repo()}/issues/{issue_number}/comments"
+    issue_number = issue.get("number")
+    comment_count = issue.get("comments")
+    if (
+        not isinstance(issue_number, int) or isinstance(issue_number, bool) or issue_number <= 0
+        or not isinstance(comment_count, int) or isinstance(comment_count, bool) or comment_count <= 0
+    ):
+        return None
 
+    # Read only the latest page. Missing older evidence leaves the status unknown,
+    # rather than turning an unverified closure into a claim of resolution.
+    comments_url = f"https://api.github.com/repos/{_github_repo()}/issues/{issue_number}/comments"
     response = requests.get(
         comments_url,
         headers=_github_headers(require_token=True),
-        params={"per_page": "100"},
-        timeout=_github_timeout(),
+        params={"per_page": str(REPORT_LIST_PAGE_SIZE), "page": math.ceil(comment_count / REPORT_LIST_PAGE_SIZE)},
+        timeout=timeout if timeout is not None else _github_timeout(),
+        allow_redirects=False,
     )
+    if response.status_code != 200:
+        response.raise_for_status()
+        raise RuntimeError("Unexpected GitHub comment response.")
     response.raise_for_status()
     comments = response.json()
     if not isinstance(comments, list):
         return None
 
     for comment in reversed(comments):
-        if str(comment.get("body") or "").strip():
-            return _to_kst(comment.get("created_at"))
+        if not isinstance(comment, dict) or comment.get("author_association") not in RESOLUTION_AUTHOR_ASSOCIATIONS:
+            continue
+        result = _extract_section(comment.get("body") or "", "처리 결과")
+        if result.splitlines()[:1] != ["조치 완료"]:
+            continue
+        resolution_at = _to_kst(comment.get("created_at"))
+        if resolution_at:
+            return resolution_at
     return None
 
 
@@ -221,10 +256,14 @@ def _issue_to_report(issue: dict, resolution_at=None) -> dict:
     body = issue.get("body") or ""
     message = _extract_section(body, "신고 내용") or issue.get("title") or ""
     closed_at = _to_kst(issue.get("closed_at"))
-    resolution_message = ""
-    if issue.get("state") == "closed":
-        resolution_message = _customer_resolution_message(message)
-        resolution_at = resolution_at or closed_at
+    resolution_at = _to_kst(resolution_at)
+    resolved = bool(
+        issue.get("state") == "closed"
+        and issue.get("state_reason") == "completed"
+        and resolution_at
+    )
+    resolution_message = _customer_resolution_message(message) if resolved else ""
+    resolution_at = resolution_at if resolved else None
 
     return {
         "id": issue_number or 0,
@@ -233,8 +272,8 @@ def _issue_to_report(issue: dict, resolution_at=None) -> dict:
         "page_url": _extract_section(body, "문제가 있던 주소"),
         "issue_number": issue_number,
         "issue_url": issue.get("html_url") or "",
-        "status": issue.get("state") or "open",
-        "status_label": _status_label(issue.get("state")),
+        "status": issue.get("state") or "unknown",
+        "status_label": _status_label(issue.get("state"), resolved),
         "created_at": _to_kst(issue.get("created_at")),
         "closed_at": closed_at,
         "updated_at": _to_kst(issue.get("updated_at")),
@@ -244,38 +283,74 @@ def _issue_to_report(issue: dict, resolution_at=None) -> dict:
 
 
 def _recent_github_reports(limit: int = 10) -> list[dict]:
+    limit = max(0, min(int(limit), 25))
+    if not limit:
+        return []
     url = f"https://api.github.com/repos/{_github_repo()}/issues"
-    params = {
-        "state": "all",
-        "sort": "created",
-        "direction": "desc",
-        "per_page": "100",
-    }
-    response = requests.get(
-        url,
-        headers=_github_headers(require_token=True),
-        params=params,
-        timeout=_github_timeout(),
-    )
-    response.raise_for_status()
-    issues = response.json()
-    if not isinstance(issues, list):
-        raise RuntimeError("GitHub issue list response was not a list.")
-
     reports = []
-    for issue in issues if isinstance(issues, list) else []:
-        if issue.get("pull_request"):
+    issues_by_number = {}
+    headers = _github_headers(require_token=True)
+    deadline = time.monotonic() + min(_github_timeout(), REPORT_LIST_BUDGET_SECONDS)
+    complete = False
+    try:
+        for page in range(1, REPORT_LIST_MAX_PAGES + 1):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("Report list budget exhausted.")
+            response = requests.get(
+                url,
+                headers=headers,
+                params={"state": "all", "sort": "created", "direction": "desc",
+                        "per_page": str(REPORT_LIST_PAGE_SIZE), "page": page},
+                timeout=remaining,
+                allow_redirects=False,
+            )
+            if response.status_code != 200:
+                response.raise_for_status()
+                raise RuntimeError("Unexpected GitHub issue list response.")
+            response.raise_for_status()
+            issues = response.json()
+            if not isinstance(issues, list):
+                raise RuntimeError("GitHub issue list response was not a list.")
+            for issue in issues:
+                if not isinstance(issue, dict) or "pull_request" in issue:
+                    continue
+                if not str(issue.get("title") or "").startswith(REPORT_TITLE_PREFIX):
+                    continue
+                number = issue.get("number")
+                if not isinstance(number, int) or isinstance(number, bool) or number <= 0:
+                    continue
+                if number in issues_by_number:
+                    continue
+                issues_by_number[number] = issue
+                reports.append(_issue_to_report(issue))
+                if len(reports) >= limit:
+                    complete = True
+                    break
+            if complete or len(issues) < REPORT_LIST_PAGE_SIZE:
+                complete = True
+                break
+    except Exception as exc:
+        raise ReportListUnavailable(reports) from exc
+    if not complete:
+        raise ReportListUnavailable(reports)
+
+    lookups = 0
+    for report in reports:
+        issue = issues_by_number[report["issue_number"]]
+        if issue.get("state") != "closed" or issue.get("state_reason") != "completed" or not issue.get("comments"):
             continue
-        if not str(issue.get("title") or "").startswith(REPORT_TITLE_PREFIX):
-            continue
-        resolution_at = None
-        try:
-            resolution_at = _latest_resolution_time(issue)
-        except Exception as exc:
-            print(f"[report warning] github issue comment fetch failed: {exc}")
-        reports.append(_issue_to_report(issue, resolution_at))
-        if len(reports) >= limit:
+        remaining = deadline - time.monotonic()
+        if lookups >= REPORT_RESOLUTION_MAX_LOOKUPS or remaining <= 0:
             break
+        lookups += 1
+        try:
+            resolution_at = _latest_resolution_time(issue, timeout=remaining)
+        except Exception:
+            # The list is still valid. Failure to verify a result never means fixed.
+            continue
+        if resolution_at:
+            report.update(_issue_to_report(issue, resolution_at))
     return reports
 
 
@@ -298,8 +373,12 @@ def _render_reports_page(
             detail = _github_error_detail(exc)
             print(f"[report error] github issue list failed: {detail} raw={exc}")
             reports_unavailable = True
+            if isinstance(exc, ReportListUnavailable):
+                reports = exc.reports
             if saved_report:
                 reports_notice = "최근 접수 목록 동기화가 지연되어 방금 접수한 신고를 먼저 보여드립니다."
+            elif reports:
+                reports_notice = REPORT_LIST_PARTIAL_NOTICE
             else:
                 error = error or _report_store_error(exc)
 
@@ -378,7 +457,16 @@ def _create_github_issue(form: dict, user_agent: str) -> dict:
             timeout=_github_timeout(),
         )
     response.raise_for_status()
-    return _issue_to_report(response.json())
+    issue = response.json()
+    if (
+        response.status_code != 201
+        or not isinstance(issue, dict)
+        or not isinstance(issue.get("number"), int)
+        or isinstance(issue.get("number"), bool)
+        or issue["number"] <= 0
+    ):
+        raise RuntimeError("GitHub did not confirm a created report.")
+    return _issue_to_report(issue)
 
 
 @report_bp.route("/reports", methods=["GET", "POST"])
@@ -455,7 +543,9 @@ def api_recent_reports():
         detail = _github_error_detail(exc)
         print(f"[report error] github issue list failed: {detail} raw={exc}")
         reports_unavailable = True
-        reports_notice = _report_store_error(exc)
+        if isinstance(exc, ReportListUnavailable):
+            reports = exc.reports
+        reports_notice = REPORT_LIST_PARTIAL_NOTICE if reports else _report_store_error(exc)
         status_code = 503
 
     html = _render_recent_reports_fragment(

@@ -208,8 +208,8 @@ def api_yes24_status():
             session = get_status_session()
             res = session.get(detail_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
-        html = yes24_status_html(res, "yes24_detail", goods_id) if use_relay else res.text
-        status = parse_yes24_status(html, goods_id)
+        html = yes24_status_html(res, "yes24_detail", goods_id)
+        status = parse_yes24_status(html, goods_id, "yes24_detail")
     except Exception as e:
         if use_relay:
             print("[status error] library_relay_status_failed")
@@ -224,8 +224,8 @@ def api_yes24_status():
             else:
                 res = get_status_session().get(fallback_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
             res.raise_for_status()
-            html = yes24_status_html(res, "yes24_list", goods_id) if use_relay else res.text
-            status = parse_yes24_status(html, goods_id)
+            html = yes24_status_html(res, "yes24_list", goods_id)
+            status = parse_yes24_status(html, goods_id, "yes24_list")
         except Exception as e:
             if use_relay:
                 print("[status error] library_relay_status_failed")
