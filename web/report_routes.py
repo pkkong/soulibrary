@@ -95,7 +95,11 @@ def _to_kst(value):
 
 
 def _github_repo() -> str:
-    return os.environ.get("GITHUB_ISSUE_REPO", DEFAULT_GITHUB_REPO).strip() or DEFAULT_GITHUB_REPO
+    repo = os.environ.get("GITHUB_ISSUE_REPO", DEFAULT_GITHUB_REPO).strip() or DEFAULT_GITHUB_REPO
+    # This repository was renamed; use its current API endpoint directly.
+    if repo.casefold() == "pkkong/library_crawler":
+        return DEFAULT_GITHUB_REPO
+    return repo
 
 
 def _github_timeout() -> float:

@@ -104,6 +104,8 @@
 
 다섯 작업의 구현·독립 오프라인 회귀·main CUA 통합 검수는 완료했다. 릴리스 상태는 [PR #62](https://github.com/pkkong/soulibrary/pull/62)의 CI와 해당 merge commit의 production 배포·live smoke 결과에서 확인하고, 상세 근거는 ignored `artifacts/qa/20261019-service-integrity-report.md`에 기록한다. 계약은 [서비스 관측성](service_observability.md)과 [UX/UI 가이드](UX_UI_Guide.md)를 따른다. Bookcube·강남 상태 ID 부분 매칭과 서울도서관·서울교육청 JSON 첫 항목 선택은 별도 감사 대기이며, [송파 미복구](songpa_connectivity.md)도 별도 유지한다.
 
+신고 목록 후속(2026-10-19): 배포 후 최근 목록 HTTP 503은 이전 저장소 이름 설정의 GitHub API 301과 redirect 거절로 재현했다. 알려진 이전 이름만 canonical 저장소로 매핑하는 코드 수정을 마쳤으며, CI·배포와 실제 production 목록 HTTP 200 확인은 대기 중이다.
+
 ### 나머지 감사 항목
 
 1. GSC 인증 유지·재만료·실수집 검증, GA 내부 방문/QA 실제 제외, 맞춤항목 처리와 미완성 기간 이후 집계 확인. 이벤트 실수집은 원시 수치를 공개하지 않고 ignored 보고서에 근거를 남긴다
