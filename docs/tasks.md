@@ -102,7 +102,7 @@
 | 선택 도서관 기억·상세 우선 정렬 | 구현·독립 회귀·360px/430px/desktop CUA 검수 완료 |
 | 개인 서재 JSON 백업·복원 | 구현·최종 파일 계약 확인·독립 회귀·CUA 취소/성공/중복/실패·포커스 검수 완료 |
 
-다섯 작업의 구현·독립 오프라인 회귀·main CUA 통합 검수는 완료했으며 release CI·production 배포·live 검증은 대기 중이다. 근거는 이번 변경 PR의 CI와 ignored `artifacts/qa/20261019-service-integrity-report.md`에 기록한다. 계약은 [서비스 관측성](service_observability.md)과 [UX/UI 가이드](UX_UI_Guide.md)를 따른다. Bookcube·강남 상태 ID 부분 매칭과 서울도서관·서울교육청 JSON 첫 항목 선택은 별도 감사 대기이며, [송파 미복구](songpa_connectivity.md)도 별도 유지한다.
+다섯 작업의 구현·독립 오프라인 회귀·main CUA 통합 검수는 완료했다. 릴리스 상태는 [PR #62](https://github.com/pkkong/soulibrary/pull/62)의 CI와 해당 merge commit의 production 배포·live smoke 결과에서 확인하고, 상세 근거는 ignored `artifacts/qa/20261019-service-integrity-report.md`에 기록한다. 계약은 [서비스 관측성](service_observability.md)과 [UX/UI 가이드](UX_UI_Guide.md)를 따른다. Bookcube·강남 상태 ID 부분 매칭과 서울도서관·서울교육청 JSON 첫 항목 선택은 별도 감사 대기이며, [송파 미복구](songpa_connectivity.md)도 별도 유지한다.
 
 ### 나머지 감사 항목
 
