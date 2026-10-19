@@ -17,6 +17,7 @@
 - 데이터 산출물: Git 미포함, 필요 시 별도 백업/작업 환경에서 생성
 - Phase 0 운영 경로 정리: 문서와 inventory만 갱신한 이전 단계. 현재 production은 Vercel + Supabase 기준
 - 운영 inventory: `docs/phase0_operating_inventory.md`
+- 연결 상태(2026-10-19 검증): main `iad1` + 선택적 `icn1` relay로 성북·영등포·강서 복구, 송파 소장형 `songpa_owned`는 미복구·relay 제외. 근거는 [송파 연결 인수인계](songpa_connectivity.md) 참고
 
 ## PostgreSQL/DB 코드 분류
 
@@ -80,6 +81,8 @@
 - 캐시/로그
 
 ## 다음 우선순위
+
+송파 소장형 미복구 후속 작업은 [송파 연결 인수인계](songpa_connectivity.md)의 검증 날짜·cloud TCP 미완료 증거와 완료 기준을 확인한 뒤 이어간다.
 
 1. Codespaces/Codex Cloud에서 새 작업이 바로 가능한지 확인
 2. 모바일에서 브랜치/PR/배포 상태를 확인하는 운영 흐름 고정

@@ -222,6 +222,8 @@ vercel.json -> index.py -> web/app_search.py
 
 Phase 0 운영 경로 정리는 Cloudtype 시절 inventory 기록입니다. 현재 production 운영 기준은 [docs/production_operations.md](docs/production_operations.md)를 우선 확인하고, 레거시/보류 항목 분류는 [docs/phase0_operating_inventory.md](docs/phase0_operating_inventory.md)를 참고합니다.
 
+2026-10-19 검증 기준, main `iad1`과 선택적 `icn1` relay로 성북·영등포·강서는 복구됐지만 송파 소장형 YES24 `songpa_owned`는 미복구이며 relay 활성화에서 제외돼 있습니다. 관련 작업의 근거와 재개·완료 기준은 [송파 연결 인수인계](docs/songpa_connectivity.md)를 먼저 확인합니다.
+
 자동배포에는 GitHub Actions secret 세 개가 필요합니다.
 
 ```text

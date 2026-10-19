@@ -489,6 +489,8 @@ UI/UX 변경은 다음 순서를 통과해야 한다.
 - 배포 흐름: `main` push 또는 merge 후 GitHub Actions smoke test 통과, 이후 Vercel production 배포와 `https://www.soulib.kr` live smoke test
 - Phase 0 운영 경로 정리는 문서와 inventory 정리만 수행했다. 현재는 Vercel + Supabase 운영 경로가 production 기준이다.
 - 운영 경로와 레거시/보류 항목의 기준 inventory는 `docs/phase0_operating_inventory.md`를 우선 확인한다.
+- 알려진 검색 장애(2026-10-19 검증): 송파 소장형 YES24 `songpa_owned`는 production에서 미복구이므로 관련 작업을 시작할 때 [송파 연결 인수인계](docs/songpa_connectivity.md)의 최신 검증일·사실·미확정 원인을 먼저 확인한다.
+- 송파의 진단 성공이나 HTTP 200의 빈 API 응답을 복구로 표시하지 않고, 실제 production cache miss 검색에서 책이 일치하는 결과와 같은 책의 상태 조회, 타기관 회귀를 확인한 뒤에만 위 인수인계의 복구 기록을 갱신한다.
 
 PostgreSQL 관련 코드는 아래 세 그룹으로 구분한다.
 
