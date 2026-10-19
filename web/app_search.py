@@ -29,6 +29,15 @@ app.register_blueprint(status_api_bp)
 app.register_blueprint(live_search_bp)
 app.register_blueprint(report_bp)
 
+
+@app.context_processor
+def library_registry_context():
+    return {"library_registry": [
+        {"code": code, "name": LIBRARY_SHORT.get(code, info.get("library_name") or info.get("name") or code)}
+        for code, info in LIBRARIES.items()
+    ]}
+
+
 if os.environ.get("ENABLE_CURATION_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     from data_quality_admin import data_quality_bp
 

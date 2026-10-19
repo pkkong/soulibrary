@@ -18,6 +18,10 @@ const shelfSharePanel = document.getElementById("shelf-share-panel");
 const shelfShareUrl = document.getElementById("shelf-share-url");
 const shelfCopyShare = document.getElementById("shelf-copy-share");
 const shelfShareStatus = document.getElementById("shelf-share-status");
+const shelfBackup = document.getElementById("shelf-backup");
+const shelfRestore = document.getElementById("shelf-restore");
+const shelfRestoreFile = document.getElementById("shelf-restore-file");
+const shelfBackupStatus = document.getElementById("shelf-backup-status");
 const shelfViewButtons = Array.from(document.querySelectorAll("[data-shelf-view]"));
 const shelf = window.SoulibShelf;
 const ACTIVE_LIST_KEY = "soulib.myShelf.activeList";
@@ -374,4 +378,55 @@ shelfClear.addEventListener("click", () => {
 });
 
 window.addEventListener("soulib:shelf-changed", renderShelf);
+
+function createShelfBackup() {
+    let objectUrl = "";
+    try {
+        const text = shelf.createBackup();
+        objectUrl = URL.createObjectURL(new Blob([text], {type: "application/json;charset=utf-8"}));
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = `soulib-shelves-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        shelfBackupStatus.textContent = "백업 파일을 만들었습니다.";
+    } catch (_) {
+        shelfBackupStatus.textContent = "백업 파일을 만들지 못했습니다. 다시 시도해주세요.";
+    } finally {
+        if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    }
+}
+
+async function restoreShelfFile(file) {
+    if (!file) return;
+    shelfRestore.disabled = true;
+    shelfBackupStatus.textContent = "";
+    try {
+        if (file.size > shelf.BACKUP_MAX_BYTES) throw new Error("backup_invalid");
+        const plan = await shelf.prepareRestore(await file.text());
+        if (plan.duplicate) {
+            shelfBackupStatus.textContent = "이미 가져온 서재입니다.";
+            return;
+        }
+        if (!window.confirm(`서재 ${plan.listCount}개, 책 ${plan.bookCount}권을 추가할까요? 기존 서재는 그대로 유지됩니다.`)) return;
+        const result = shelf.restoreBackup(plan);
+        shelfBackupStatus.textContent = result.status === "duplicate" ? "이미 가져온 서재입니다." : `서재 ${result.listCount}개를 추가했습니다.`;
+    } catch (error) {
+        shelfBackupStatus.textContent = error.message === "backup_save_failed"
+            ? "서재를 저장하지 못했습니다. 기존 서재는 그대로입니다."
+            : "Soulib에서 저장한 백업 파일을 선택해주세요.";
+    } finally {
+        shelfRestore.disabled = false;
+        shelfRestoreFile.value = "";
+        shelfRestore.focus();
+    }
+}
+
+shelfBackup.addEventListener("click", createShelfBackup);
+shelfRestore.addEventListener("click", () => {
+    shelfRestoreFile.value = "";
+    shelfRestoreFile.click();
+});
+shelfRestoreFile.addEventListener("change", () => restoreShelfFile(shelfRestoreFile.files[0]));
 renderShelf();

@@ -1,4 +1,7 @@
 import re
+from urllib.parse import parse_qs, urlparse
+
+from lxml import html as lxml_html
 
 def _to_int(value, default=0):
     try:
@@ -142,40 +145,71 @@ def parse_gangnam_detail_status(html: str):
     }
 
 
-def parse_yes24_status(html: str, goods_id: str = ""):
-    if not html:
-        return None
-    stat_match = re.search(r'<div class="stat[^\"]*">.*?</div>', html, re.S)
-    if stat_match:
-        stat_html = stat_match.group(0)
-        def pick(label):
-            m = re.search(rf"<li>\s*{label}\s*<strong>(\d+)</strong>", stat_html)
-            return int(m.group(1)) if m else 0
-        return {
-            "owned": pick("보유"),
-            "loaned": pick("대출"),
-            "reserved": pick("예약"),
-        }
+def parse_yes24_status(html: str, goods_id: str = "", operation: str = ""):
+    """Read explicit counts only after identifying exactly one requested book.
 
-    if goods_id:
-        parts = html.split('<div class="bx')
-        for part in parts[1:]:
-            block = '<div class="bx' + part
-            if f"goods_id={goods_id}" not in block:
-                continue
-            stat_match = re.search(r'<div class="stat">.*?</div>', block, re.S)
-            if not stat_match:
+    A stat fragment alone cannot establish which book it belongs to. Keep the
+    detail's return URL or the list book's link when calling this parser.
+    """
+    if not html or not isinstance(goods_id, str) or not re.fullmatch(r"[0-9]{1,32}", goods_id):
+        return None
+
+    def has_class(node, value):
+        return value in (node.get("class") or "").split()
+
+    def nearest(node, value):
+        return next((parent for parent in node.iterancestors() if has_class(parent, value)), None)
+
+    def matches_detail(value):
+        parsed = urlparse(value)
+        return (parsed.path in ("/ebook/detail", "/ebook/detail/")
+                and parse_qs(parsed.query).get("goods_id") == [goods_id])
+
+    try:
+        doc = lxml_html.fromstring(html, parser=lxml_html.HTMLParser(remove_comments=True))
+        views = doc.xpath("//div[contains(concat(' ',normalize-space(@class),' '),' ebook-view ')]")
+        mode = operation or ("yes24_detail" if views else "yes24_list")
+        if mode == "yes24_detail":
+            references = doc.xpath("//input[@name='return_url']/@value")
+            if len(views) != 1 or not references or not all(matches_detail(value) for value in references):
                 return None
-            stat_html = stat_match.group(0)
-            def pick(label):
-                m = re.search(rf"<li>\s*{label}\s*<strong>(\d+)</strong>", stat_html)
-                return int(m.group(1)) if m else 0
-            return {
-                "owned": pick("보유"),
-                "loaned": pick("대출"),
-                "reserved": pick("예약"),
-            }
-    return None
+            book = views[0]
+            stats = [node for node in book.xpath(".//div")
+                     if has_class(node, "stat") and nearest(node, "ebook-view") is book
+                     and nearest(node, "bx") is None]
+        elif mode == "yes24_list":
+            books = doc.xpath("//div[contains(concat(' ',normalize-space(@class),' '),' ebook-list ')]"
+                              "//div[contains(concat(' ',normalize-space(@class),' '),' bx ')]")
+            selected = [book for book in books if any(
+                matches_detail(anchor.get("href", "")) and nearest(anchor, "bx") is book
+                for anchor in book.xpath(".//a[@href]"))]
+            if len(selected) != 1:
+                return None
+            book = selected[0]
+            stats = [node for node in book.xpath(".//div")
+                     if has_class(node, "stat") and nearest(node, "bx") is book]
+        else:
+            return None
+        if len(stats) != 1:
+            return None
+        counts = {}
+        keys = {"보유": "owned", "대출": "loaned", "예약": "reserved"}
+        for item in stats[0].xpath(".//li"):
+            numbers = item.xpath(".//strong")
+            if len(numbers) != 1:
+                continue
+            number = "".join(numbers[0].itertext())
+            if not re.fullmatch(r"[0-9]+", number):
+                continue
+            label = re.sub(r"\s+", "", "".join(item.itertext()).partition(number)[0])
+            key = keys.get(label)
+            if key:
+                if key in counts:
+                    return None
+                counts[key] = int(number)
+        return counts if set(counts) == set(keys.values()) else None
+    except (ValueError, TypeError, lxml_html.etree.ParserError):
+        return None
 
 
 def parse_seoul_status(data: dict):

@@ -5,6 +5,7 @@ from lxml import html as lxml_html
 
 from live_search.connectors.common import absolute_url, make_session, origin_from_url, request_headers, text
 from live_search.models import LiveSearchResult
+from live_search.normalizer import clean_author_display
 from live_search.relay import fetch_page, operation_deadline, relay_enabled, validate_search_document
 
 
@@ -103,7 +104,7 @@ class Yes24Connector:
                 goods_id = match.group(1)
 
             writer = text(node.xpath("string(.//p[contains(@class, 'writer')])"))
-            author = writer.split("/")[0].replace(" 저", "").strip() if writer else ""
+            author = clean_author_display(writer)
             details = [text(value) for value in node.xpath(".//p[contains(@class, 'detail')]/span/text()")]
             publisher = details[0] if details else ""
             provider = normalize_provider(details[2] if len(details) >= 3 else "")

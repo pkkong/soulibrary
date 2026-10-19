@@ -60,7 +60,15 @@
                     <path d="M14.5 9.5l-5 5"></path>
                 </svg>
             </button>
+            <button class="shelf-action-button" id="shelf-backup" type="button" aria-label="모든 서재 백업" title="모든 서재 백업">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4"></path><path d="M5 15v5h14v-5"></path></svg>
+            </button>
+            <button class="shelf-action-button" id="shelf-restore" type="button" aria-label="서재 복원" title="서재 복원">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4"></path><path d="M5 15v5h14v-5"></path></svg>
+            </button>
         </div>
+        <input id="shelf-restore-file" type="file" accept="application/json,.json" hidden>
+        <p class="shelf-backup-status" id="shelf-backup-status" role="status" aria-live="polite"></p>
         <form class="shelf-create-form" id="shelf-create-form" hidden>
             <label class="sr-only" for="shelf-create-name">새 서재 이름</label>
             <input id="shelf-create-name" type="text" maxlength="80" placeholder="새 서재 이름" enterkeyhint="done">
@@ -131,6 +139,6 @@
         <div id="shelf-items" class="shelf-items"></div>
     </section>
 </div>
-<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260526a') }}"></script>
-<script src="{{ url_for('static', filename='js/my_shelf.js', v='20261014a') }}"></script>
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20261019a') }}"></script>
+<script src="{{ url_for('static', filename='js/my_shelf.js', v='20261019a') }}"></script>
 {% endblock %}

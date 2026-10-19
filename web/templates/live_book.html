@@ -88,6 +88,7 @@
             <div class="detail-inner">
                 <div class="detail-section-head">
                     <div class="detail-section-title">소장 도서관</div>
+                    <span class="detail-library-preference" data-library-preference-note hidden>내 도서관 먼저</span>
                 </div>
                 <p class="detail-status-note" data-detail-status-note role="status" aria-live="polite" hidden></p>
 
@@ -100,7 +101,9 @@
 
 {% block scripts %}
 {% if book %}
-<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260526a') }}"></script>
+<script src="{{ url_for('static', filename='js/library_preferences.js', v='20261019a') }}"></script>
+<script>window.SoulibLibraryPreferences.configure({{ library_registry|default([])|tojson|safe }});</script>
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20261019a') }}"></script>
 <script src="{{ url_for('static', filename='js/shelf_picker.js', v='20261012a') }}"></script>
 <script>
     (function () {
@@ -135,6 +138,8 @@
             if (!group) return;
             const cards = Array.from(group.querySelectorAll(".lib-card"));
             cards.sort((a, b) => {
+                const preferredOrder = window.SoulibLibraryPreferences?.compareCards(a, b) || 0;
+                if (preferredOrder) return preferredOrder;
                 const aOrder = a.dataset.statusOrder || "2";
                 const bOrder = b.dataset.statusOrder || "2";
                 if (aOrder !== bOrder) return aOrder.localeCompare(bOrder);
@@ -147,6 +152,14 @@
             });
             cards.forEach((card) => group.appendChild(card));
         }
+
+        function refreshPreferredLibraries() {
+            document.querySelectorAll("[data-lib-group]").forEach(sortGroup);
+            const note = document.querySelector("[data-library-preference-note]");
+            if (note) note.hidden = !Array.from(document.querySelectorAll(".lib-card"))
+                .some(card => window.SoulibLibraryPreferences?.matches(card));
+        }
+        window.addEventListener("soulib:library-preferences-changed", refreshPreferredLibraries);
 
         function statusUrl(card) {
             if (card.dataset.serviceType === "Subscription") {
@@ -264,6 +277,7 @@
             scope.querySelectorAll("[data-lib-group]").forEach((group) => {
                 group.dataset.pendingCount = String(group.querySelectorAll("[data-live-status]").length);
             });
+            refreshPreferredLibraries();
             runStatusQueue(cards);
         }
 

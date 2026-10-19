@@ -2,6 +2,9 @@
     const STORAGE_KEY = "soulib.myShelf.v1";
     const DEFAULT_LIST_ID = "default";
     const DEFAULT_LIST_NAME = "기본 서재";
+    const BACKUP_FORMAT = "soulib-shelf-backup";
+    const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
+    const preparedRestores = new WeakMap();
 
     function cleanText(value) {
         return String(value || "").trim();
@@ -60,6 +63,8 @@
             created_at: cleanText(list && list.created_at) || now,
             updated_at: cleanText(list && list.updated_at) || now,
             book_keys: [...new Set(keys.map(cleanText).filter(Boolean))],
+            ...(typeof list?.import_ref === "string" && /^[a-f0-9]{64}:.{1,160}$/.test(list.import_ref)
+                ? {import_ref: list.import_ref} : {}),
         };
     }
 
@@ -207,7 +212,7 @@
             book_id: (book && book.book_id) || null,
             counts: (book && book.counts) || {},
             added_at: cleanText(book && book.added_at) || nowIso(),
-            updated_at: nowIso(),
+            updated_at: cleanText(book && book.updated_at) || nowIso(),
         };
     }
 
@@ -346,6 +351,183 @@
         window.dispatchEvent(new CustomEvent("soulib:shelf-changed", { detail: { action, ...(detail || {}) } }));
     }
 
+    function backupError(code) { return new Error(code || "backup_invalid"); }
+
+    function backupText(value, limit, required = false) {
+        if (typeof value !== "string" || value.length > limit || (required && !value.trim())) throw backupError();
+        return value.trim();
+    }
+
+    function safeImage(value) {
+        if (!value) return "";
+        const text = backupText(value, 2048);
+        try {
+            const url = new URL(text);
+            return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password ? url.href : "";
+        } catch (_) { return ""; }
+    }
+
+    function backupDate(value, required = false) {
+        const text = backupText(value || "", 50);
+        if (required && !text) throw backupError();
+        if (text && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(text) || !Number.isFinite(Date.parse(text)))) throw backupError();
+        return text;
+    }
+
+    function checkBackupTree(value, depth = 0, count = {value: 0}) {
+        if (++count.value > 200000 || depth > 12) throw backupError();
+        if (!value || typeof value !== "object") return;
+        Object.keys(value).forEach(key => {
+            if (["__proto__", "constructor", "prototype"].includes(key)) throw backupError();
+            checkBackupTree(value[key], depth + 1, count);
+        });
+    }
+
+    function backupBook(book, key) {
+        if (!book || typeof book !== "object" || Array.isArray(book)) throw backupError();
+        const title = backupText(book.title, 500, true);
+        const author = backupText(book.author || "", 300);
+        const publisher = backupText(book.publisher || "", 300);
+        const canonicalKey = canonicalKeyFor({title, author, publisher});
+        if (key !== canonicalKey || (book.key !== undefined && book.key !== key)) throw backupError();
+        const counts = {};
+        if (book.counts !== undefined && (!book.counts || typeof book.counts !== "object" || Array.isArray(book.counts))) throw backupError();
+        ["kyobo", "yes24", "other", "total"].forEach(name => {
+            const number = book.counts?.[name] ?? 0;
+            if (!Number.isInteger(number) || number < 0 || number > 10000000) throw backupError();
+            counts[name] = number;
+        });
+        if (book.image_candidates !== undefined && (!Array.isArray(book.image_candidates) || book.image_candidates.length > 8)) throw backupError();
+        const candidates = (book.image_candidates || []).map(candidate => {
+            if (typeof candidate === "string") return safeImage(candidate);
+            if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw backupError();
+            return safeImage(candidate.url || candidate.image_url || "");
+        }).filter(Boolean);
+        const image = safeImage(book.image_url || "");
+        const added = backupDate(book.added_at, true);
+        const updated = backupDate(book.updated_at, true);
+        // Imported links and IDs never determine navigation. Build a local detail
+        // address from the validated text, and copy only the book fields we use.
+        return toShelfBook({title, author, publisher, image_url: image,
+            image_candidates: candidates.map(url => ({url})), counts, added_at: added, updated_at: updated});
+    }
+
+    function validateBackup(value) {
+        checkBackupTree(value);
+        if (!value || value.format !== BACKUP_FORMAT || value.version !== 1 || !value.state || value.state.version !== 2) throw backupError();
+        const source = value.state;
+        if (!Array.isArray(source.lists) || !source.lists.length || source.lists.length > 100 ||
+            !source.books || typeof source.books !== "object" || Array.isArray(source.books)) throw backupError();
+        const keys = Object.keys(source.books);
+        if (keys.length > 10000) throw backupError();
+        const books = Object.create(null);
+        keys.forEach(key => {
+            backupText(key, 1200, true);
+            books[key] = backupBook(source.books[key], key);
+        });
+        const seen = new Set();
+        let references = 0;
+        const lists = source.lists.map(list => {
+            if (!list || typeof list !== "object" || Array.isArray(list)) throw backupError();
+            const id = backupText(list.id, 160, true);
+            if (seen.has(id)) throw backupError();
+            seen.add(id);
+            if (list.import_ref !== undefined && (typeof list.import_ref !== "string" || !/^[a-f0-9]{64}:.{1,160}$/.test(list.import_ref))) throw backupError();
+            if (!Array.isArray(list.book_keys) || list.book_keys.length > 10000) throw backupError();
+            references += list.book_keys.length;
+            if (references > 100000) throw backupError();
+            const bookKeys = list.book_keys.map(key => {
+                backupText(key, 1200, true);
+                if (!Object.hasOwn(books, key)) throw backupError();
+                return key;
+            });
+            if (new Set(bookKeys).size !== bookKeys.length) throw backupError();
+            return {id, name: backupText(list.name, 80, true), description: backupText(list.description || "", 200), book_keys: bookKeys,
+                created_at: backupDate(list.created_at, true), updated_at: backupDate(list.updated_at, true)};
+        });
+        const referenced = new Set(lists.flatMap(list => list.book_keys));
+        if (keys.some(key => !referenced.has(key))) throw backupError();
+        return {version: 2, lists, books};
+    }
+
+    function backupSize(text) { return new TextEncoder().encode(text).byteLength; }
+
+    function createBackup() {
+        const state = stateForRestore();
+        const value = {format: BACKUP_FORMAT, version: 1, exported_at: nowIso(), state};
+        // The same strict format is used for our own files and imported files.
+        const checked = validateBackup(value);
+        const text = JSON.stringify({...value, state: checked}, null, 2);
+        if (backupSize(text) > BACKUP_MAX_BYTES) throw backupError("backup_too_large");
+        return text;
+    }
+
+    function stateForRestore() {
+        let value;
+        try { value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); }
+        catch (_) { throw backupError("backup_save_failed"); }
+        if (value !== null && !Array.isArray(value)) {
+            try { validateBackup({format: BACKUP_FORMAT, version: 1, state: value}); }
+            catch (_) { throw backupError("backup_save_failed"); }
+        }
+        return normalizeState(value);
+    }
+
+    async function prepareRestore(text) {
+        if (typeof text !== "string" || backupSize(text) > BACKUP_MAX_BYTES) throw backupError();
+        let value;
+        try { value = JSON.parse(text); } catch (_) { throw backupError(); }
+        const state = validateBackup(value);
+        const signature = {
+            lists: state.lists.map(list => ({...list})).sort((a, b) => a.id.localeCompare(b.id)),
+            books: Object.keys(state.books).sort().map(key => {
+                const book = state.books[key];
+                return {key, title: book.title, author: book.author, publisher: book.publisher,
+                    image_url: book.image_url, image_candidates: book.image_candidates, counts: book.counts};
+            }),
+        };
+        const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(signature)));
+        const fingerprint = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+        const existing = stateForRestore();
+        const newLists = state.lists.filter(list => !existing.lists.some(item => item.import_ref === `${fingerprint}:${list.id}`));
+        const plan = Object.freeze({listCount: newLists.length, bookCount: new Set(newLists.flatMap(list => list.book_keys)).size, duplicate: !newLists.length});
+        preparedRestores.set(plan, {state, fingerprint});
+        return plan;
+    }
+
+    function restoreBackup(plan) {
+        const prepared = preparedRestores.get(plan);
+        if (!prepared) throw backupError();
+        const {state: incoming, fingerprint} = prepared;
+        const state = stateForRestore();
+        const existingIds = new Set(state.lists.map(list => list.id));
+        const existingNames = new Set(state.lists.map(list => list.name));
+        const newLists = incoming.lists.filter(list => !state.lists.some(item => item.import_ref === `${fingerprint}:${list.id}`));
+        if (!newLists.length) return {status: "duplicate", listCount: 0};
+        newLists.forEach(source => {
+            let id;
+            do { id = uid(); } while (existingIds.has(id));
+            existingIds.add(id);
+            let name = source.name;
+            let suffix = 1;
+            while (existingNames.has(name)) {
+                const marker = suffix === 1 ? " (복원)" : ` (복원 ${suffix})`;
+                name = source.name.slice(0, 80 - marker.length) + marker;
+                suffix += 1;
+            }
+            existingNames.add(name);
+            source.book_keys.forEach(key => {
+                if (!Object.hasOwn(state.books, key)) state.books[key] = incoming.books[key];
+            });
+            state.lists.push({id, name, description: source.description, created_at: source.created_at, updated_at: source.updated_at,
+                book_keys: source.book_keys.slice(), import_ref: `${fingerprint}:${source.id}`});
+        });
+        // setItem is atomic: a quota/storage failure leaves the previous value.
+        try { saveState(state); } catch (_) { throw backupError("backup_save_failed"); }
+        emitChanged("restore", {listCount: newLists.length});
+        return {status: "imported", listCount: newLists.length};
+    }
+
     window.SoulibShelf = {
         add,
         booksForList,
@@ -365,5 +547,9 @@
         saveState,
         toShelfBook,
         updateCover,
+        createBackup,
+        prepareRestore,
+        restoreBackup,
+        BACKUP_MAX_BYTES,
     };
 })();

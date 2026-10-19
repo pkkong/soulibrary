@@ -778,7 +778,7 @@ def main():
         raise AssertionError("search page title should keep the service name")
     if "책 제목이나 저자를 검색하세요." not in search_body:
         raise AssertionError("search page should keep the concise empty state")
-    if "search.js?v=live20261014a" not in search_body:
+    if "search.js?v=live20261019a" not in search_body:
         raise AssertionError("search page should use the current search asset")
 
     blog = assert_response(client, "/blog")
@@ -1306,9 +1306,9 @@ def main():
     )
     if (
         parsed_report["category"] != "대출 상태"
-        or parsed_report["status_label"] != "처리 완료"
-        or parsed_report["resolution_message"] != "신고해주신 '기존 신고 내용' 문제를 확인했고, 필요한 조치를 완료했습니다. 알려주셔서 감사합니다."
-        or parsed_report["resolution_at"].strftime("%Y-%m-%d %H:%M") != "2026-05-14 18:00"
+        or parsed_report["status_label"] != "종료됨"
+        or parsed_report["resolution_message"] != ""
+        or parsed_report["resolution_at"] is not None
     ):
         raise AssertionError(f"github issue report did not parse correctly: {parsed_report}")
 
@@ -1815,6 +1815,8 @@ def main():
                 os.environ[name] = value
 
     class FakeIssueListResponse:
+        status_code = 200
+
         def raise_for_status(self):
             return None
 
@@ -1828,6 +1830,7 @@ def main():
                     "comments_url": "https://api.github.com/repos/pkkong/soulibrary/issues/124/comments",
                     "comments": 1,
                     "state": "closed",
+                    "state_reason": "completed",
                     "created_at": "2026-05-14T08:18:00Z",
                     "closed_at": "2026-05-14T09:00:00Z",
                     "updated_at": "2026-05-14T09:00:00Z",
@@ -1850,13 +1853,16 @@ def main():
             ]
 
     class FakeIssueCommentsResponse:
+        status_code = 200
+
         def raise_for_status(self):
             return None
 
         def json(self):
             return [
                 {
-                    "body": "수정 후 배포 완료했습니다.",
+                    "body": "## 처리 결과\n조치 완료\n수정 후 배포 완료했습니다.",
+                    "author_association": "OWNER",
                     "created_at": "2026-05-14T09:00:00Z",
                 }
             ]
@@ -1886,7 +1892,9 @@ def main():
         def raise_for_status(self):
             raise RuntimeError("fake issue creation failure")
 
-    def fake_issue_get(url, headers=None, params=None, timeout=None):
+    def fake_issue_get(url, headers=None, params=None, timeout=None, allow_redirects=True):
+        if allow_redirects:
+            raise AssertionError("GitHub list and comment reads must not follow redirects")
         if url == "https://api.github.com/repos/pkkong/soulibrary/issues/124/comments":
             return FakeIssueCommentsResponse()
         if url != "https://api.github.com/repos/pkkong/soulibrary/issues":
@@ -1951,7 +1959,7 @@ def main():
         raise AssertionError("reports page did not render GitHub issues as the report store")
     if "처리 안내" not in reports_body:
         raise AssertionError("reports page did not render customer-facing resolution heading")
-    if "신고해주신 &#39;해결된 신고입니다.&#39; 문제를 확인했고" not in reports_body:
+    if "신고하신 문제를 해결했습니다." not in reports_body or "해결됨" not in reports_body:
         raise AssertionError("reports page did not render customer-facing resolution message")
     if "수정 후 배포 완료했습니다" in reports_body:
         raise AssertionError("reports page leaked developer-facing issue comments")

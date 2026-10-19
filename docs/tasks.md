@@ -92,8 +92,22 @@
 
 ## 서비스 감사 후속 큐
 
+### 서비스 신뢰·편의 기능 진행 상태(2026-10-19)
+
+| 작업 | 현재 상태 |
+|---|---|
+| YES24 요청 도서·수량 검증 | 직접/relay 공통 parser와 실패 cache 방지 구현·독립 오프라인 QA 완료 |
+| 저자명 보존·기관 registry | 이름 끝의 `저`·`글`·`역` 보존과 code/name 분리 구현·독립 오프라인 QA 완료 |
+| 신고 해결 근거·목록 신뢰 | 상태/댓글 근거·최대 500개 조회·부분 목록 보존·실제 저장 성공 판정 구현·독립 오프라인 QA 완료 |
+| 선택 도서관 기억·상세 우선 정렬 | 구현·독립 회귀·360px/430px/desktop CUA 검수 완료 |
+| 개인 서재 JSON 백업·복원 | 구현·최종 파일 계약 확인·독립 회귀·CUA 취소/성공/중복/실패·포커스 검수 완료 |
+
+다섯 작업의 구현·독립 오프라인 회귀·main CUA 통합 검수는 완료했다. 릴리스 상태는 [PR #62](https://github.com/pkkong/soulibrary/pull/62)의 CI와 해당 merge commit의 production 배포·live smoke 결과에서 확인하고, 상세 근거는 ignored `artifacts/qa/20261019-service-integrity-report.md`에 기록한다. 계약은 [서비스 관측성](service_observability.md)과 [UX/UI 가이드](UX_UI_Guide.md)를 따른다. Bookcube·강남 상태 ID 부분 매칭과 서울도서관·서울교육청 JSON 첫 항목 선택은 별도 감사 대기이며, [송파 미복구](songpa_connectivity.md)도 별도 유지한다.
+
+### 나머지 감사 항목
+
 1. GSC 인증 유지·재만료·실수집 검증, GA 내부 방문/QA 실제 제외, 맞춤항목 처리와 미완성 기간 이후 집계 확인. 이벤트 실수집은 원시 수치를 공개하지 않고 ignored 보고서에 근거를 남긴다
 2. 검색 cache/동시 요청/partial 신뢰는 앞선 QA·배포를 확인했다. 후속 deadline/cache 변경도 회귀를 통과했다. 릴리즈는 CI·배포·live smoke까지 확인한다.
 3. 상세 후보 공통 deadline, 도봉 fallback 협력형 시간 예산, 상태 TTL cache 상한은 구현·QA 완료. 실행 중 HTTP 강제 중단/전체 hard wall과 공급사별 TLS 예외 범위는 남은 한계이며 별도 조사한다
-4. 신고 목록 pagination·해결 상태의 사실성 검토. 공개 연락처 저장 제거 후에도 과거 신고의 개인정보는 별도 점검
+4. 신고 신뢰 보완의 배포 후 읽기 검증과 과거 공개 신고의 개인정보 점검. 이번 코드가 과거 개인정보를 자동 제거하지는 않음
 5. 기능별 회귀가 확보된 뒤 `app_search.py`와 공통 CSS를 점진적으로 분리. 대규모 구조 변경과 디자인 변경을 한 번에 섞지 않는다

@@ -91,6 +91,33 @@ Codespaces에서는 포트 `5001`이 자동 포워딩됩니다. 모바일이나 
 
 사용자 상태 문구는 [docs/UX_UI_Guide.md](docs/UX_UI_Guide.md)에 따라 UX/UI Designer가 표시 조건과 자연스러운 표현을 먼저 검수한다. 정상 검색·필터·상세 추가 조회 중을 실제 실패와 구분하고, 타이머만으로 실패를 알리거나 경고를 중복 표시하지 않는다.
 
+### 도서·신고 신뢰 회귀
+
+YES24 상태는 요청한 책의 ID와 명시된 보유·대출·예약 숫자가 모두 확인돼야 성공으로 처리합니다. 직접 조회와 relay가 같은 parser를 사용하며, 잘못된 책·누락 숫자·중복 상태 블록은 실패로 처리하고 cache하지 않습니다. 명시된 0은 정상 값이며, 저자 이름 끝의 `저`·`글`·`역`은 이름의 일부일 수 있으므로 일괄 삭제하지 않습니다.
+
+신고를 `해결됨`으로 표시하려면 GitHub issue가 `closed`·`state_reason=completed`이고, `OWNER`·`MEMBER`·`COLLABORATOR` 작성 댓글에 아래 섹션이 있어야 합니다. 섹션의 첫 내용 줄은 정확히 `조치 완료`이며, 댓글 작성 시각도 유효해야 합니다.
+
+```markdown
+## 처리 결과
+조치 완료
+```
+
+위는 판정 계약 설명이며 댓글 발송 지시가 아닙니다. 화면에는 댓글 원문 대신 `신고하신 문제를 해결했습니다.`만 표시합니다. 근거를 확인하지 못한 종료는 `종료됨`으로 표시하며, 실제 문제가 해결되지 않았다고 역으로 단정하지 않습니다. 조회 한도와 실패 처리는 [공개 피드백 검수](docs/service_observability.md#공개-피드백)를 따릅니다.
+
+```bash
+python scripts/search_integrity_regression_test.py
+python scripts/report_integrity_regression_test.py
+python scripts/library_relay_regression_test.py
+node scripts/frontend_regression_test.cjs
+node scripts/convenience_regression_test.cjs
+```
+
+### 도서관 기억과 서재 백업·복원
+
+도서관 필터에서 `선택한 도서관 기억하기`를 선택한 경우에만 이 브라우저에 저장하며, URL의 도서관 지정이 우선합니다. `전체 보기`는 기억한 선택을 지우지 않습니다. 내 서재의 백업은 모든 개인 서재를 JSON 파일로 내려받고, 복원은 검증·확인 후 기존 서재를 유지하며 새 서재로 추가합니다. 서버 전송·로그인은 없습니다.
+
+백업은 `format="soulib-shelf-backup"`, 파일 `version=1`·내부 `state.version=2`, 최대 5MiB이며 서재·책의 ISO 날짜를 보존합니다. 백업·복원 전 기존 v2의 참조·메타데이터·`import_ref`도 엄격히 검증하며, 저장값이 null이거나 legacy 배열인 경우는 기존 정규화 경로를 사용합니다.
+
 ## 환경변수
 
 필요한 값은 `.env.example`을 참고합니다. 기본 실시간 검색은 별도 DB 없이 실행됩니다.

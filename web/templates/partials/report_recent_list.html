@@ -13,8 +13,9 @@
                         <span>{{ report.category }}</span>
                         {% if report.is_new %}
                             <span class="report-status is-new">방금 접수</span>
-                        {% endif %}
+                        {% else %}
                         <span class="report-status">{{ report.status_label or "접수됨" }}</span>
+                        {% endif %}
                         {% if report.issue_url %}
                             <a class="report-issue-link" href="{{ report.issue_url }}" target="_blank" rel="noopener noreferrer">이슈 #{{ report.issue_number }}</a>
                         {% endif %}

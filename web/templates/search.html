@@ -37,6 +37,8 @@
                     <span class="toggle-label">결과 내 재검색</span>
                 </label>
             </div>
+            <p class="library-scope" id="library-scope" hidden><span id="library-scope-label"></span><span aria-hidden="true"> · </span><button type="button" id="library-scope-all">전체 보기</button></p>
+            <p class="library-preference-status" id="library-preference-status" role="status" aria-live="polite" hidden></p>
         </div>
 
         <div class="summary-row">
@@ -82,6 +84,7 @@
         <div class="sheet-right">
             <div class="sheet-label" id="sheet-label"></div>
             <div class="sheet-options" id="sheet-options"></div>
+            <label class="sheet-remember" id="sheet-remember" hidden><input type="checkbox" id="remember-libraries">선택한 도서관 기억하기</label>
         </div>
     </div>
     <div class="sheet-actions">
@@ -94,9 +97,11 @@
 <script>
     const LIB_URLS = {{ lib_url_map|tojson|safe }};
 </script>
-<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20260526a') }}"></script>
+<script src="{{ url_for('static', filename='js/library_preferences.js', v='20261019a') }}"></script>
+<script>window.SoulibLibraryPreferences.configure({{ library_registry|default([])|tojson|safe }});</script>
+<script src="{{ url_for('static', filename='js/shelf_storage.js', v='20261019a') }}"></script>
 <script src="{{ url_for('static', filename='js/shelf_picker.js', v='20261012a') }}"></script>
-<script src="{{ url_for('static', filename='js/search.js', v='live20261014a') }}"></script>
+<script src="{{ url_for('static', filename='js/search.js', v='live20261019a') }}"></script>
 {% endblock %}
 
 {% block scripts %}
