@@ -80,6 +80,58 @@ class ReportIntegrityTests(unittest.TestCase):
         self.app.register_blueprint(reports.report_bp)
         self.client = self.app.test_client()
 
+    def test_renamed_repository_is_canonical_without_changing_other_repositories(self):
+        cases = (
+            ("pkkong/library_crawler", "pkkong/soulibrary"),
+            ("  PKKONG/Library_Crawler \n", "pkkong/soulibrary"),
+            ("pkkong/soulibrary", "pkkong/soulibrary"),
+            ("  OtherOwner/CustomRepo  ", "OtherOwner/CustomRepo"),
+            ("other-owner/library_crawler", "other-owner/library_crawler"),
+            ("", "pkkong/soulibrary"),
+        )
+        for configured, expected in cases:
+            with self.subTest(configured=configured), patch.dict(os.environ, {"GITHUB_ISSUE_REPO": configured}):
+                self.assertEqual(reports._github_repo(), expected)
+        with patch.dict(os.environ):
+            os.environ.pop("GITHUB_ISSUE_REPO", None)
+            self.assertEqual(reports._github_repo(), "pkkong/soulibrary")
+
+    def test_legacy_repository_routes_list_comments_and_creation_to_canonical_endpoint(self):
+        for configured in ("pkkong/library_crawler", "  PKKONG/Library_Crawler  "):
+            with self.subTest(configured=configured), patch.dict(os.environ, {"GITHUB_ISSUE_REPO": configured}):
+                with patch.object(reports.requests, "get", side_effect=[
+                    Response([issue(7, "closed", state_reason="completed", comments=1)]),
+                    Response([comment()]),
+                ]) as get, patch.object(reports.requests, "post", return_value=Response(issue(42), 201)) as post:
+                    recent = self.client.get("/api/reports/recent")
+                    created = self.client.post("/api/reports", json={"message": "오프라인 검증을 위한 신고 내용"})
+                self.assertEqual(recent.status_code, 200)
+                self.assertIn("해결됨", recent.get_json()["html"])
+                self.assertEqual(created.status_code, 201)
+                self.assertEqual(created.get_json()["report"]["issue_number"], 42)
+                self.assertEqual([call.args[0] for call in get.call_args_list], [
+                    "https://api.github.com/repos/pkkong/soulibrary/issues",
+                    "https://api.github.com/repos/pkkong/soulibrary/issues/7/comments",
+                ])
+                self.assertTrue(all(call.kwargs["allow_redirects"] is False for call in get.call_args_list))
+                self.assertEqual(post.call_args.args[0], "https://api.github.com/repos/pkkong/soulibrary/issues")
+                self.assertEqual(post.call_count, 1)
+
+    def test_custom_repository_preserves_all_configured_endpoints(self):
+        with patch.dict(os.environ, {"GITHUB_ISSUE_REPO": "  OtherOwner/CustomRepo  "}):
+            with patch.object(reports.requests, "get", side_effect=[
+                Response([issue(7, "closed", state_reason="completed", comments=1)]),
+                Response([comment()]),
+            ]) as get, patch.object(reports.requests, "post", return_value=Response(issue(42), 201)) as post:
+                self.assertEqual(self.client.get("/api/reports/recent").status_code, 200)
+                self.assertEqual(self.client.post("/api/reports", json={"message": "오프라인 검증을 위한 신고 내용"}).status_code, 201)
+        self.assertEqual([call.args[0] for call in get.call_args_list], [
+            "https://api.github.com/repos/OtherOwner/CustomRepo/issues",
+            "https://api.github.com/repos/OtherOwner/CustomRepo/issues/7/comments",
+        ])
+        self.assertTrue(all(call.kwargs["allow_redirects"] is False for call in get.call_args_list))
+        self.assertEqual(post.call_args.args[0], "https://api.github.com/repos/OtherOwner/CustomRepo/issues")
+
     def test_closed_states_without_evidence_never_claim_resolved(self):
         for reason in (None, "completed", "not_planned", "duplicate", "unknown"):
             with self.subTest(reason=reason):
