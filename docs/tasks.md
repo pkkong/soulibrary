@@ -110,7 +110,7 @@
 
 ### 상태 정확성·연결 후속(2026-10-20)
 
-- Bookcube·강남·서울도서관·서울교육청: 요청 ID 완전 일치·상세/목록 동일 책·명시 수량·JSON/XML 식별값·실패 cache 금지의 [구현 전 게이트](service_observability.md#책-식별자수량저자-표시)를 확정했다. 구현·공급사별 회귀·실제 production 상태 검증은 아직 완료가 아니다.
+- Bookcube·강남·서울도서관·서울교육청: [공통 상태 검수 계약](service_observability.md#책-식별자수량저자-표시)의 구현·오프라인 QA를 완료했고, [PR #64](https://github.com/pkkong/soulibrary/pull/64)의 `2cc85fb` [CI](https://github.com/pkkong/soulibrary/actions/runs/39440250655)를 통과했다. 공식 응답 표본의 새 parser 정상 처리·다른 ID 거절도 확인했으며, 최종 production 배포·실제 상태 검증은 별도 대기다.
 - 강서·송파: 기존 4.5초 기관/relay·5.8초 검색 예산과 TLS·공개 카탈로그 접근 범위를 유지해 추가 조사한다. 회원용 API·임의 proxy·새 유료 서비스·TLS 검증 완화를 도입하지 않으며, 실제 cache miss 검색의 책 일치·같은 책 상태·타기관 회귀를 통과한 뒤에만 복구로 기록한다. 현재 복구는 미검증이다.
 
 ### 나머지 감사 항목

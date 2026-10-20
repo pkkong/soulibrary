@@ -77,7 +77,7 @@
 - 보유·대출·예약은 각각 명시된 숫자가 있어야 한다. 누락·비정상·중복 숫자를 0으로 채우지 않고 실패로 처리하며 실패 상태는 cache하지 않는다. 세 숫자가 명시된 0인 경우는 정상 값으로 보존한다.
 - JSON/XML도 요청 ID와 응답 식별값을 비교해 일치하는 항목 하나만 선택한다. 응답 ID 누락·불일치·중복을 첫 항목 선택이나 요청 ID를 응답에 복사하는 방식으로 보완하지 않는다.
 - 저자명 끝의 `저`·`글`·`역`을 일괄 삭제하지 않는다. 역할 표기 정리와 이름 보존은 normalizer와 YES24 connector에 같은 계약을 적용한다. 도서관 registry는 기관 code와 표시 name을 구분해 제공한다.
-- 기존 `python scripts/search_integrity_regression_test.py`와 `python scripts/library_relay_regression_test.py`를 유지하고, 공급사별 회귀에 ID 부분 충돌·다른 책·누락/중복 ID와 상태·JSON/XML 불일치·누락 수량과 명시적 0·동일 책 fallback·실패 미저장과 성공 cache 재사용을 포함한다. 회귀 계약 확정과 구현·실연결 검증 완료는 [작업 상태](tasks.md)에서 구분한다.
+- `python scripts/search_integrity_regression_test.py`와 `python scripts/library_relay_regression_test.py`로 공급사별 ID 부분 충돌·다른 책·누락/중복 ID와 상태·JSON/XML 불일치·누락 수량과 명시적 0·동일 책 fallback·실패 미저장과 성공 cache 재사용을 확인한다. 구현·오프라인 회귀와 실제 production 검증 완료는 [작업 상태](tasks.md)에서 구분한다.
 
 ### 개인 도서관 설정과 서재 복원
 
