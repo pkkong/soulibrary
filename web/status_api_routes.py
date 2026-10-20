@@ -131,6 +131,15 @@ def _gangnam_list_url(library_code: str) -> str:
     return f"{base_url.rstrip('/')}/elibbook/book_category.asp?mode=&page_num=1&branch=99&supply_code=&strSort=p&ldav="
 
 
+def _unique_status_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate_status_field")
+        result[key] = value
+    return result
+
+
 @status_api_bp.route("/api/kyobo_status")
 def api_kyobo_status():
     library_code = (request.args.get("library_code") or "").strip()
@@ -268,7 +277,7 @@ def api_bookcube_status():
     try:
         res = session.get(detail_url, timeout=7, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
-        status = parse_bookcube_detail_status(res.text)
+        status = parse_bookcube_detail_status(res.text, content_id)
         if status:
             source = "detail"
     except Exception as e:
@@ -326,7 +335,7 @@ def api_gangnam_status():
         attempted.append(detail_url)
         res = session.get(detail_url, timeout=7, headers=headers, verify=False)
         res.raise_for_status()
-        status = parse_gangnam_detail_status(res.content.decode("euc-kr", "replace"))
+        status = parse_gangnam_detail_status(res.content.decode("euc-kr", "replace"), content_id)
     except Exception as e:
         print(f"[status error] {e}")
         print(traceback.format_exc())
@@ -383,8 +392,8 @@ def api_seoul_status():
         url = f"https://elib.seoul.go.kr/api/contents/{content_id}"
         res = session.get(url, timeout=15, headers=DEFAULT_HEADERS, verify=False)
         res.raise_for_status()
-        data = res.json()
-        status = parse_seoul_status(data)
+        data = res.json(object_pairs_hook=_unique_status_object)
+        status = parse_seoul_status(data, content_id)
         if not status:
             raise RuntimeError("status_missing")
         payload = {"content_id": content_id, "status": status}
@@ -423,15 +432,15 @@ def api_sen_status():
         content_type = (res.headers.get("Content-Type", "") or "").lower()
         if "json" in content_type and not res.text.lstrip().startswith("<"):
             try:
-                data = res.json()
+                data = res.json(object_pairs_hook=_unique_status_object)
             except Exception as e:
                 print(f"[status error] {e}")
                 print(traceback.format_exc())
                 data = None
         if data is not None:
-            status = parse_sen_status(data)
+            status = parse_sen_status(data, content_id)
         if not status:
-            status = parse_sen_xml_status(res.text)
+            status = parse_sen_xml_status(res.text, content_id)
         if not status:
             raise RuntimeError("status_missing")
         payload = {"library_code": library_code, "content_id": content_id, "status": status}

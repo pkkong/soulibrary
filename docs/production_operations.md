@@ -48,7 +48,7 @@ secret은 서버 runtime env로만 주입하고 소스·파일·로그·브라�
 출시 전에 다음을 확인한다.
 
 1. relay 배포의 mode·실제 `icn1` 지역·고정 URL을 확인하고, 메인 앱과 production 도메인이 기존 `iad1`에 남아 있는지 확인한다.
-2. 기관별 실제 검색과 같은 책의 상태 조회를 모두 검증한다. 기존 `icn1` 검색 성공이나 local/mock 통과를 새 relay 검증으로 대신하지 않는다. 강서는 검색과 같은 책의 상태 조회가 모두 통과할 때만 포함하고, 송파 소장은 이번 활성화에서 제외한다. 기관별 검증 결과와 미복구 범위를 별도로 보고한다.
+2. 기관별 실제 cache miss 검색에서 책이 일치하는 결과와 같은 책의 상태 조회를 모두 검증한다. 기존 `icn1` 검색 성공이나 local/mock 통과를 새 relay 검증으로 대신하지 않는다. 강서는 검색과 같은 책의 상태 조회가 모두 통과할 때만 포함하고, 송파 소장은 이번 활성화에서 제외한다. 기관별 검증 결과와 미복구 범위를 별도로 보고한다.
 3. 기존 parser/cache와 기관 식별자를 유지한다. relay를 거치는 기관 작업의 최대 4.5초는 검색의 다중 필드 조회 또는 상태의 detail·list fallback이 공유하며, 기존 검색 fanout 5.8초 예산도 늘리지 않는다. 직접 조회의 기존 timeout은 변경하지 않는다. 실패·시간 초과를 정상 0건으로 바꾸지 않는다. 상세한 인증·응답·cache 검수는 [service_observability.md](service_observability.md)를 따른다.
 4. 활성화할 코드만 선택한 뒤 전체 34개 기관의 새 실패를 비교한다. 관악·동작·도봉의 검색과 상태, 공유 서재 create/read, sitemap XML, 기존 CI와 production live smoke를 확인한다.
 5. `LIBRARY_RELAY_ENABLED`를 OFF로 바꾸고 재배포하면 기존 직접 조회로 돌아오는지 확인한다. 되돌린 뒤 메인 mode·`iad1`·기존 성공 기관과 공유 서재를 다시 확인한다. 필요하면 이전 메인 deployment로 rollback한다.

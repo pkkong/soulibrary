@@ -1370,7 +1370,12 @@ def main():
     if (dobong_session.calls[0]["params"] or {}).get("product_cd") != "002":
         raise AssertionError(f"dobong status did not request product_cd=002: {dobong_session.calls}")
 
-    gangnam_html = "보유 3 대출 2 예약 0".encode("euc-kr")
+    gangnam_html = (
+        '<html><body><div class="book_warp"><div class="book_info"><div class="current">'
+        '<span>보유 <strong>3</strong></span><span>대출 <strong>2</strong></span>'
+        '<span>예약 <strong>0</strong></span></div></div></div>'
+        '<input type="hidden" name="book_num" value="Y167892129"></body></html>'
+    ).encode("euc-kr")
     gangnam_session = FakeStatusSession(FakeStatusResponse(content=gangnam_html))
     status_api_routes.get_status_session = lambda: gangnam_session
     try:

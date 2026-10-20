@@ -72,10 +72,12 @@
 
 ### 책 식별자·수량·저자 표시
 
+- 공급사 공통 게이트: YES24·Bookcube·강남·서울도서관·서울교육청의 상태는 요청 ID와 완전히 일치하는 책 하나의 근거를 확인한 뒤 읽는다. 상세와 목록 fallback 모두 동일한 책의 식별 근거를 확인하며, ID 부분 문자열·주변 텍스트·목록 첫 항목만으로 책을 선택하지 않는다. 다른 책·식별 근거 누락·중복 일치는 실패이며 cache하지 않는다.
 - YES24 직접 조회와 relay는 공통 `parse_yes24_status()`에서 요청한 `goods_id`와 일치하는 책 하나의 상태만 읽는다. 상세의 ID 근거와 목록 fallback의 정확한 책 링크를 확인하고, 다른 책·누락 ID·중복 책/상태 블록은 성공으로 처리하지 않는다.
 - 보유·대출·예약은 각각 명시된 숫자가 있어야 한다. 누락·비정상·중복 숫자를 0으로 채우지 않고 실패로 처리하며 실패 상태는 cache하지 않는다. 세 숫자가 명시된 0인 경우는 정상 값으로 보존한다.
+- JSON/XML도 요청 ID와 응답 식별값을 비교해 일치하는 항목 하나만 선택한다. 응답 ID 누락·불일치·중복을 첫 항목 선택이나 요청 ID를 응답에 복사하는 방식으로 보완하지 않는다.
 - 저자명 끝의 `저`·`글`·`역`을 일괄 삭제하지 않는다. 역할 표기 정리와 이름 보존은 normalizer와 YES24 connector에 같은 계약을 적용한다. 도서관 registry는 기관 code와 표시 name을 구분해 제공한다.
-- `python scripts/search_integrity_regression_test.py`와 `python scripts/library_relay_regression_test.py`로 직접/relay의 ID·수량·실패 cache 격리·저자명 회귀를 확인한다. Bookcube·강남의 상태 ID 부분 매칭과 서울도서관·서울교육청 JSON 첫 항목 선택은 이 수정의 완료 범위가 아니며 별도 감사 대기 항목이다.
+- `python scripts/search_integrity_regression_test.py`와 `python scripts/library_relay_regression_test.py`로 공급사별 ID 부분 충돌·다른 책·누락/중복 ID와 상태·JSON/XML 불일치·누락 수량과 명시적 0·동일 책 fallback·실패 미저장과 성공 cache 재사용을 확인한다. 구현·오프라인 회귀와 실제 production 검증 완료는 [작업 상태](tasks.md)에서 구분한다.
 
 ### 개인 도서관 설정과 서재 복원
 

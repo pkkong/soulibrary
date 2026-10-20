@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import json
 import os
 from pathlib import Path
 import sys
@@ -14,7 +15,11 @@ sys.path.insert(0, str(ROOT / "web"))
 import requests
 from flask import Flask, template_rendered
 
-from adapters.status_parsers import parse_yes24_status
+from adapters.status_parsers import (
+    parse_bookcube_detail_status, parse_bookcube_status, parse_gangnam_detail_status,
+    parse_gangnam_status, parse_seoul_status, parse_sen_status, parse_sen_xml_status,
+    parse_yes24_status,
+)
 from live_search.connectors.yes24 import Yes24Connector
 from live_search.models import LiveSearchResult
 from live_search.normalizer import clean_author_display, merge_live_results, normalize_author, result_group_key
@@ -181,6 +186,267 @@ class Yes24RouteTests(unittest.TestCase):
         self.assertEqual(value.status_code, 502)
         self.assertIsNone(value.json["status"])
         self.assertIsNone(status_api_routes.STATUS_CACHE.get("yes24:gwanak:222"))
+
+
+# Minimal structures verified against the public sites on 2026-10-20. Keep only
+# book identity and current counts; no descriptions, account fields, or loan IDs.
+def cube_counts(loaned=1, total=3, reserved=2, kind="i2"):
+    return f'<ul class="{kind}"><li><p>대출</p>{loaned}/{total}</li><li><p>예약</p>{reserved}</li><li>누적대출 99</li></ul>'
+
+
+def cube_card(content_id="222", counts=None):
+    return (f'<li class="item"><div class="subject"><a href="javascript:goView(\'{content_id}\',\'\',\'book\',\'N\');">검증 도서</a></div>'
+            + (cube_counts() if counts is None else counts) + '</li>')
+
+
+def cube_list(*cards):
+    return '<html><body><ul id="detail_list" class="list typelist">' + ''.join(cards) + '</ul></body></html>'
+
+
+def cube_detail(content_id="222", counts=None):
+    return ('<html><body><div class="book_view"><div class="detail_info">'
+            + (cube_counts(kind="state") if counts is None else counts) + '</div></div>'
+            + f'<input type="hidden" name="book_num" value="{content_id}"></body></html>')
+
+
+def gangnam_counts(owned=3, loaned=1, reserved=2):
+    return (f'<div class="current"><span>보유 <strong>{owned}</strong></span>'
+            f'<span>대출 <strong>{loaned}</strong></span><span>예약 <strong>{reserved}</strong></span></div>')
+
+
+def gangnam_card(content_id="222", counts=None):
+    return (f'<div class="book"><div class="list_info"><div class="book_title"><a href="book_detail.asp?book_num={content_id}">검증 도서</a></div>'
+            + (gangnam_counts() if counts is None else counts) + '</div></div>')
+
+
+def gangnam_list(*cards):
+    return '<html><body><div class="contents book"><div class="book_list_body catalog">' + ''.join(cards) + '</div></div></body></html>'
+
+
+def gangnam_detail(content_id="222", counts=None):
+    return ('<html><body><div class="book_warp"><div class="book_info">'
+            + (gangnam_counts() if counts is None else counts) + '</div></div>'
+            + f'<input type="hidden" name="book_num" value="{content_id}"></body></html>')
+
+
+def content_record(content_id="222", loaned=1, total=3, reserved=2):
+    return {"contentsKey": content_id, "currentLoanCount": loaned, "contentsCopys": total, "currentResvCount": reserved}
+
+
+def xml_record(content_id="222", loaned=1, total=3, reserved=2):
+    return (f'<Contents><contentsKey>{content_id}</contentsKey><currentLoanCount>{loaned}</currentLoanCount>'
+            f'<contentsCopys>{total}</contentsCopys><currentResvCount>{reserved}</currentResvCount></Contents>')
+
+
+def xml_document(*records):
+    return '<Map>' + ''.join(records) + '</Map>'
+
+
+def api_response(value, content_type="application/json"):
+    result = response(json.dumps(value) if not isinstance(value, str) else value)
+    result.headers["Content-Type"] = content_type
+    return result
+
+
+def gangnam_response(document):
+    result = response(document)
+    result._content = document.encode("euc-kr")
+    result.encoding = "euc-kr"
+    return result
+
+
+class BookcubeIdentityTests(unittest.TestCase):
+    def test_list_uses_exact_card_identity_and_ignores_grid_copy(self):
+        document = cube_list(cube_card("2220", cube_counts(8, 9, 7)), cube_card())
+        document = document.replace('</body>', '<ul id="grid_list">' + cube_card(counts="") + '</ul></body>')
+        self.assertEqual(parse_bookcube_status(document, "222"), {"loaned": 1, "total": 3, "reserved": 2})
+        self.assertIsNone(parse_bookcube_status(cube_list(cube_card("2220")), "222"))
+
+    def test_id_in_text_or_nearby_book_cannot_supply_counts(self):
+        self.assertIsNone(parse_bookcube_status(cube_list(cube_card("111", cube_counts() + '222')), "222"))
+        self.assertIsNone(parse_bookcube_status(cube_list(cube_card("111"), cube_card(counts="")), "222"))
+        self.assertIsNone(parse_bookcube_status('<html><body>222' + cube_counts() + '</body></html>', "222"))
+
+    def test_duplicate_cards_and_conflicting_links_are_ambiguous(self):
+        self.assertIsNone(parse_bookcube_status(cube_list(cube_card(), cube_card()), "222"))
+        conflicting = cube_card().replace('</li>', '<a href="/FxLibrary/product/view/?num=111">다른 책</a></li>', 1)
+        self.assertIsNone(parse_bookcube_status(cube_list(conflicting), "222"))
+        ambiguous = cube_card().replace("javascript:goView('222','','book','N');", "/FxLibrary/product/view/?num=222&amp;num=111")
+        self.assertIsNone(parse_bookcube_status(cube_list(ambiguous), "222"))
+
+    def test_detail_requires_matching_hidden_identity_and_own_state(self):
+        self.assertEqual(parse_bookcube_detail_status(cube_detail(), "222"), {"loaned": 1, "total": 3, "reserved": 2})
+        for document in (cube_detail("2220"), cube_detail().replace('name="book_num"', 'name="other"'), cube_counts(kind="state")):
+            self.assertIsNone(parse_bookcube_detail_status(document, "222"))
+        self.assertIsNone(parse_bookcube_detail_status(cube_detail().replace('</body>', '<input name="book_num" value="111"></body>'), "222"))
+        self.assertIsNone(parse_bookcube_detail_status(cube_detail(counts=cube_card("111", cube_counts(kind="state"))), "222"))
+        repeated = cube_detail().replace('</body>', '<input name="book_num" value="222"></body>')
+        self.assertEqual(parse_bookcube_detail_status(repeated, "222"), {"loaned": 1, "total": 3, "reserved": 2})
+
+    def test_missing_invalid_and_duplicate_counts_fail_but_explicit_zero_succeeds(self):
+        invalid = (cube_counts(reserved=""), cube_counts(reserved=-1), cube_counts(total="1,2"),
+                   cube_counts(loaned="oops"), cube_counts().replace('</ul>', '<li>예약 9</li></ul>'),
+                   cube_counts() + cube_counts())
+        for counts in invalid:
+            with self.subTest(counts=counts):
+                self.assertIsNone(parse_bookcube_status(cube_list(cube_card(counts=counts)), "222"))
+                self.assertIsNone(parse_bookcube_detail_status(cube_detail(counts=counts.replace('class="i2"', 'class="state"')), "222"))
+        self.assertEqual(parse_bookcube_detail_status(cube_detail(counts=cube_counts(0, 0, 0, "state")), "222"), {"loaned": 0, "total": 0, "reserved": 0})
+        self.assertEqual(parse_bookcube_status(cube_list(cube_card(counts=cube_counts(0, 0, 0))), "222"), {"loaned": 0, "total": 0, "reserved": 0})
+
+
+class GangnamIdentityTests(unittest.TestCase):
+    def test_list_selects_requested_book_instead_of_prefix_or_parent(self):
+        document = gangnam_list(gangnam_card("2220", gangnam_counts(9, 8, 7)), gangnam_card())
+        self.assertEqual(parse_gangnam_status(document, "222"), {"owned": 3, "loaned": 1, "reserved": 2})
+        self.assertIsNone(parse_gangnam_status(gangnam_list(gangnam_card("2220")), "222"))
+        self.assertIsNone(parse_gangnam_status(gangnam_list(gangnam_card("111"), gangnam_card(counts="")), "222"))
+
+    def test_detail_requires_matching_identity_and_ignores_due_date_numbers(self):
+        counts = gangnam_counts().replace('<div class="current">', '<div class="current"><span>대출예정일 <span><strong>2026-11-13</strong></span>')
+        self.assertEqual(parse_gangnam_detail_status(gangnam_detail(counts=counts), "222"), {"owned": 3, "loaned": 1, "reserved": 2})
+        for document in (gangnam_detail("2220"), gangnam_detail().replace('name="book_num"', 'name="other"'), '보유 3 대출 1 예약 2'):
+            self.assertIsNone(parse_gangnam_detail_status(document, "222"))
+        self.assertIsNone(parse_gangnam_detail_status(gangnam_detail(counts=gangnam_card("111")), "222"))
+        repeated = gangnam_detail().replace('</body>', '<input name="book_num" value="222"></body>')
+        self.assertEqual(parse_gangnam_detail_status(repeated, "222"), {"owned": 3, "loaned": 1, "reserved": 2})
+        self.assertIsNone(parse_gangnam_detail_status(repeated.replace('value="222"', 'value="111"', 1), "222"))
+
+    def test_duplicates_conflicting_identity_and_partial_numbers_fail(self):
+        self.assertIsNone(parse_gangnam_status(gangnam_list(gangnam_card(), gangnam_card()), "222"))
+        conflicting = gangnam_card().replace('</a>', '</a><a href="book_detail.asp?book_num=111">다른 책</a>', 1)
+        self.assertIsNone(parse_gangnam_status(gangnam_list(conflicting), "222"))
+        for counts in (gangnam_counts(reserved=""), gangnam_counts(owned=-1), gangnam_counts(loaned="1.0"),
+                       gangnam_counts().replace('</div>', '<span>보유 <strong>9</strong></span></div>'), gangnam_counts() + gangnam_counts()):
+            with self.subTest(counts=counts):
+                self.assertIsNone(parse_gangnam_status(gangnam_list(gangnam_card(counts=counts)), "222"))
+                self.assertIsNone(parse_gangnam_detail_status(gangnam_detail(counts=counts), "222"))
+
+    def test_explicit_zero_is_valid(self):
+        expected = {"owned": 0, "loaned": 0, "reserved": 0}
+        self.assertEqual(parse_gangnam_status(gangnam_list(gangnam_card(counts=gangnam_counts(0, 0, 0))), "222"), expected)
+        self.assertEqual(parse_gangnam_detail_status(gangnam_detail(counts=gangnam_counts(0, 0, 0)), "222"), expected)
+
+
+class PublicApiIdentityTests(unittest.TestCase):
+    def test_json_selects_requested_record_instead_of_first_and_supports_dict(self):
+        expected = {"loaned": 1, "total": 3, "reserved": 2}
+        for parse in (parse_seoul_status, parse_sen_status):
+            self.assertEqual(parse({"Contents": [content_record("111", 8, 9, 7), content_record()]}, "222"), expected)
+            self.assertEqual(parse({"Contents": content_record()}, "222"), expected)
+
+    def test_json_missing_wrong_duplicate_ids_and_empty_contents_are_failures(self):
+        without_id = content_record(); without_id.pop("contentsKey")
+        for parse in (parse_seoul_status, parse_sen_status):
+            for data in ({"Contents": {}}, {"Contents": []}, {"Contents": content_record("2220")},
+                         {"Contents": without_id}, {"Contents": [content_record(), content_record()]}, content_record()):
+                with self.subTest(parse=parse.__name__, data=data):
+                    self.assertIsNone(parse(data, "222"))
+
+    def test_json_all_counts_must_be_explicit_integers(self):
+        for parse in (parse_seoul_status, parse_sen_status):
+            for key in ("currentLoanCount", "contentsCopys", "currentResvCount"):
+                for value in (None, "", -1, True, False, 1.5, "1.0", "-1", "1,2", [], {}):
+                    record = content_record(); record[key] = value
+                    with self.subTest(parse=parse.__name__, key=key, value=value):
+                        self.assertIsNone(parse({"Contents": record}, "222"))
+                record = content_record(); record.pop(key)
+                self.assertIsNone(parse({"Contents": record}, "222"))
+            self.assertEqual(parse({"Contents": content_record(loaned=0, total="0", reserved=0)}, "222"), {"loaned": 0, "total": 0, "reserved": 0})
+
+    def test_xml_uses_same_record_for_id_and_all_counts(self):
+        self.assertEqual(parse_sen_xml_status(xml_document(xml_record("111", 8, 9, 7), xml_record()), "222"), {"loaned": 1, "total": 3, "reserved": 2})
+        self.assertEqual(parse_sen_xml_status(xml_document(xml_record(loaned=0, total=0, reserved=0)), "222"), {"loaned": 0, "total": 0, "reserved": 0})
+        for document in (xml_document(xml_record("2220")), xml_document(xml_record(), xml_record()),
+                         xml_document(xml_record().replace('<contentsKey>222</contentsKey>', '')),
+                         xml_document(xml_record().replace('<currentResvCount>2</currentResvCount>', '')),
+                         xml_document(xml_record().replace('</Contents>', '<contentsCopys>9</contentsCopys></Contents>')),
+                         xml_document(xml_record().replace('</Contents>', '<contentsKey>222</contentsKey></Contents>')),
+                         xml_document(xml_record(loaned=-1)), xml_document(xml_record(total="1.0")),
+                         '<Map><Contents><contentsKey>222</contentsKey></Contents><currentLoanCount>1</currentLoanCount><contentsCopys>3</contentsCopys><currentResvCount>2</currentResvCount></Map>',
+                         '<!DOCTYPE Map [<!ENTITY id "222">]><Map><Contents><contentsKey>&id;</contentsKey></Contents></Map>'):
+            with self.subTest(document=document):
+                self.assertIsNone(parse_sen_xml_status(document, "222"))
+
+
+class OtherStatusRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.network = patch("requests.sessions.Session.request", side_effect=AssertionError("Offline test attempted network"))
+        self.network.start(); self.addCleanup(self.network.stop)
+        self.addCleanup(status_api_routes.STATUS_CACHE.clear)
+        status_api_routes.STATUS_CACHE.clear()
+        app = Flask("other-status-integrity-tests"); app.register_blueprint(status_api_routes.status_api_bp)
+        self.client = app.test_client(); self.session = MagicMock()
+        self.transport = patch.object(status_api_routes, "get_status_session", return_value=self.session)
+        self.transport.start(); self.addCleanup(self.transport.stop)
+
+    def get(self, route):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return self.client.get(route)
+
+    def test_wrong_detail_and_fallback_never_cache_another_book(self):
+        cases = (
+            ("/api/bookcube_status?library_code=geumcheon&content_id=222", "bookcube:geumcheon:222", cube_detail("111"), cube_list(cube_card("2220", cube_counts(8, 9, 7)))),
+            ("/api/gangnam_status?library_code=gangnam&content_id=222", "gangnam:gangnam:222", gangnam_detail("111"), gangnam_list(gangnam_card("2220", gangnam_counts(9, 8, 7)))),
+        )
+        for route, key, wrong_detail, wrong_list in cases:
+            with self.subTest(route=route):
+                self.session.get.reset_mock()
+                encode = gangnam_response if route.startswith('/api/gangnam_status') else response
+                self.session.get.side_effect = [encode(wrong_detail), encode(wrong_list)] * 2
+                for _ in range(2):
+                    self.assertEqual(self.get(route).status_code, 502)
+                    self.assertIsNone(status_api_routes.STATUS_CACHE.get(key))
+                self.assertEqual(self.session.get.call_count, 4)
+
+    def test_correct_requested_fallback_is_cached(self):
+        for route, key, bad, good, expected in (
+            ("/api/bookcube_status?library_code=geumcheon&content_id=222", "bookcube:geumcheon:222", cube_detail("111"), cube_list(cube_card("111"), cube_card()), {"loaned": 1, "total": 3, "reserved": 2}),
+            ("/api/gangnam_status?library_code=gangnam&content_id=222", "gangnam:gangnam:222", gangnam_detail("111"), gangnam_list(gangnam_card("111"), gangnam_card()), {"owned": 3, "loaned": 1, "reserved": 2}),
+        ):
+            with self.subTest(route=route):
+                encode = gangnam_response if route.startswith('/api/gangnam_status') else response
+                self.session.get.reset_mock(); self.session.get.side_effect = [encode(bad), encode(good)]
+                value = self.get(route)
+                self.assertEqual(value.status_code, 200); self.assertEqual(value.json["status"], expected)
+                self.assertEqual(self.get(route).json, value.json); self.assertEqual(self.session.get.call_count, 2)
+
+    def test_public_api_wrong_missing_or_duplicate_record_is_failure_not_cached_zero(self):
+        for route, key in (("/api/seoul_status?content_id=222", "seoul:222"), ("/api/sen_status?library_code=sen_owned&content_id=222", "sen:sen_owned:222")):
+            for data in ({"Contents": {}}, {"Contents": content_record("2220")}, {"Contents": [content_record(), content_record()]}, {"Contents": {"contentsKey": "222"}}):
+                with self.subTest(route=route, data=data):
+                    self.session.get.reset_mock(); self.session.get.side_effect = None; self.session.get.return_value = api_response(data)
+                    for _ in range(2):
+                        value = self.get(route); self.assertEqual(value.status_code, 502); self.assertIsNone(value.json["status"])
+                        self.assertIsNone(status_api_routes.STATUS_CACHE.get(key))
+                    self.assertEqual(self.session.get.call_count, 2)
+
+    def test_duplicate_json_fields_and_invalid_xml_counts_do_not_cache(self):
+        duplicate = '{"Contents":{"contentsKey":"222","contentsCopys":3,"contentsCopys":9,"currentLoanCount":1,"currentResvCount":2}}'
+        for route, key in (("/api/seoul_status?content_id=222", "seoul:222"), ("/api/sen_status?library_code=sen_owned&content_id=222", "sen:sen_owned:222")):
+            self.session.get.return_value = api_response(duplicate)
+            self.assertEqual(self.get(route).status_code, 502); self.assertIsNone(status_api_routes.STATUS_CACHE.get(key))
+        self.session.get.return_value = api_response(xml_document(xml_record(reserved="")), "application/xhtml+xml")
+        self.assertEqual(self.get('/api/sen_status?library_code=sen_owned&content_id=222').status_code, 502)
+        self.assertIsNone(status_api_routes.STATUS_CACHE.get('sen:sen_owned:222'))
+
+    def test_explicit_zero_success_is_cached_and_subscription_contract_is_unchanged(self):
+        cases = (
+            ("/api/bookcube_status?library_code=geumcheon&content_id=222", response(cube_detail(counts=cube_counts(0, 0, 0, "state")))),
+            ("/api/gangnam_status?library_code=gangnam&content_id=222", gangnam_response(gangnam_detail(counts=gangnam_counts(0, 0, 0)))),
+            ("/api/seoul_status?content_id=222", api_response({"Contents": content_record(loaned=0, total=0, reserved=0)})),
+            ("/api/sen_status?library_code=sen_owned&content_id=222", api_response(xml_document(xml_record(loaned=0, total=0, reserved=0)), "application/xhtml+xml")),
+        )
+        for route, value in cases:
+            with self.subTest(route=route):
+                self.session.get.reset_mock(); self.session.get.side_effect = None; self.session.get.return_value = value
+                first = self.get(route); self.assertEqual(first.status_code, 200)
+                self.assertEqual(set(first.json["status"].values()), {0})
+                self.assertEqual(self.get(route).json, first.json); self.assertEqual(self.session.get.call_count, 1)
+        self.session.get.reset_mock()
+        subs = self.get('/api/sen_status?library_code=sen_subs&content_id=unlimited')
+        self.assertEqual(subs.status_code, 200); self.assertEqual(subs.json["status"], {"loaned": 0, "total": 1, "reserved": 0})
+        self.session.get.assert_not_called()
 
 
 class AuthorIdentityTests(unittest.TestCase):
