@@ -1,12 +1,12 @@
 # 송파 소장형 연결 인수인계
 
-마지막 검증일: **2026-10-19(KST)**. 송파 소장형 검색은 **production 미복구**다. 이 문서는 다음 작업자가 확인된 사실과 아직 확인하지 못한 원인을 구분해 이어가기 위한 기준이다.
+마지막 검증일: **2026-10-20(KST)**. 송파 소장형 검색은 **production 미복구**다. 이 문서는 다음 작업자가 확인된 사실과 아직 확인하지 못한 원인을 구분해 이어가기 위한 기준이다.
 
 ## 대상과 현재 운영
 
 - 대상은 `songpa_owned`, [송파 전자도서관](https://ebook.splib.or.kr/)의 **YES24 소장형**이다. 송파책박물관 교보와 송파 구독형은 다른 서비스이므로 대체 검색 성공을 이 기관의 복구로 세지 않는다.
-- 현재 main은 `iad1`, 선택적 국내 relay는 `icn1`이다. 성북·영등포·강서는 relay 검색과 같은 책의 상태 조회에 성공한 과거 기록이 있으나, 2026-10-19 강서의 검색·상태 조회 실패가 다시 확인돼 현재 미복구다. `songpa_owned`도 미복구이며 relay 활성화에서 제외돼 있다. 최신 연결 상태는 [작업 메모](tasks.md), 운영 절차는 [production_operations.md](production_operations.md)를 따른다.
-- 2026-10-19 production 송파 단독 cache miss 검색은 `ConnectTimeout`으로 실패했다. API envelope의 HTTP 200과 빈 결과는 정상 검색 0건이 아니다.
+- 현재 main은 `iad1`, 선택적 국내 relay는 `icn1`이다. 성북·영등포·강서는 relay 검색과 같은 책의 상태 조회에 성공한 과거 기록이 있으나, 2026-10-19 강서의 운영 실패가 다시 확인됐고 10월 20일 production 검색·상태 조회도 실패했다. 같은 날 고립 진단도 운영 예산 내 복구를 입증하지 못했다. `songpa_owned`도 미복구이며 relay 활성화에서 제외돼 있다. 최신 연결 상태는 [작업 메모](tasks.md), 운영 절차는 [production_operations.md](production_operations.md)를 따른다.
+- 2026-10-19 production 송파 단독 cache miss 검색은 `ConnectTimeout`으로 실패했고, 10월 20일 전체 검색 재검수에서도 실패했다. API envelope의 HTTP 200과 빈 결과는 정상 검색 0건이 아니다.
 
 ## 확인된 증거
 
@@ -14,8 +14,11 @@
 |---|---|---|
 | 2026-10-18 일반 인터넷의 국내 로컬 | 공식 host에서 DNS·TCP·인증서 검증을 포함한 TLS·HTTP 200·기존 YES24 parser가 모두 정상 | 해당 로컬 표본에서 공식 주소와 parser가 작동했다. cloud 연결 성공을 입증하지 않는다. |
 | 2026-10-19 같은 Vercel 프로젝트의 고립 `icn1` preview | DNS는 로컬과 같은 대상으로 성공. 진단 종료 15.015초까지 TCP connect가 완료되지 않아 TLS·HTTP에 진입하지 못함 | cloud의 이 표본은 HTTP/HTML 처리 이전에 멈췄다. 운영 timeout을 늘리거나 HTTP header·parser를 바꾸면 해결된다는 근거는 없다. |
+| 2026-10-20 같은 Vercel 프로젝트의 새 고립 `icn1` preview | DNS는 기대한 같은 대상으로 성공했으나 15초 진단 예산 안에 TCP connect가 완료되지 않아 TLS·HTTP 미진입 | 10월 19일의 송파 접속 단계 실패를 재현했으며 production 복구를 입증하지 않는다. |
 
-실제 cloud 증거는 [진단 run 39179951430](https://github.com/pkkong/soulibrary/actions/runs/39179951430)에서 확인한다. 결과의 `ok: true`는 진단 실행 성공이며, `serviceRecoveryVerified: false`와 함께 읽어야 한다. 진단은 production 설정·도메인·환경변수·지역을 변경하지 않았다.
+실제 cloud 증거는 [10월 19일 진단](https://github.com/pkkong/soulibrary/actions/runs/39179951430)과 [10월 20일 비교 진단](https://github.com/pkkong/soulibrary/actions/runs/39440448290)에서 확인한다. 결과의 `ok: true`는 진단 실행 성공이며, `serviceRecoveryVerified: false`와 함께 읽어야 한다. 진단은 production 설정·도메인·환경변수·지역을 변경하지 않았다.
+
+같은 10월 20일 진단에서 강서는 DNS·TCP·인증서 검증을 포함한 TLS를 통과하고 같은 QA 책이 일치하는 HTTP 200을 받았으나, 첫 응답이 운영 4.5초 예산보다 늦어 운영 복구가 아니다. 로컬에서도 공식 검색 HTTP 500과 홈 read timeout을 관찰했으므로 특정 검색 필드의 SQL 문제로 원인을 확정할 수 없다. title-only 대체나 두 필드 중복 요청을 해결책으로 적용할 근거도 아직 없다. 강서의 HTTP 응답 지연과 송파의 TCP 미완료는 서로 구분한다.
 
 진단 구현은 `codex/songpa-connection-fix`의 [Draft PR #60](https://github.com/pkkong/soulibrary/pull/60)에 있으며, 이 기록 시점에는 미병합이다. PR 작성·진단 성공은 production 복구가 아니다. 로컬 보조 증거인 ignored `artifacts/qa/20261018-songpa-phases-local.json`, `artifacts/qa/20261019-songpa-cloud-phases.json`은 다른 작업 환경에 없을 수 있으므로 이 문서와 공개 run의 결과 요약을 우선한다.
 
