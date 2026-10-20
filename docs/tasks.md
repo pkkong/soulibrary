@@ -102,11 +102,16 @@
 | 선택 도서관 기억·상세 우선 정렬 | 구현·독립 회귀·360px/430px/desktop CUA 검수 완료 |
 | 개인 서재 JSON 백업·복원 | 구현·최종 파일 계약 확인·독립 회귀·CUA 취소/성공/중복/실패·포커스 검수 완료 |
 
-다섯 작업의 구현·독립 오프라인 회귀·main CUA 통합 검수는 완료했다. 릴리스 상태는 [PR #62](https://github.com/pkkong/soulibrary/pull/62)의 CI와 해당 merge commit의 production 배포·live smoke 결과에서 확인하고, 상세 근거는 ignored `artifacts/qa/20261019-service-integrity-report.md`에 기록한다. 계약은 [서비스 관측성](service_observability.md)과 [UX/UI 가이드](UX_UI_Guide.md)를 따른다. Bookcube·강남 상태 ID 부분 매칭과 서울도서관·서울교육청 JSON 첫 항목 선택은 별도 감사 대기이며, [송파 미복구](songpa_connectivity.md)도 별도 유지한다.
+다섯 작업의 구현·독립 오프라인 회귀·main CUA 통합 검수는 완료했다. 릴리스 상태는 [PR #62](https://github.com/pkkong/soulibrary/pull/62)의 CI와 해당 merge commit의 production 배포·live smoke 결과에서 확인하고, 상세 근거는 ignored `artifacts/qa/20261019-service-integrity-report.md`에 기록한다. 계약은 [서비스 관측성](service_observability.md)과 [UX/UI 가이드](UX_UI_Guide.md)를 따른다. 당시 완료 범위 밖이던 Bookcube·강남·서울도서관·서울교육청 상태 정확성은 아래 후속 작업으로 이어가며, [송파 미복구](songpa_connectivity.md)도 별도 유지한다.
 
 신고 목록 후속(2026-10-19): 배포 후 최근 목록 HTTP 503을 확인했고, 이전 저장소 이름의 GitHub API 301과 redirect 거절을 재현했다. 실제 production의 이전 이름 설정 여부는 미확인이다. 알려진 이전 이름만 canonical 저장소로 매핑하는 코드 수정과 독립 신고·smoke 회귀는 통과했다. [PR #63](https://github.com/pkkong/soulibrary/pull/63)의 `bf4caf0` [production 재실행](https://github.com/pkkong/soulibrary/actions/runs/39256713238)은 배포·live smoke를 통과했으며, 실제 최근 목록 HTTP 200·`unavailable=false`와 CUA 목록 화면 확인을 완료했다.
 
 강서 연결 후속(2026-10-19): 현재 검색의 relay 예산 소진과 상태 조회 HTTP 502로 미복구다. PR #62 이전 고정 배포에서도 같은 실패를 재현했으므로 새 parser 회귀로 단정하지 않으며, 연결 원인은 미확정으로 남긴다.
+
+### 상태 정확성·연결 후속(2026-10-20)
+
+- Bookcube·강남·서울도서관·서울교육청: 요청 ID 완전 일치·상세/목록 동일 책·명시 수량·JSON/XML 식별값·실패 cache 금지의 [구현 전 게이트](service_observability.md#책-식별자수량저자-표시)를 확정했다. 구현·공급사별 회귀·실제 production 상태 검증은 아직 완료가 아니다.
+- 강서·송파: 기존 4.5초 기관/relay·5.8초 검색 예산과 TLS·공개 카탈로그 접근 범위를 유지해 추가 조사한다. 회원용 API·임의 proxy·새 유료 서비스·TLS 검증 완화를 도입하지 않으며, 실제 cache miss 검색의 책 일치·같은 책 상태·타기관 회귀를 통과한 뒤에만 복구로 기록한다. 현재 복구는 미검증이다.
 
 ### 나머지 감사 항목
 

@@ -93,6 +93,8 @@ Codespaces에서는 포트 `5001`이 자동 포워딩됩니다. 모바일이나 
 
 ### 도서·신고 신뢰 회귀
 
+Bookcube·강남·서울도서관·서울교육청도 요청 ID 완전 일치, 상세/목록의 같은 책 근거, JSON/XML 응답 ID와 명시 수량 검증을 따릅니다. 구현 전 계약과 공급사별 필수 회귀는 [책 식별자·수량 검수](docs/service_observability.md#책-식별자수량저자-표시)를 기준으로 하며, 계약 반영을 구현 완료로 보지 않습니다.
+
 YES24 상태는 요청한 책의 ID와 명시된 보유·대출·예약 숫자가 모두 확인돼야 성공으로 처리합니다. 직접 조회와 relay가 같은 parser를 사용하며, 잘못된 책·누락 숫자·중복 상태 블록은 실패로 처리하고 cache하지 않습니다. 명시된 0은 정상 값이며, 저자 이름 끝의 `저`·`글`·`역`은 이름의 일부일 수 있으므로 일괄 삭제하지 않습니다.
 
 신고를 `해결됨`으로 표시하려면 GitHub issue가 `closed`·`state_reason=completed`이고, `OWNER`·`MEMBER`·`COLLABORATOR` 작성 댓글에 아래 섹션이 있어야 합니다. 섹션의 첫 내용 줄은 정확히 `조치 완료`이며, 댓글 작성 시각도 유효해야 합니다.
@@ -249,7 +251,7 @@ vercel.json -> index.py -> web/app_search.py
 
 Phase 0 운영 경로 정리는 Cloudtype 시절 inventory 기록입니다. 현재 production 운영 기준은 [docs/production_operations.md](docs/production_operations.md)를 우선 확인하고, 레거시/보류 항목 분류는 [docs/phase0_operating_inventory.md](docs/phase0_operating_inventory.md)를 참고합니다.
 
-2026-10-19 검증 기준, main `iad1`과 선택적 `icn1` relay로 성북·영등포·강서는 복구됐지만 송파 소장형 YES24 `songpa_owned`는 미복구이며 relay 활성화에서 제외돼 있습니다. 관련 작업의 근거와 재개·완료 기준은 [송파 연결 인수인계](docs/songpa_connectivity.md)를 먼저 확인합니다.
+main `iad1`과 선택적 `icn1` relay를 사용합니다. 성북·영등포·강서의 relay 검색·상태 조회 성공 기록이 있으나 2026-10-19 강서는 다시 검색·상태 조회 실패를 확인해 현재 미복구이며, 송파 소장형 YES24 `songpa_owned`도 미복구·relay 활성화 제외 상태입니다. 최신 후속 상태는 [작업 메모](docs/tasks.md), 송파의 근거와 재개·완료 기준은 [송파 연결 인수인계](docs/songpa_connectivity.md)를 확인합니다.
 
 자동배포에는 GitHub Actions secret 세 개가 필요합니다.
 

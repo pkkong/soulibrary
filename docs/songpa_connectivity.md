@@ -5,7 +5,7 @@
 ## 대상과 현재 운영
 
 - 대상은 `songpa_owned`, [송파 전자도서관](https://ebook.splib.or.kr/)의 **YES24 소장형**이다. 송파책박물관 교보와 송파 구독형은 다른 서비스이므로 대체 검색 성공을 이 기관의 복구로 세지 않는다.
-- 현재 main은 `iad1`, 선택적 국내 relay는 `icn1`이다. 성북·영등포·강서는 검색과 같은 책의 상태 조회를 검증해 복구했으며, `songpa_owned`는 relay 활성화에서 제외돼 있다. 운영 절차는 [production_operations.md](production_operations.md)를 따른다.
+- 현재 main은 `iad1`, 선택적 국내 relay는 `icn1`이다. 성북·영등포·강서는 relay 검색과 같은 책의 상태 조회에 성공한 과거 기록이 있으나, 2026-10-19 강서의 검색·상태 조회 실패가 다시 확인돼 현재 미복구다. `songpa_owned`도 미복구이며 relay 활성화에서 제외돼 있다. 최신 연결 상태는 [작업 메모](tasks.md), 운영 절차는 [production_operations.md](production_operations.md)를 따른다.
 - 2026-10-19 production 송파 단독 cache miss 검색은 `ConnectTimeout`으로 실패했다. API envelope의 HTTP 200과 빈 결과는 정상 검색 0건이 아니다.
 
 ## 확인된 증거
