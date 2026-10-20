@@ -23,6 +23,7 @@ on:
           - disable
           - retain
           - songpa-diagnose
+          - transport-compare
       relay_url:
         description: Existing immutable relay preview URL for retain mode only
         type: string
@@ -178,7 +179,8 @@ jobs:
     if: >-
       github.repository == 'pkkong/soulibrary' &&
       github.ref == 'refs/heads/codex/songpa-connection-fix' &&
-      github.event_name == 'workflow_dispatch' && inputs.mode == 'songpa-diagnose'
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.mode == 'songpa-diagnose' || inputs.mode == 'transport-compare')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -206,9 +208,10 @@ jobs:
       - name: Install reviewed Vercel CLI
         run: npm install --global vercel@64.2.0
 
-      - name: Run one isolated Seoul Songpa diagnostic
+      - name: Run selected isolated Seoul transport diagnostic
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: python scripts/songpa_connectivity_probe.py
+          SONGPA_DIAGNOSTIC_MODE: ${{ inputs.mode }}
+        run: python scripts/songpa_connectivity_probe.py --mode "$SONGPA_DIAGNOSTIC_MODE"

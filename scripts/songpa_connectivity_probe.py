@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Run one fixed Songpa transport diagnostic in an isolated Seoul preview."""
+"""Run fixed public-library transport diagnostics in an isolated Seoul preview."""
 
+import argparse
 import hashlib
 import hmac
 import json
@@ -24,6 +25,7 @@ import songpa_probe_app as probe_app
 REF = "refs/heads/codex/songpa-connection-fix"
 ROOT = Path(__file__).resolve().parents[1]
 MAX_REPLY = 32768
+MODES = ("songpa-diagnose", "transport-compare")
 
 
 def deploy(environ, secret, run=subprocess.run):
@@ -51,13 +53,32 @@ def deploy(environ, secret, run=subprocess.run):
         return release.safe_url(result.stdout.strip())
 
 
-def invoke(opener, url, secret):
+def _summary(payload):
+    release.require(isinstance(payload, dict)
+                    and payload.get("diagnosticComplete") is True
+                    and payload.get("outcome") in ("request_completed", "request_failed", "budget_exhausted", "probe_failed")
+                    and type(payload.get("requestSucceeded")) is bool
+                    and type(payload.get("elapsedSeconds")) in (int, float)
+                    and 0 <= payload["elapsedSeconds"] <= 20
+                    and isinstance(payload.get("phases"), list) and len(payload["phases"]) <= 64, "diagnostic_invalid_response")
+    events = b"\n".join(json.dumps(event).encode() for event in payload["phases"])
+    events += b"\n" + json.dumps({"kind": "versions", **(payload.get("versions") or {})}).encode()
+    phases, versions, _ = probe_app._event_payload(events)
+    release.require(bool(phases), "diagnostic_unverified")
+    book_match = next((event["bookMatch"] for event in reversed(phases) if event.get("phase") == "body" and "bookMatch" in event), "unverified")
+    return {"outcome": payload["outcome"], "requestSucceeded": payload["requestSucceeded"], "bookMatch": book_match,
+            "elapsedSeconds": round(payload["elapsedSeconds"], 3), "phases": phases, "versions": versions}
+
+
+def invoke(opener, url, secret, mode="songpa-diagnose"):
+    release.require(mode in MODES, "invalid_diagnostic_mode")
+    body = probe_app.COMPARE_BODY if mode == "transport-compare" else probe_app.BODY
     stamp = str(int(time.time()))
-    signature = hmac.new(secret.encode(), stamp.encode() + b"\n" + probe_app.BODY, hashlib.sha256).hexdigest()
-    request = urllib.request.Request(url + "/diagnose", data=probe_app.BODY, method="POST", headers={
+    signature = hmac.new(secret.encode(), stamp.encode() + b"\n" + body, hashlib.sha256).hexdigest()
+    request = urllib.request.Request(url + "/diagnose", data=body, method="POST", headers={
         "Content-Type": "application/json", "X-Songpa-Probe-Timestamp": stamp, "X-Songpa-Probe-Signature": signature})
     try:
-        with opener.open(request, timeout=24) as response:
+        with opener.open(request, timeout=40 if mode == "transport-compare" else 24) as response:
             release.require(response.status == 200, "diagnostic_http_error")
             declared = response.headers.get("Content-Length")
             if declared is not None:
@@ -68,17 +89,13 @@ def invoke(opener, url, secret):
         release.require(isinstance(payload, dict) and payload.get("ok") is True
                         and payload.get("mode") == "songpa-probe" and payload.get("region") == "icn1"
                         and payload.get("diagnosticComplete") is True, "diagnostic_unverified")
-        release.require(payload.get("outcome") in ("request_completed", "request_failed", "budget_exhausted", "probe_failed")
-                        and type(payload.get("requestSucceeded")) is bool
-                        and type(payload.get("elapsedSeconds")) in (int, float)
-                        and 0 <= payload["elapsedSeconds"] <= 20
-                        and isinstance(payload.get("phases"), list) and len(payload["phases"]) <= 64, "diagnostic_invalid_response")
-        events = b"\n".join(json.dumps(event).encode() for event in payload["phases"])
-        events += b"\n" + json.dumps({"kind": "versions", **(payload.get("versions") or {})}).encode()
-        phases, versions, _ = probe_app._event_payload(events)
-        release.require(bool(phases), "diagnostic_unverified")
-        return {"outcome": payload["outcome"], "requestSucceeded": payload["requestSucceeded"],
-                "elapsedSeconds": round(payload["elapsedSeconds"], 3), "phases": phases, "versions": versions}
+        if mode == "transport-compare":
+            records = payload.get("comparison")
+            release.require(isinstance(records, list) and len(records) == 2
+                            and all(isinstance(record, dict) for record in records)
+                            and tuple(record.get("libraryCode") for record in records) == probe_app.COMPARE_CODES, "diagnostic_invalid_comparison")
+            return {"comparison": [{"libraryCode": record["libraryCode"], **_summary(record)} for record in records]}
+        return _summary(payload)
     except urllib.error.HTTPError as exc:
         status = exc.code if type(exc.code) is int and 100 <= exc.code <= 599 else None
         exc.close()
@@ -91,7 +108,8 @@ def invoke(opener, url, secret):
         raise release.inspect.ProbeFailure("diagnostic_invalid_response") from None
 
 
-def diagnose(environ, opener=None, run=subprocess.run, mask=None):
+def diagnose(environ, opener=None, run=subprocess.run, mask=None, mode="songpa-diagnose"):
+    release.require(mode in MODES, "invalid_diagnostic_mode")
     release.manual_context(environ, REF)
     token, team_id, project_id = release.inspect.credentials(environ)
     opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}), release.inspect.NoRedirects())
@@ -100,7 +118,7 @@ def diagnose(environ, opener=None, run=subprocess.run, mask=None):
     secret = secrets.token_hex(32)
     if mask:
         mask(secret)
-    report = {"mode": "songpa-diagnose", "ok": False, "previewCreated": False,
+    report = {"mode": mode, "ok": False, "previewCreated": False,
               "productionMutationsRequested": False, "productionPreserved": False, "serviceRecoveryVerified": False}
     try:
         url = deploy(environ, secret, run)
@@ -114,7 +132,7 @@ def diagnose(environ, opener=None, run=subprocess.run, mask=None):
         status, health, _ = release.read_json_response(opener, urllib.request.Request(url + "/health"), maximum=8192)
         release.require(status == 200 and health.get("ok") is True and health.get("mode") == "songpa-probe"
                         and health.get("region") == "icn1", "preview_health_or_access_failed")
-        report["diagnostic"] = invoke(opener, url, secret)
+        report["diagnostic"] = invoke(opener, url, secret, mode=mode)
         report["invocationRegion"] = "icn1"
     except release.inspect.ProbeFailure as exc:
         report["errorKind"] = exc.kind
@@ -137,12 +155,15 @@ def diagnose(environ, opener=None, run=subprocess.run, mask=None):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--mode", choices=MODES, default="songpa-diagnose")
+    args = parser.parse_args()
     try:
-        report = diagnose(os.environ, mask=lambda value: print("::add-mask::" + value, flush=True))
+        report = diagnose(os.environ, mode=args.mode, mask=lambda value: print("::add-mask::" + value, flush=True))
     except release.inspect.ProbeFailure as exc:
-        report = {"ok": False, "mode": "songpa-diagnose", "errorKind": exc.kind, "productionMutationsRequested": False}
+        report = {"ok": False, "mode": args.mode, "errorKind": exc.kind, "productionMutationsRequested": False}
     except Exception:
-        report = {"ok": False, "mode": "songpa-diagnose", "errorKind": "unexpected_error", "productionMutationsRequested": False}
+        report = {"ok": False, "mode": args.mode, "errorKind": "unexpected_error", "productionMutationsRequested": False}
     print(json.dumps(report, sort_keys=True))
     return 0 if report["ok"] else 1
 
